@@ -16,11 +16,16 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
@@ -44,7 +49,7 @@ import org.jspecify.annotations.Nullable;
  * gets off (vanilla's dismount). It comes off the Rail, dropping itself and its fuel, when the Span
  * it hangs from is cut.
  */
-public final class LocomotiveEntity extends VehicleEntity {
+public final class LocomotiveEntity extends VehicleEntity implements HasCustomInventoryScreen {
 
     public static final float WIDTH = 1.0F;
     public static final float HEIGHT = 2.0F;
@@ -66,8 +71,30 @@ public final class LocomotiveEntity extends VehicleEntity {
     private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
 
+    /** How a car's menu is opened for a player, given the car's id; replaceable for a connection that cannot carry the screen. */
+    @FunctionalInterface
+    public interface MenuOpening {
+        void open(ServerPlayer player, MenuProvider menu, int carId);
+    }
+
+    private static volatile MenuOpening menuOpening =
+            (player, menu, carId) -> player.openMenu(menu, buffer -> buffer.writeVarInt(carId));
+
+    public static void setMenuOpening(MenuOpening opening) {
+        menuOpening = opening;
+    }
+
     private @Nullable Locomotive model;
-    private ItemStack fuelItem = ItemStack.EMPTY;
+    /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
+    private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
+        @Override
+        public void setChanged() {
+            super.setChanged();
+            if (!level().isClientSide()) {
+                entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
+            }
+        }
+    };
 
     public LocomotiveEntity(EntityType<? extends LocomotiveEntity> type, Level level) {
         super(type, level);
@@ -173,12 +200,13 @@ public final class LocomotiveEntity extends VehicleEntity {
 
     /** Burns one fuel item from the slot whole and says what it was worth; 0 when there is none. */
     private long ignite() {
-        long joules = fuelValue(level(), fuelItem);
+        ItemStack fuel = cab.getItem(LocomotiveMenu.FUEL);
+        long joules = fuelValue(level(), fuel);
         if (joules <= 0L) {
             return 0L;
         }
-        var remainder = fuelItem.getCraftingRemainder();
-        fuelItem.shrink(1);
+        var remainder = fuel.getCraftingRemainder();
+        cab.removeItem(LocomotiveMenu.FUEL, 1);
         if (remainder != null && level() instanceof ServerLevel server) {
             spawnAtLocation(server, remainder.create());
         }
@@ -219,7 +247,7 @@ public final class LocomotiveEntity extends VehicleEntity {
         entityData.set(DATA_SPEED, (float) model.speed());
         entityData.set(DATA_FUEL, model.fuel().storedJoules());
         entityData.set(DATA_FUEL_CAPACITY, model.fuel().gaugeCapacity());
-        entityData.set(DATA_FUEL_ITEM, fuelItem.copy());
+        entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
     }
 
     // ---- using it ----
@@ -227,14 +255,22 @@ public final class LocomotiveEntity extends VehicleEntity {
     @Override
     public InteractionResult interact(Player player, InteractionHand hand, Vec3 location) {
         InteractionResult inherited = super.interact(player, hand, location);
-        if (inherited != InteractionResult.PASS || player.isSecondaryUseActive()) {
+        if (inherited != InteractionResult.PASS) {
             return inherited;
         }
-        ItemStack held = player.getItemInHand(hand);
-        // Fuel in hand fills the slot; fuel the slot cannot take (full, or another fuel) boards instead.
-        if (fuelValue(level(), held) > 0L && takesFuel(held)) {
+        // Sneaking at the car from outside opens its menu.
+        if (player.isSecondaryUseActive()) {
             if (!level().isClientSide()) {
-                fill(held);
+                openCustomInventoryScreen(player);
+            }
+            return InteractionResult.SUCCESS;
+        }
+        ItemStack held = player.getItemInHand(hand);
+        // Fuel in hand fills the slot as a shortcut; fuel the slot cannot take boards instead.
+        if (fuelValue(level(), held) > 0L && cab.canAddItem(held)) {
+            if (!level().isClientSide()) {
+                ItemStack left = cab.addItem(held.copy());
+                held.setCount(left.getCount());
             }
             return InteractionResult.SUCCESS;
         }
@@ -244,25 +280,13 @@ public final class LocomotiveEntity extends VehicleEntity {
         return InteractionResult.SUCCESS;
     }
 
-    private boolean takesFuel(ItemStack held) {
-        return fuelItem.isEmpty()
-                || ItemStack.isSameItemSameComponents(fuelItem, held) && fuelItem.getCount() < held.getMaxStackSize();
-    }
-
-    /** Moves as much of {@code held} into the fuel slot as fits, if it is the fuel already there or the slot is empty. */
-    private void fill(ItemStack held) {
-        int room = held.getMaxStackSize() - fuelItem.getCount();
-        int moved = Math.min(room, held.getCount());
-        if (moved <= 0) {
-            return;
+    /** The menu, from the inventory key while riding and from sneaking at the car. */
+    @Override
+    public void openCustomInventoryScreen(Player player) {
+        if (player instanceof ServerPlayer server) {
+            menuOpening.open(server, new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
+                    Component.translatable("entity.railworks.burner_locomotive")), getId());
         }
-        if (fuelItem.isEmpty()) {
-            fuelItem = held.copyWithCount(moved);
-        } else {
-            fuelItem.grow(moved);
-        }
-        held.shrink(moved);
-        entityData.set(DATA_FUEL_ITEM, fuelItem.copy());
     }
 
     @Override
@@ -305,9 +329,10 @@ public final class LocomotiveEntity extends VehicleEntity {
 
     @Override
     protected void destroy(ServerLevel level, DamageSource source) {
-        if (!fuelItem.isEmpty()) {
-            spawnAtLocation(level, fuelItem);
-            fuelItem = ItemStack.EMPTY;
+        for (int slot = 0; slot < cab.getContainerSize(); slot++) {
+            if (!cab.getItem(slot).isEmpty()) {
+                spawnAtLocation(level, cab.removeItemNoUpdate(slot));
+            }
         }
         super.destroy(level, source);
     }
@@ -341,16 +366,13 @@ public final class LocomotiveEntity extends VehicleEntity {
         if (model != null) {
             output.store("locomotive", Locomotive.CODEC, model);
         }
-        if (!fuelItem.isEmpty()) {
-            output.store("fuel_item", ItemStack.CODEC, fuelItem);
-        }
+        cab.storeAsItemList(output.list("cab", ItemStack.OPTIONAL_CODEC));
     }
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
         input.read("locomotive", Locomotive.CODEC).ifPresent(this::setLocomotive);
-        fuelItem = input.read("fuel_item", ItemStack.CODEC).orElse(ItemStack.EMPTY);
-        entityData.set(DATA_FUEL_ITEM, fuelItem.copy());
+        cab.fromItemList(input.listOrEmpty("cab", ItemStack.OPTIONAL_CODEC));
     }
 
     /** Which end the car faces, for the renderer: true when it is the Span's second end. */

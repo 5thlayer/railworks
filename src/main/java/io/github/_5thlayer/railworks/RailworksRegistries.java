@@ -9,6 +9,8 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.inventory.MenuType;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -25,6 +27,7 @@ public final class RailworksRegistries {
     private static final DeferredRegister.Entities ENTITIES = DeferredRegister.createEntities(Railworks.MOD_ID);
     private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, Railworks.MOD_ID);
+    private static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, Railworks.MOD_ID);
     private static final DeferredRegister<DataComponentType<?>> DATA_COMPONENTS =
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, Railworks.MOD_ID);
 
@@ -50,6 +53,10 @@ public final class RailworksRegistries {
                     .updateInterval(1)
                     .noSummon());
 
+    /** The Locomotive's menu, opened with the car's entity id. */
+    public static final DeferredHolder<MenuType<?>, MenuType<LocomotiveMenu>> LOCOMOTIVE_MENU =
+            MENUS.register("burner_locomotive", () -> IMenuTypeExtension.create(LocomotiveMenu::new));
+
     /** The first Arm of a Span that a Rail is holding, on the stack so it survives a relog and the client can see it. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> PENDING_SPAN =
             DATA_COMPONENTS.register("pending_span", () -> DataComponentType.<GlobalPos>builder()
@@ -64,6 +71,7 @@ public final class RailworksRegistries {
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
         ENTITIES.register(modBus);
+        MENUS.register(modBus);
         BLOCK_ENTITIES.register(modBus);
         DATA_COMPONENTS.register(modBus);
     }

@@ -9,6 +9,7 @@ import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.LocomotiveMenu;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
@@ -21,6 +22,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
@@ -49,6 +51,10 @@ final class LocomotiveTests {
     }
 
     static void register(RailworksGameTests.Registrar tests) {
+        // The tests' players have no client connection to carry the open-screen packet, so the menu
+        // is put straight in the player's hands, as the server side of opening it ends up.
+        LocomotiveEntity.setMenuOpening((player, menu, carId) ->
+                player.containerMenu = menu.createMenu(1, player.getInventory(), player));
         tests.test("locomotive_places_hanging_from_the_span_aimed_at", 20, LocomotiveTests::places);
         tests.test("locomotive_faces_the_way_the_player_looks_along_the_span", 20, LocomotiveTests::facesLookDirection);
         tests.test("locomotive_plan_matches_placement", 20, LocomotiveTests::planMatchesPlacement);
@@ -57,6 +63,10 @@ final class LocomotiveTests {
         tests.test("locomotive_plan_is_refused_on_a_span_another_holds", 20, LocomotiveTests::refusedTaken);
         tests.test("locomotive_fuel_goes_in_its_slot", 20, LocomotiveTests::fuelSlot);
         tests.test("locomotive_is_boarded_by_using_it_and_left_by_sneaking", 20, LocomotiveTests::boardsAndLeaves);
+        tests.test("locomotive_sneaking_at_the_car_opens_its_menu", 20, LocomotiveTests::sneakOpensMenu);
+        tests.test("locomotive_the_inventory_key_opens_the_menu_while_riding", 20, LocomotiveTests::inventoryKeyOpensMenu);
+        tests.test("locomotive_menu_slot_takes_fuel_and_gives_it_back", 20, LocomotiveTests::menuSlot);
+        tests.test("locomotive_menu_shift_click_moves_fuel_between_slot_and_inventory", 20, LocomotiveTests::menuShiftClick);
         tests.test("locomotive_is_driven_both_ways_by_forward_and_back", 20, LocomotiveTests::drivesBothWays);
         tests.test("locomotive_stops_at_a_lines_end", 20, LocomotiveTests::stopsAtLinesEnd);
         tests.test("locomotive_stops_when_its_fuel_runs_out", 20, LocomotiveTests::stopsWhenFuelRunsOut);
@@ -193,6 +203,100 @@ final class LocomotiveTests {
             helper.fail("the driver was set down in the air at " + player.getY(), STAND);
         }
         helper.succeed();
+    }
+
+    private static void sneakOpensMenu(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        player.setGameMode(GameType.SURVIVAL);
+        // Coal in hand would fill the slot; sneaking opens the menu all the same.
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL, 2));
+        player.setShiftKeyDown(true);
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        if (!(player.containerMenu instanceof LocomotiveMenu)) {
+            helper.fail("sneaking at the car did not open its menu, the player has " + player.containerMenu, STAND);
+        }
+        if (player.getVehicle() != null || !car.fuelItem().isEmpty()) {
+            helper.fail("sneaking at the car boarded it or filled its slot", STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void inventoryKeyOpensMenu(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        ServerPlayer driver = board(helper, car);
+        // The inventory key sends OPEN_INVENTORY, which the server answers for a vehicle like this.
+        if (!(driver.getVehicle() instanceof net.minecraft.world.entity.HasCustomInventoryScreen vehicle)) {
+            helper.fail("the car does not answer the inventory key", STAND);
+            return;
+        }
+        vehicle.openCustomInventoryScreen(driver);
+        if (!(driver.containerMenu instanceof LocomotiveMenu menu) || !menu.stillValid(driver)) {
+            helper.fail("the inventory key did not open a menu the driver can use", STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void menuSlot(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        player.setGameMode(GameType.SURVIVAL);
+        player.setShiftKeyDown(true);
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        LocomotiveMenu menu = (LocomotiveMenu) player.containerMenu;
+        // Only furnace fuel goes in.
+        menu.setCarried(new ItemStack(Items.APPLE, 3));
+        menu.clicked(LocomotiveMenu.FUEL, 0, ContainerInput.PICKUP, player);
+        if (!car.fuelItem().isEmpty() || menu.getCarried().getCount() != 3) {
+            helper.fail("the fuel slot took an apple", STAND);
+        }
+        menu.setCarried(new ItemStack(Items.COAL, 3));
+        menu.clicked(LocomotiveMenu.FUEL, 0, ContainerInput.PICKUP, player);
+        if (car.fuelItem().getCount() != 3 || !car.fuelItem().is(Items.COAL) || !menu.getCarried().isEmpty()) {
+            helper.fail("the fuel slot did not take the coal, it holds " + car.fuelItem(), STAND);
+        }
+        // And it comes back out.
+        menu.clicked(LocomotiveMenu.FUEL, 0, ContainerInput.PICKUP, player);
+        if (!car.fuelItem().isEmpty() || menu.getCarried().getCount() != 3) {
+            helper.fail("the coal did not come back out of the slot", STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void menuShiftClick(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        player.setGameMode(GameType.SURVIVAL);
+        player.setShiftKeyDown(true);
+        player.getInventory().setItem(9, new ItemStack(Items.COAL, 4));
+        player.getInventory().setItem(10, new ItemStack(Items.APPLE, 2));
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        LocomotiveMenu menu = (LocomotiveMenu) player.containerMenu;
+        int coal = slotOf(menu, player, 9);
+        int apple = slotOf(menu, player, 10);
+        menu.quickMoveStack(player, apple);
+        if (!car.fuelItem().isEmpty() || menu.getSlot(apple).getItem().getCount() != 2) {
+            helper.fail("shift-click moved an apple into the fuel slot", STAND);
+        }
+        menu.quickMoveStack(player, coal);
+        if (car.fuelItem().getCount() != 4 || !menu.getSlot(coal).getItem().isEmpty()) {
+            helper.fail("shift-click did not move the coal into the slot, it holds " + car.fuelItem(), STAND);
+        }
+        menu.quickMoveStack(player, LocomotiveMenu.FUEL);
+        if (!car.fuelItem().isEmpty() || player.getInventory().countItem(Items.COAL) != 4) {
+            helper.fail("shift-click did not move the coal back to the inventory", STAND);
+        }
+        helper.succeed();
+    }
+
+    /** The menu slot showing the player's inventory slot {@code inventorySlot}. */
+    private static int slotOf(LocomotiveMenu menu, ServerPlayer player, int inventorySlot) {
+        for (int i = 0; i < menu.slots.size(); i++) {
+            if (menu.getSlot(i).container == player.getInventory() && menu.getSlot(i).getContainerSlot() == inventorySlot) {
+                return i;
+            }
+        }
+        throw new IllegalStateException("no menu slot for inventory slot " + inventorySlot);
     }
 
     // ---- driving ----
