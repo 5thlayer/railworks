@@ -3,8 +3,10 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.List;
 import java.util.Optional;
 
+import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.AutoStringing;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.SpanRules;
@@ -27,11 +29,28 @@ public final class PlacedColumn {
      *         free Arm in reach, or too little Rail
      */
     public static Optional<AutoStringing.Choice> autoString(Level level, BlockPos pos, Player placer, RailNetwork network) {
-        if (placer.isSecondaryUseActive() || !PylonColumn.startsColumn(level, pos)) {
+        if (!strings(level, pos, placer)) {
             return Optional.empty();
         }
-        int reach = (int) Math.ceil(SpanRules.lengthLimit());
-        return AutoStringing.choose(network, PylonColumn.arm(pos), PylonColumn.armsNear(level, pos, reach),
-                RailPurse.count(placer));
+        return AutoStringing.choose(network, PylonColumn.arm(pos), armsInReach(level, pos), RailPurse.count(placer));
+    }
+
+    /**
+     * The Arm the column would have strung to but for the grade or bend limit, which the preview draws
+     * red, as {@link AutoStringing#refused} says.
+     */
+    public static Optional<Arm> refusedString(Level level, BlockPos pos, Player placer, RailNetwork network) {
+        if (!strings(level, pos, placer)) {
+            return Optional.empty();
+        }
+        return AutoStringing.refused(network, PylonColumn.arm(pos), armsInReach(level, pos), RailPurse.count(placer));
+    }
+
+    private static boolean strings(Level level, BlockPos pos, Player placer) {
+        return !placer.isSecondaryUseActive() && PylonColumn.startsColumn(level, pos);
+    }
+
+    private static List<Arm> armsInReach(Level level, BlockPos pos) {
+        return PylonColumn.armsNear(level, pos, (int) Math.ceil(SpanRules.lengthLimit()));
     }
 }

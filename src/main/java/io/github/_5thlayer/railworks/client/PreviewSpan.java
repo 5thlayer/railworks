@@ -8,6 +8,8 @@ import io.github._5thlayer.groundworks.client.PlacementPreviewEvent;
 import io.github._5thlayer.railworks.PylonBlock;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.PlacedColumn;
+import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
@@ -21,7 +23,8 @@ import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
  * The Span a held Pylon would string, drawn with its Placement Preview: the server's own
  * {@link PlacedColumn#autoString} asked of the previewed spot, answered entirely on the client from its
  * block entities, {@link ClientRails} and the player's inventory, so the preview cannot promise a Span
- * the placement will not make. Faded, like the Rail it promises.
+ * the placement will not make. Faded, like the Rail it promises; where the grade or bend limit refuses
+ * the Span it would have strung, that Span in red.
  */
 final class PreviewSpan {
 
@@ -41,16 +44,24 @@ final class PreviewSpan {
         ClientLevel level = event.getLevel();
         LocalPlayer player = event.getPlayer();
         var choice = PlacedColumn.autoString(level, pos, player, ClientRails.network());
-        if (choice.isEmpty()) {
+        if (choice.isPresent()) {
+            draw(event, pos, choice.get().target(), FADE, new float[] {SpanRenderer.R, SpanRenderer.G, SpanRenderer.B});
             return;
         }
+        // Nothing would string: the Span the grade or bend limit refused shows red, as the held Rail's slack does.
+        PlacedColumn.refusedString(level, pos, player, ClientRails.network())
+                .ifPresent(target -> draw(event, pos, target, 1.0F, SpanRenderer.colourOf(Stringing.Tint.REFUSED)));
+    }
+
+    private static void draw(PlacementPreviewEvent.Overlay event, BlockPos pos, Arm target, float fade, float[] colour) {
+        ClientLevel level = event.getLevel();
         SubmitCustomGeometryEvent geometry = event.getGeometry();
         Vec3 camera = geometry.getLevelRenderState().cameraRenderState.pos;
         Vec3 start = SpanRenderer.attachPoint(pos).subtract(camera);
-        Vec3 end = SpanRenderer.attachPoint(PylonColumn.block(choice.get().target())).subtract(camera);
+        Vec3 end = SpanRenderer.attachPoint(PylonColumn.block(target)).subtract(camera);
         int light = LightCoordsUtil.pack(level.getBrightness(LightLayer.BLOCK, pos), level.getBrightness(LightLayer.SKY, pos));
         geometry.getSubmitNodeCollector().submitCustomGeometry(geometry.getPoseStack(), RenderTypes.leash(),
-                (pose, buffer) -> SpanRenderer.drawSpan(pose.pose(), buffer, start, end, light, FADE,
-                        SpanRenderer.R, SpanRenderer.G, SpanRenderer.B));
+                (pose, buffer) -> SpanRenderer.drawSpan(pose.pose(), buffer, start, end, light, fade,
+                        colour[0], colour[1], colour[2]));
     }
 }
