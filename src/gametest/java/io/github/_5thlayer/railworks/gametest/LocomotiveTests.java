@@ -38,10 +38,10 @@ import net.minecraft.world.phys.Vec3;
  */
 final class LocomotiveTests {
 
-    /** Eight apart, four segments tall so the car clears the floor, with a Span strung between the tops. */
+    /** Eight apart, three segments tall so the car clears the floor and the test's roof is still free to stack under, with a Span strung between the tops. */
     private static final BlockPos A = new BlockPos(1, 1, 3);
     private static final BlockPos B = new BlockPos(9, 1, 3);
-    private static final int HEIGHT = 4;
+    private static final int HEIGHT = 3;
     /** Under the middle of the Span. */
     private static final BlockPos STAND = new BlockPos(5, 1, 3);
 
@@ -62,6 +62,7 @@ final class LocomotiveTests {
         tests.test("locomotive_stops_when_its_fuel_runs_out", 20, LocomotiveTests::stopsWhenFuelRunsOut);
         tests.test("locomotive_with_no_fuel_does_not_move_under_a_driver", 20, LocomotiveTests::noFuelNoMovement);
         tests.test("locomotive_comes_off_the_rail_when_its_span_is_cut", 20, LocomotiveTests::derails);
+        tests.test("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
         tests.test("locomotive_is_saved_with_its_place_speed_and_fuel", 20, LocomotiveTests::saves);
     }
 
@@ -281,6 +282,35 @@ final class LocomotiveTests {
         boolean coal = drops.stream().anyMatch(drop -> drop.getItem().is(Items.COAL));
         if (!locomotive || !coal) {
             helper.fail("a derailed car should drop itself and its fuel, dropped " + drops, STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void staysWhenStacked(GameTestHelper helper) {
+        LocomotiveEntity car = fuelled(helper);
+        double distance = car.locomotive().toFront() / car.locomotive().span().length();
+        ServerPlayer builder = helper.makeMockServerPlayerInLevel();
+        builder.setGameMode(GameType.SURVIVAL);
+        BlockPos stand = helper.absolutePos(STAND);
+        builder.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
+        builder.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.PYLON_ITEM.get()));
+        BlockPos base = helper.absolutePos(B);
+        // The structure's roof is a barrier layer just above the columns; clear it for the new segment.
+        helper.setBlock(B.above(HEIGHT), Blocks.AIR);
+        builder.gameMode.useItemOn(builder, helper.getLevel(), builder.getMainHandItem(), InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(base).relative(Direction.NORTH, 0.5), Direction.NORTH, base, false));
+        if (!helper.getBlockState(B.above(HEIGHT)).is(RailworksRegistries.PYLON.get())) {
+            helper.fail("the segment was not stacked on the column", B);
+        }
+        Span moved = Span.of(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))),
+                PylonColumn.arm(helper.absolutePos(B.above(HEIGHT))), 8);
+        car.tick();
+        if (car.isRemoved() || !car.holds(moved)) {
+            helper.fail("a car on a Span whose Arm moved should stay on it, removed=" + car.isRemoved(), STAND);
+        }
+        double now = car.locomotive().toFront() / car.locomotive().span().length();
+        if (Math.abs(now - distance) > 1e-6) {
+            helper.fail("the car moved along its Span from " + distance + " to " + now + " of the way", STAND);
         }
         helper.succeed();
     }

@@ -93,6 +93,15 @@ public final class LocomotiveEntity extends VehicleEntity {
         return !level.getEntitiesOfClass(LocomotiveEntity.class, around, car -> car.holds(span)).isEmpty();
     }
 
+    /** The Arm at {@code from} moved to {@code to} with its Spans: this car stays on its Span. */
+    public void armMoved(RailNetwork network, Arm from, Arm to) {
+        if (model != null) {
+            model.moveArm(network, from, to);
+            moveToModel();
+            syncFromModel();
+        }
+    }
+
     /** Whether this car hangs from {@code span}, as the client knows it from synched data. */
     public boolean holds(Span span) {
         BlockPos a = entityData.get(DATA_SPAN_A);

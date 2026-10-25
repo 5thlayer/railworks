@@ -226,4 +226,38 @@ class LocomotiveTest {
         assertEquals(loco.speed(), back.speed(), EPS);
         assertEquals(loco.fuel().storedJoules(), back.fuel().storedJoules());
     }
+
+    @Test
+    void aCarStaysOnItsSpanWhenTheArmItFacesMovesUp() {
+        Locomotive loco = Locomotive.on(network.get(A, B), B, 5.0);
+        Arm higher = new Arm(B.x(), B.y() + 1, B.z());
+        network.rekey(B, higher);
+        loco.moveArm(network, B, higher);
+        assertEquals(network.get(A, higher), loco.span());
+        assertEquals(higher, loco.front());
+        // A quarter of the way from the front, as it was.
+        assertEquals(0.25 * network.get(A, higher).length(), loco.toFront(), EPS);
+        assertTrue(loco.onRail(network));
+    }
+
+    @Test
+    void aCarStaysOnItsSpanWhenTheArmBehindItMovesUp() {
+        Locomotive loco = Locomotive.on(network.get(A, B), A, 5.0);
+        Arm higher = new Arm(B.x(), B.y() + 1, B.z());
+        network.rekey(B, higher);
+        loco.moveArm(network, B, higher);
+        assertEquals(A, loco.front(), "it still faces the Arm that did not move");
+        assertEquals(network.get(A, higher), loco.span());
+        assertEquals(0.25 * network.get(A, higher).length(), loco.toFront(), EPS);
+    }
+
+    @Test
+    void anArmMovingElsewhereLeavesTheCarAlone() {
+        Locomotive loco = Locomotive.on(network.get(A, B), B, 5.0);
+        Arm higher = new Arm(C.x(), C.y() + 1, C.z());
+        network.rekey(C, higher);
+        loco.moveArm(network, C, higher);
+        assertEquals(network.get(A, B), loco.span());
+        assertEquals(5.0, loco.toFront(), EPS);
+    }
 }

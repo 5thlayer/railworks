@@ -89,6 +89,25 @@ public final class Locomotive {
         return network.contains(span.a(), span.b());
     }
 
+    /**
+     * The Arm at {@code from} has moved to {@code to}, {@code network} already holding its Spans
+     * there: a car on one of them stays on it, the same fraction of the way along, rather than
+     * losing the Rail it was on.
+     */
+    public void moveArm(RailNetwork network, Arm from, Arm to) {
+        if (!span.touches(from)) {
+            return;
+        }
+        Span moved = network.get(to, span.otherEnd(from));
+        if (moved == null) {
+            return;
+        }
+        double fraction = toFront / span.length();
+        front = front.equals(from) ? to : front;
+        span = moved;
+        toFront = fraction * moved.length();
+    }
+
     /** Where it is, in Arm coordinates: along the Span, {@code toFront} short of its front. */
     public Point point() {
         Arm back = span.otherEnd(front);

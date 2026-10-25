@@ -13,6 +13,7 @@ import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -25,6 +26,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
@@ -93,7 +95,13 @@ public final class LevelRails extends SavedData {
         }
         Arm from = PylonColumn.arm(below);
         List<Span> moving = network.spansAt(from);
-        network.rekey(from, PylonColumn.arm(pos));
+        Arm to = PylonColumn.arm(pos);
+        network.rekey(from, to);
+        // A car hanging from one of those Spans stays on it, its Arm now one segment higher.
+        AABB around = new AABB(PylonColumn.block(from)).inflate(SpanRules.lengthLimit() + LocomotiveEntity.HEIGHT + 1.0);
+        for (LocomotiveEntity car : level.getEntitiesOfClass(LocomotiveEntity.class, around)) {
+            car.armMoved(network, from, to);
+        }
         if (!moving.isEmpty()) {
             changed(level, moving.stream().flatMap(s -> Stream.of(s.a(), s.b())).toArray(Arm[]::new));
         }
