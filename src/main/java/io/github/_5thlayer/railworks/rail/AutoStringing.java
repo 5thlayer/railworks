@@ -35,7 +35,7 @@ public final class AutoStringing {
                 .filter(arm -> !arm.equals(placed))
                 // The click's own rule decides each candidate, so a refusal added there applies here too.
                 .filter(arm -> Stringing.decide(network, placed, arm, railHeld).result() == Stringing.Result.STRUNG)
-                .min(Comparator.comparingLong((Arm arm) -> placed.distanceSquaredTo(arm)).thenComparing(Comparator.naturalOrder()))
+                .min(nearestTo(placed))
                 .map(arm -> new Choice(arm, SpanRules.cost(placed, arm)));
     }
 
@@ -54,6 +54,11 @@ public final class AutoStringing {
                     Stringing.Result result = Stringing.decide(network, placed, arm, railHeld).result();
                     return result == Stringing.Result.TOO_STEEP || result == Stringing.Result.TOO_SHARP;
                 })
-                .min(Comparator.comparingLong((Arm arm) -> placed.distanceSquaredTo(arm)).thenComparing(Comparator.naturalOrder()));
+                .min(nearestTo(placed));
+    }
+
+    /** Nearest first, ties broken by position so the server and the preview pick the same Arm. */
+    private static Comparator<Arm> nearestTo(Arm placed) {
+        return Comparator.comparingLong((Arm arm) -> placed.distanceSquaredTo(arm)).thenComparing(Comparator.naturalOrder());
     }
 }

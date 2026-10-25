@@ -12,8 +12,9 @@ import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, and the Burner Locomotive's drive and fuel. A server
- * config, so the client measures the same limit the server strings by.
+ * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, and the Burner
+ * Locomotive's drive and fuel. A server config, so the client measures the same limits the server
+ * strings by.
  */
 public final class RailworksConfig {
 

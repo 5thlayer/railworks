@@ -85,7 +85,11 @@ public final class Stringing {
         return new Outcome(Result.STRUNG, cost);
     }
 
-    /** Whether a new Span from {@code at} to {@code to} bends too sharply against any Span already at {@code at}. */
+    /**
+     * Whether a new Span from {@code at} to {@code to} bends too sharply against any Span already at
+     * {@code at}. Any, since an Arm takes two Spans and so one line; a Junction's branch leaving beside
+     * its sibling would only need to run on from one of them, judged by the same {@link SpanRules#tooSharp}.
+     */
     private static boolean bendsTooSharply(RailNetwork network, Arm at, Arm to) {
         for (Span span : network.spansAt(at)) {
             if (SpanRules.tooSharp(span.otherEnd(at), at, to)) {
@@ -108,11 +112,14 @@ public final class Stringing {
         if (target == null) {
             return Tint.HELD;
         }
-        return switch (decide(network, anchor, target, railHeld).result()) {
-            case CANCELLED -> Tint.HELD;
+        Result result = decide(network, anchor, target, railHeld).result();
+        if (refused(result)) {
+            return Tint.REFUSED;
+        }
+        return switch (result) {
             case STRUNG -> Tint.STRING;
             case CUT -> Tint.CUT;
-            case TOO_LONG, TOO_STEEP, TOO_SHARP, ARM_FULL, SHORT_OF_RAIL -> Tint.REFUSED;
+            default -> Tint.HELD;
         };
     }
 
