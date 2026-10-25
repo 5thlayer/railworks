@@ -129,6 +129,21 @@ public final class SpanRules {
     }
 
     /**
+     * Whether a Train runs straight on from {@code from} through {@code at} to {@code to}, without the
+     * least {@link #bend}: exact, as Arms are whole blocks. Running back the way it came is a bend.
+     */
+    public static boolean inLine(Arm from, Arm at, Arm to) {
+        long ix = (long) at.x() - from.x();
+        long iy = (long) at.y() - from.y();
+        long iz = (long) at.z() - from.z();
+        long ox = (long) to.x() - at.x();
+        long oy = (long) to.y() - at.y();
+        long oz = (long) to.z() - at.z();
+        boolean parallel = iy * oz == iz * oy && iz * ox == ix * oz && ix * oy == iy * ox;
+        return parallel && ix * ox + iy * oy + iz * oz > 0;
+    }
+
+    /**
      * Whether two Spans meeting at {@code at}, from there to {@code one} and to {@code other}, bend
      * through it more sharply than the limit: whether a Train could not run from one onto the other.
      * Either order gives the same answer.

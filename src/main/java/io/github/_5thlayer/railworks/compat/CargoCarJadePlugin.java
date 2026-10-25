@@ -51,6 +51,9 @@ public class CargoCarJadePlugin implements IWailaPlugin {
         public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
             if (accessor.getEntity() instanceof CargoCarEntity car && car.atStation()) {
                 tooltip.add(Component.translatable("tooltip.railworks.cargo_car.jade.station", car.stationName()));
+                if (!car.loading()) {
+                    tooltip.add(Component.translatable("tooltip.railworks.cargo_car.jade.not_straight"));
+                }
             }
         }
 

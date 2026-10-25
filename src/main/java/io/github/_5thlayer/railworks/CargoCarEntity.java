@@ -100,7 +100,12 @@ public final class CargoCarEntity extends CarEntity {
      * diagonal, or on a client.
      */
     public @Nullable ResourceHandler<ItemResource> automation() {
-        return !stoppedAt().isEmpty() && onStraightLeg() ? handler : null;
+        return loads(stoppedAt()) ? handler : null;
+    }
+
+    /** Whether it loads, its Train stopped at the Stations {@code at}: at one, on a Straight leg. */
+    private boolean loads(List<Station> at) {
+        return !at.isEmpty() && onStraightLeg();
     }
 
     /** Whether it stands wholly on a straight leg square to the blocks, on the server: where it loads. */
@@ -160,8 +165,8 @@ public final class CargoCarEntity extends CarEntity {
 
     /**
      * Sets a hopper in the filling spot on the player's side, pointing at the car, while its Train is
-     * stopped at a Station and the car stands on a straight leg: the spots are where it stands, so a
-     * hopper set while it passes, or where it does not load, would load nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
+     * stopped at a Station and the car stands on a Straight leg: the spots are where it stands, so
+     * a hopper set while it passes, or where it does not load, would load nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
      */
     private void placeHopper(Player player, InteractionHand hand) {
         if (stoppedAt().isEmpty()) {
@@ -198,7 +203,7 @@ public final class CargoCarEntity extends CarEntity {
     protected void syncCar(Car car) {
         List<Station> at = stoppedAt();
         entityData.set(DATA_STATION, at.isEmpty() ? "" : at.getFirst().name());
-        entityData.set(DATA_LOADING, !at.isEmpty() && onStraightLeg());
+        entityData.set(DATA_LOADING, loads(at));
     }
 
     @Override

@@ -30,6 +30,7 @@
   "message.railworks.station_in_clearance": "A Station there would be in the way of a passing car",
   "tooltip.railworks.station.jade.name": "Name: %s",
   "tooltip.railworks.station.jade.off_rail": "By no Rail",
-  "tooltip.railworks.station.jade.not_straight": "Not a straight leg: a Cargo car by it won't load",
-  "tooltip.railworks.cargo_car.jade.station": "At Station %s"
+  "tooltip.railworks.station.jade.not_straight": "The Rail here bends or runs diagonally: a Cargo car standing here won't load",
+  "tooltip.railworks.cargo_car.jade.station": "At Station %s",
+  "tooltip.railworks.cargo_car.jade.not_straight": "Not loading: not on a straight leg of Rail"
 }

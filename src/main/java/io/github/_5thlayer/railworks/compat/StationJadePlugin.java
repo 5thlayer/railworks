@@ -7,8 +7,6 @@ import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.StationBlock;
 import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.client.ClientRails;
-import io.github._5thlayer.railworks.rail.CargoCar;
-import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.StraightLeg;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -22,7 +20,7 @@ import snownee.jade.api.config.IPluginConfig;
 
 /**
  * A Station in Jade: its name and, when no Span is in reach of it, that it serves no Rail, or when
- * its stretch of Rail is not a straight leg, that a Cargo car by it will not load. The name
+ * its stretch of Rail is not a straight leg, that a Cargo car standing by it will not load, though cars of the same Train elsewhere may. The name
  * is the block entity's, which the server sends the client, and the Span is asked of the client's
  * Spans, so no server data provider is needed. Found by Jade's annotation scan and named nowhere
  * else, so Jade stays a soft dependency.
@@ -49,8 +47,7 @@ public class StationJadePlugin implements IWailaPlugin {
             var foot = station.station().foot(network);
             if (foot.isEmpty()) {
                 tooltip.add(Component.translatable("tooltip.railworks.station.jade.off_rail"));
-            } else if (!StraightLeg.under(network, foot.get().place(), 2.0 * Station.STRETCH + CargoCar.LENGTH)) {
-                // Its stretch, and a Cargo car's body over either end of it.
+            } else if (!StraightLeg.at(network, station.station())) {
                 tooltip.add(Component.translatable("tooltip.railworks.station.jade.not_straight"));
             }
         }

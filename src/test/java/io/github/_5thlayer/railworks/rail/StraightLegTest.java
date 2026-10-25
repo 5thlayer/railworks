@@ -6,6 +6,8 @@ package io.github._5thlayer.railworks.rail;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 /** Where Rail is a straight leg, square to the blocks, so a Cargo car loads there. */
@@ -80,13 +82,24 @@ class StraightLegTest {
     @Test
     void aBodyAcrossAnArmNeedsBothSpansStraight() {
         Span ab = string(A, B);
-        Span on = string(B, IN_LINE);
+        string(B, IN_LINE);
         assertTrue(StraightLeg.under(network, along(ab, 9.5), 1.8));
         network.remove(B, IN_LINE);
         string(B, OFF_LINE);
         assertFalse(StraightLeg.under(network, along(ab, 9.5), 1.8));
         assertFalse(StraightLeg.under(network, along(ab, 2.0), 1.8));
-        assertTrue(on.length() > 0.0);
+    }
+
+    @Test
+    void aBodyStoppedAtALinesEndIsAskedOnlyOfTheRailUnderIt() {
+        // A to B bends at A; B on to a line's end a block further is straight.
+        string(A, B);
+        string(A, new Arm(0, 5, 6));
+        Arm end = new Arm(11, 5, 0);
+        Span last = string(B, end);
+        // A car stopped with its centre at the line's end reaches 0.9 back, all on the last Span.
+        assertTrue(StraightLeg.under(network, new Place(last, end, 0.0), 1.8));
+        assertFalse(StraightLeg.under(network, new Place(last, end, 0.0), 2.4));
     }
 
     @Test
@@ -96,7 +109,7 @@ class StraightLegTest {
         Span bent = string(B, IN_LINE);
         string(IN_LINE, OFF_LINE);
         // The Locomotive just past B, on the bent Span; its Cargo car behind it, wholly before B.
-        Train train = Train.of(along(bent, 0.5), java.util.List.of(Locomotive.burner(), CargoCar.create()));
+        Train train = Train.of(along(bent, 0.5), List.of(Locomotive.burner(), CargoCar.create()));
         assertFalse(StraightLeg.under(network, train, train.cars().getFirst()));
         assertTrue(StraightLeg.under(network, train, train.cars().getLast()));
     }
