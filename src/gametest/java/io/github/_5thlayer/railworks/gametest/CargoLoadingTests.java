@@ -16,6 +16,7 @@ import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
@@ -46,8 +47,11 @@ final class CargoLoadingTests {
 
     /** Beside the Rail a block down, by the coupled Cargo car. */
     private static final BlockPos LOADING = new BlockPos(5, 1, 2);
-    /** Beside the Rail a block down, by where the Cargo car stops at the line's end. */
-    private static final BlockPos UNLOADING = new BlockPos(7, 1, 2);
+    /**
+     * Beside the second Pylon a block down, by where the Locomotive stops at the line's end and by no
+     * car of the Train where it starts.
+     */
+    private static final BlockPos UNLOADING = new BlockPos(9, 1, 2);
     /** Beside the Rail a block down, by the Locomotive and not by the Cargo cars behind it. */
     private static final BlockPos BY_LOCOMOTIVE = new BlockPos(7, 1, 2);
     /** Beside the Rail far from the Cargo car. */
@@ -210,9 +214,13 @@ final class CargoLoadingTests {
                 .thenExecute(() -> {
                     var network = LevelRails.of(helper.getLevel()).network();
                     var train = second.train();
+                    var stations = LevelStations.of(helper.getLevel()).stations();
                     if (train != locomotive.train() || train.cars().size() != 3 || train.cars().getLast() != second.car()
-                            || !LevelStations.of(helper.getLevel()).stations().at(network, train.placeOf(network, second.car())).isEmpty()) {
-                        helper.fail("expected a Locomotive and two Cargo cars, the last away from the Station: " + train, BY_LOCOMOTIVE);
+                            || stations.at(network, train.placeOf(network, locomotive.car())).isEmpty()
+                            || !stations.at(network, train.placeOf(network, first.car())).isEmpty()
+                            || !stations.at(network, train.placeOf(network, second.car())).isEmpty()) {
+                        helper.fail("expected a Locomotive by the Station and two Cargo cars behind it, neither by it: " + train,
+                                BY_LOCOMOTIVE);
                     }
                     ServerPlayer namer = helper.makeMockServerPlayerInLevel();
                     BlockPos stand = helper.absolutePos(LocomotiveTests.STAND);
@@ -254,11 +262,11 @@ final class CargoLoadingTests {
         LocomotiveTests.use(helper, CargoCarTests.cargoPlayer(helper, car, -1));
         var train = car.train();
         if (train == null || train.cars().getLast() == car.car()) {
-            throw helper.assertionException(BY_LOCOMOTIVE, net.minecraft.network.chat.Component.literal(
+            throw helper.assertionException(BY_LOCOMOTIVE, Component.literal(
                     "a second Cargo car did not couple behind the first: " + train));
         }
         if (!(LevelRails.of(helper.getLevel()).view(train.cars().getLast()) instanceof CargoCarEntity coupled)) {
-            throw helper.assertionException(BY_LOCOMOTIVE, net.minecraft.network.chat.Component.literal(
+            throw helper.assertionException(BY_LOCOMOTIVE, Component.literal(
                     "the car coupled behind is not a Cargo car"));
         }
         return coupled;

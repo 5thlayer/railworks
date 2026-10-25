@@ -26,8 +26,8 @@ import snownee.jade.api.view.ViewGroup;
 /**
  * A Cargo car in Jade: its contents, through Jade's own item storage view, as a chest's, the server
  * reading the car's cargo and Jade drawing it; and the Station its Train is stopped at, from the
- * entity's synched data, so that needs no server data provider. Found by Jade's annotation scan and named nowhere else, so
- * Jade stays a soft dependency.
+ * entity's synched data, so that needs no server data provider. Found by Jade's annotation scan and
+ * named nowhere else, so Jade stays a soft dependency.
  */
 @WailaPlugin
 public class CargoCarJadePlugin implements IWailaPlugin {

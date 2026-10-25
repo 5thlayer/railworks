@@ -65,6 +65,7 @@ public final class Stations {
         if (!train.atRest()) {
             return List.of();
         }
+        // Each Station once, in the order placed, however many cars are by it.
         List<Place> places = train.cars().stream().map(car -> train.placeOf(network, car)).toList();
         return stations.values().stream()
                 .filter(station -> places.stream().anyMatch(place -> station.serves(network, place)))
