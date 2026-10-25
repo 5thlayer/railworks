@@ -127,26 +127,21 @@ public final class RailCurve {
         return (lo + within) / SAMPLES;
     }
 
+    /** Where the curve is at Hermite parameter {@code s}. */
     private double[] evaluate(double s) {
         double s2 = s * s;
         double s3 = s2 * s;
-        double h00 = 2 * s3 - 3 * s2 + 1;
-        double h10 = s3 - 2 * s2 + s;
-        double h01 = -2 * s3 + 3 * s2;
-        double h11 = s3 - s2;
-        return new double[] {
-                h00 * ax + h10 * m0[0] + h01 * bx + h11 * m1[0],
-                h00 * ay + h10 * m0[1] + h01 * by + h11 * m1[1],
-                h00 * az + h10 * m0[2] + h01 * bz + h11 * m1[2]
-        };
+        return combine(2 * s3 - 3 * s2 + 1, s3 - 2 * s2 + s, -2 * s3 + 3 * s2, s3 - s2);
     }
 
+    /** Which way, and how fast, the curve runs at Hermite parameter {@code s}. */
     private double[] derivative(double s) {
         double s2 = s * s;
-        double h00 = 6 * s2 - 6 * s;
-        double h10 = 3 * s2 - 4 * s + 1;
-        double h01 = -6 * s2 + 6 * s;
-        double h11 = 3 * s2 - 2 * s;
+        return combine(6 * s2 - 6 * s, 3 * s2 - 4 * s + 1, -6 * s2 + 6 * s, 3 * s2 - 2 * s);
+    }
+
+    /** The ends and their tangents, weighted by the four Hermite basis functions. */
+    private double[] combine(double h00, double h10, double h01, double h11) {
         return new double[] {
                 h00 * ax + h10 * m0[0] + h01 * bx + h11 * m1[0],
                 h00 * ay + h10 * m0[1] + h01 * by + h11 * m1[1],

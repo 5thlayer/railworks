@@ -4,9 +4,9 @@
 package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
-import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.RailCurve;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
@@ -78,10 +78,8 @@ public final class CarPlacement {
             return refused(PlacementPlan.refused(aimedBlock, state, RailworksRefusal.OFF_SPAN));
         }
         Span span = aim.get().span();
-        boolean facesB = facesSecond(span, look);
-        Arm front = facesB ? span.b() : span.a();
-        double toFront = facesB ? span.length() - aim.get().fromA() : aim.get().fromA();
-        Place aimed = new Place(span, front, toFront);
+        Place towardB = new Place(span, span.b(), span.length() - aim.get().fromA());
+        Place aimed = looksAlong(network, towardB, look) ? towardB : towardB.turned();
         Car car = kind.create();
         Coupling coupling = level instanceof ServerLevel server
                 ? serverCoupling(server, network, aimed, car)
@@ -100,7 +98,7 @@ public final class CarPlacement {
             return new Result(car, Train.of(aimed, car), null, false, PlacementPlan.accepted(at, state));
         }
         // The car faces the way the player looks along the Rail, which may be against the Train.
-        boolean reversed = facesSecond(place.span(), look) != place.front().equals(place.span().b());
+        boolean reversed = !looksAlong(network, place, look);
         return new Result(car, null, coupling.slot(), reversed, PlacementPlan.accepted(at, state));
     }
 
@@ -108,10 +106,13 @@ public final class CarPlacement {
         return new Result(null, null, null, false, plan);
     }
 
-    /** Whether {@code look} runs toward the Span's second end. The whole vector: a steep Span has almost no horizontal run. */
-    private static boolean facesSecond(Span span, Vec3 look) {
-        return (span.b().x() - span.a().x()) * look.x + (span.b().y() - span.a().y()) * look.y
-                + (span.b().z() - span.a().z()) * look.z >= 0.0;
+    /**
+     * Whether {@code look} runs the way the curve at {@code place} heads, toward its front. The whole
+     * vector: a steep Span has almost no horizontal run.
+     */
+    private static boolean looksAlong(RailNetwork network, Place place, Vec3 look) {
+        RailCurve.Pose pose = place.pose(network);
+        return pose.dx() * look.x + pose.dy() * look.y + pose.dz() * look.z >= 0.0;
     }
 
     /**
