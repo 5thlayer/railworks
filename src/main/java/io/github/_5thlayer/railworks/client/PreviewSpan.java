@@ -7,9 +7,7 @@ import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.client.PlacementPreviewEvent;
 import io.github._5thlayer.railworks.PylonBlock;
 import io.github._5thlayer.railworks.PylonColumn;
-import io.github._5thlayer.railworks.RailPurse;
-import io.github._5thlayer.railworks.rail.AutoStringing;
-import io.github._5thlayer.railworks.rail.SpanRules;
+import io.github._5thlayer.railworks.PlacedColumn;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
@@ -21,7 +19,7 @@ import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 
 /**
  * The Span a held Pylon would string, drawn with its Placement Preview: the server's own
- * {@link AutoStringing#choose} asked of the previewed spot, answered entirely on the client from its
+ * {@link PlacedColumn#autoString} asked of the previewed spot, answered entirely on the client from its
  * block entities, {@link ClientRails} and the player's inventory, so the preview cannot promise a Span
  * the placement will not make. Faded, like the Rail it promises.
  */
@@ -42,13 +40,7 @@ final class PreviewSpan {
         BlockPos pos = plan.blocks().getFirst().pos();
         ClientLevel level = event.getLevel();
         LocalPlayer player = event.getPlayer();
-        // Stacking onto a column never strings, and neither does a sneaking placer.
-        if (player.isSecondaryUseActive() || !PylonColumn.startsColumn(level, pos)) {
-            return;
-        }
-        int reach = (int) Math.ceil(SpanRules.lengthLimit());
-        var choice = AutoStringing.choose(ClientRails.network(), PylonColumn.arm(pos),
-                PylonColumn.armsNear(level, pos, reach), RailPurse.count(player));
+        var choice = PlacedColumn.autoString(level, pos, player, ClientRails.network());
         if (choice.isEmpty()) {
             return;
         }
