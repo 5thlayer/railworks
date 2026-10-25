@@ -4,3 +4,4 @@ Written for Consumers: what a mod building against Railworks can use, or will se
 
 ## Unreleased
 - Pylons and Rail: a Pylon crafts from iron and stacks into a column, one Pylon a segment, its Arm on the top segment. Using Rail on one Arm and then another strings a Span costing `ceil(length)` Rail, up to 32 blocks (`spanLengthLimit` in `railworks-server.toml`), at most two to an Arm. Repeating it cuts the Span; breaking a Pylon cuts its Spans, and either refunds the Rail. Spans are saved with the level and a client is sent those in the chunks it loads.
+- The Pylon shows Groundworks' Placement Preview, including the segment it would stack onto a column.

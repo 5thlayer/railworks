@@ -65,6 +65,7 @@ public final class RailworksGameTests {
         GameTestPackTests.register(tests);
         CreativeTabTests.register(tests);
         SpanTests.register(tests);
+        PylonPlanTests.register(tests);
     }
 
     private static Identifier id(String path) {
