@@ -68,6 +68,7 @@ final class LocomotiveTests {
         tests.test("locomotive_menu_slot_takes_fuel_and_gives_it_back", 20, LocomotiveTests::menuSlot);
         tests.test("locomotive_menu_shift_click_moves_fuel_between_slot_and_inventory", 20, LocomotiveTests::menuShiftClick);
         tests.test("locomotive_is_driven_both_ways_by_forward_and_back", 20, LocomotiveTests::drivesBothWays);
+        tests.test("locomotive_carries_its_rider_with_it_and_is_driven_by_the_server", 20, LocomotiveTests::carriesRider);
         tests.test("locomotive_stops_at_a_lines_end", 20, LocomotiveTests::stopsAtLinesEnd);
         tests.test("locomotive_stops_when_its_fuel_runs_out", 20, LocomotiveTests::stopsWhenFuelRunsOut);
         tests.test("locomotive_with_no_fuel_does_not_move_under_a_driver", 20, LocomotiveTests::noFuelNoMovement);
@@ -320,6 +321,30 @@ final class LocomotiveTests {
         run(car, 5);
         if (car.getX() >= before) {
             helper.fail("a reversing car did not move back", STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void carriesRider(GameTestHelper helper) {
+        LocomotiveEntity car = fuelled(helper);
+        ServerPlayer driver = board(helper, car);
+        // A controlling passenger would make the car client-authoritative: the client would then drop
+        // the server's positions for it, and the rider would not move until they got off.
+        if (car.getControllingPassenger() != null) {
+            helper.fail("the car has a controlling passenger, so a client would not follow the server's positions", STAND);
+        }
+        press(driver, true, false);
+        double start = car.getX();
+        for (int tick = 0; tick < 25; tick++) {
+            car.tick();
+            driver.rideTick();
+            if (Math.abs(driver.getX() - car.getX()) > 0.01 || Math.abs(driver.getZ() - car.getZ()) > 0.01) {
+                helper.fail("on tick " + tick + " the rider is at " + driver.getX() + ", " + driver.getZ()
+                        + " but the car is at " + car.getX() + ", " + car.getZ(), STAND);
+            }
+        }
+        if (car.getX() - start < 0.1) {
+            helper.fail("the car did not move, so the rider's following proved nothing", STAND);
         }
         helper.succeed();
     }

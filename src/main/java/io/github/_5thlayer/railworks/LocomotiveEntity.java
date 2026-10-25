@@ -71,7 +71,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
 
-    /** How a car's menu is opened for a player, given the car's id; replaceable for a connection that cannot carry the screen. */
+    /** How a car's menu is opened for a player, given the car's id; the default sends the screen to the player's client. */
     @FunctionalInterface
     public interface MenuOpening {
         void open(ServerPlayer player, MenuProvider menu, int carId);
@@ -189,7 +189,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     }
 
     private Throttle throttle() {
-        if (getControllingPassenger() instanceof ServerPlayer driver) {
+        if (getFirstPassenger() instanceof ServerPlayer driver) {
             Input input = driver.getLastClientInput();
             if (input.forward() != input.backward()) {
                 return input.forward() ? Throttle.FORWARD : Throttle.BACK;
@@ -304,10 +304,9 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         return getPassengers().isEmpty();
     }
 
-    @Override
-    public @Nullable LivingEntity getControllingPassenger() {
-        return getFirstPassenger() instanceof LivingEntity driver ? driver : super.getControllingPassenger();
-    }
+    // No getControllingPassenger: the server drives the car, and a controlling passenger would make
+    // it client-authoritative, so the client would drop the server's positions for it and the rider
+    // would not move until they got off.
 
     /** Off the car onto the first floor below it, since it hangs well above the ground. */
     @Override
