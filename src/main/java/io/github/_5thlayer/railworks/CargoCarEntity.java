@@ -5,8 +5,12 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.HopperSpots;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
@@ -28,7 +32,8 @@ import org.jspecify.annotations.Nullable;
  * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
  * which its menu, vanilla's three-row chest, shows. It is not a {@link Container} itself, so a hopper
  * cannot reach into it wherever it is: only while it is stopped at a Station does it give hoppers,
- * feeders and pipes its cargo, through {@link #automation()}. Boarding and the rest are
+ * feeders and pipes its cargo, through {@link #automation()}, and a client sees that it is, to draw
+ * its {@link #hopperSpots()}. Boarding and the rest are
  * {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {
@@ -45,6 +50,10 @@ public final class CargoCarEntity extends CarEntity {
             return isAlive() && (hasPassenger(player) || player.distanceToSqr(CargoCarEntity.this) < REACH * REACH);
         }
     };
+
+    /** Whether it is stopped at a Station, which a client sees to draw where hoppers go. */
+    private static final EntityDataAccessor<Boolean> DATA_AT_STATION =
+            SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -76,6 +85,27 @@ public final class CargoCarEntity extends CarEntity {
         boolean stopped = !LevelStations.of(server).stations()
                 .stoppedAt(LevelRails.of(server).network(), train, car).isEmpty();
         return stopped ? handler : null;
+    }
+
+    /** Whether it is stopped at a Station, as the server last synced it: what the overlay draws by. */
+    public boolean atStation() {
+        return entityData.get(DATA_AT_STATION);
+    }
+
+    /** Where a hopper loads it and where one unloads it, from its box where it stands. */
+    public HopperSpots hopperSpots() {
+        return HopperSpots.of(getX(), getBoundingBox().minY, getZ(), getBbHeight());
+    }
+
+    @Override
+    protected void syncCar(Car car) {
+        entityData.set(DATA_AT_STATION, automation() != null);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder entityData) {
+        super.defineSynchedData(entityData);
+        entityData.define(DATA_AT_STATION, false);
     }
 
     /** The menu, from the inventory key while riding and from sneaking at the car. */
