@@ -1,9 +1,7 @@
 pluginManagement {
-    // The convention plugin a Module applies (ADR 0003): built here from plugin/, which
-    // fill-template.sh swaps for the released one in ~/.m2.
-    includeBuild 'plugin'
     repositories {
         maven { url = 'https://maven.neoforged.net/releases' }
+        mavenLocal()
         gradlePluginPortal()
     }
 }
@@ -12,7 +10,5 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
-rootProject.name = 'examplelib'
+rootProject.name = 'railworks'
 
-// The runtime jar other Modules nest (ADR-0128); fill-template.sh removes it from a Module.
-include 'runtime'

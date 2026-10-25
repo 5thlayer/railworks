@@ -12,9 +12,6 @@ path = [
     ".claude/settings.json",
     ".gitmodules",
     "**/*.mods.toml",
-    "scripts/*.py",
-    "scripts/*.sh",
-    "plugin/src/main/resources/**/scripts/*",
     "**/*.md",
     "**/src/main/resources/**/*.json",
     "**/src/gametest/resources/**/*.json",
@@ -41,14 +38,14 @@ SPDX-License-Identifier = "MIT"
 # [[annotations]]
 # path = [
 #     "data/art/*.png",
-#     "src/main/resources/assets/examplelib/textures/block/plating/*.png",
+#     "src/main/resources/assets/railworks/textures/block/plating/*.png",
 # ]
 # precedence = "override"
 # SPDX-FileCopyrightText = "Malcolm Riley"
 # SPDX-License-Identifier = "CC-BY-4.0"
 #
 # [[annotations]]
-# path = ["src/main/resources/assets/examplelib/textures/block/machine/front.png"]
+# path = ["src/main/resources/assets/railworks/textures/block/machine/front.png"]
 # precedence = "override"
 # SPDX-FileCopyrightText = ["Malcolm Riley", "2026 5thlayer"]
 # SPDX-License-Identifier = "CC-BY-4.0"

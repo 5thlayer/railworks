@@ -1,14 +1,6 @@
-# Example Module
+# Railworks
 
 A 5thlayer Module: a mod its Consumers, other Modules or a pack, read from the local maven repository by version. See `GLOSSARY.md` for the domain glossary.
-
-<!-- template-only: scripts/fill-template.sh removes this section -->
-## This checkout is the template
-
-libworks is the template every 5thlayer Module starts from (FactoryWorks ADR-0090), not a Module itself. `Example Module` and `examplelib` are placeholders; leave them. A change here lands in future Modules only; existing ones pick it up by hand. Work comes from drift across Modules (#1), so an empty tracker is normal.
-
-The build applies the libworks convention plugin (ADR 0003), built here from `plugin/` as an included build, beside `runtime/`; `fill-template.sh` removes both, along with `scripts/` and `module-ci.yml`, and pins a Module to the released plugin. `sh ./gradlew build` runs the plugin's tests too, and `python3 -m unittest discover scripts/tests` tests its bundled upload step against a stand-in server on localhost, CI's upstream step and `fill-template.sh`; `ci.yml` runs them beside `module-ci.yml`. The plugin and the runtime release apart from the template: `docs/plugin.md` and `docs/runtime.md`.
-<!-- /template-only -->
 
 ## Workflow
 
@@ -26,15 +18,15 @@ Conventional commits: `<type>(<optional scope>): <summary>`, with the summary in
 
 - `sh ./gradlew build` runs the JUnit tests, on a plain JVM with no Minecraft.
 - `sh ./gradlew runGameTestServer` runs the game tests headless, a real player on a real server, and names each one it ran; it fails if it ran none.
-- The `skillworks:gametest-loop` skill runs a subset, `--tests 'examplelib:<glob>' 1`, one glob a run, so a ticket's new game tests share a name prefix that selects them all.
+- The `skillworks:gametest-loop` skill runs a subset, `--tests 'railworks:<glob>' 1`, one glob a run, so a ticket's new game tests share a name prefix that selects them all.
 - CI (`.github/workflows/ci.yml`) runs both through libworks' `module-ci.yml` on every push and never publishes.
 
 ### Game-test code
 
 - Everything that exists only for the Module's own runs lives in the `gametest` source set, which never ships (libworks ADRs 0004 and 0011): its game-test code, its test-only resources and its packs.
-- `ExampleLibGameTests` hooks itself in from `FMLConstructModEvent`, and `src/main` never names game-test code.
+- `RailworksGameTests` hooks itself in from `FMLConstructModEvent`, and `src/main` never names game-test code.
 - Where shipped code must report to a test, `main` holds a hook with no test vocabulary that the game-test side fills.
-- A new game test class is registered by a line in `ExampleLibGameTests.registerTests`, and its tests stand on the `gametest/platform` structure that the plugin's `buildGametestStructures` task writes into `src/gametest/resources`.
+- A new game test class is registered by a line in `RailworksGameTests.registerTests`, and its tests stand on the `gametest/platform` structure that the plugin's `buildGametestStructures` task writes into `src/gametest/resources`.
 - `DevPacks` switches on `gametest_pack/` in the game tests and `dev_pack/` in the dev client, the datapacks that stand in for what a Consumer fills.
 - Packs a test switches on itself, such as one per batch, go under `gametest_packs/<name>/`.
 

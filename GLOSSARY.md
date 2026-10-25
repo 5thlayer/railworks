@@ -1,6 +1,6 @@
-# Example Module
+# Railworks
 
-One paragraph: the mechanic this Module gives, and which Consumers use it.
+Trains: Locomotives and Cargo cars hanging from an overhead Rail, carrying players, mobs and items between Stations, by hand or on a schedule. It is Factorio's train game as a suspended monorail, kept apart from vanilla rails, and it plays alone in vanilla on Groundworks.
 
 ## Language
 
@@ -8,7 +8,7 @@ The Module's terms, each with what it is and the words to avoid. `/domain-modeli
 
 ### Parties
 
-**Example Module**:
+**Railworks**:
 This Module.
 _Avoid_: Library, Binding
 
@@ -19,6 +19,54 @@ _Avoid_: the -works suite, the Pack
 **Consumer**:
 A mod that builds against this Module, such as another FactoryWorks Module, or a modpack that loads it.
 _Avoid_: client (collides with the game's client side), dependent, integration
+
+### Track
+
+**Rail**:
+The overhead beam a Train hangs from, strung Span by Span between Pylons. Also the item that strings it, spent by a Span's length.
+_Avoid_: track, monorail, girder, beam
+
+**Pylon**:
+The column that holds the Rail up, stacked to the height the player chooses. Its head carries one Arm or two.
+_Avoid_: pillar, support, pole (Wireworks'), post
+
+**Arm**:
+The part of a Pylon's head a Rail is strung from. A Pylon with two carries two lines that never join.
+_Avoid_: bracket, node, attachment point
+
+**Span**:
+The Rail between two Arms. It curves through each Arm, climbs and bends only within its limits, and keeps the space below it clear. One Train holds a Span at a time.
+_Avoid_: segment, section, block (Factorio's rail block), link
+
+**Junction**:
+An Arm with three or more Spans. Any two of them that bend gently enough are a way through it; nothing is switched.
+_Avoid_: switch, points, fork
+
+**Clearance**:
+The space below a Span that a hanging car passes through, which no block may fill.
+_Avoid_: loading gauge, hitbox
+
+### Trains
+
+**Train**:
+Cars coupled on the Rail that move as one.
+_Avoid_: monorail, consist
+
+**Locomotive**:
+A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electric Locomotive runs on FE.
+_Avoid_: engine (Wireworks' steam engine), loco
+
+**Cargo car**:
+A car that carries items, loaded and unloaded only while stopped at a Station.
+_Avoid_: wagon, freight car
+
+**Station**:
+A named place on the Rail where a Train stops. A schedule names Stations, and several may share a name.
+_Avoid_: stop (Voidworks' Stop), train stop, depot
+
+**Schedule**:
+The list of Stations a Train runs through, each with when to leave.
+_Avoid_: route, orders, timetable
 
 ### Dev runs
 

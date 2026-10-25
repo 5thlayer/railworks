@@ -1,7 +1,7 @@
-# Builds and tests every push through the Module CI every Module calls (ADR 0003). It never
-# publishes: a Module's jar reaches a Consumer only through ~/.m2, and Modrinth and CurseForge,
-# only from a maintainer's machine (docs/agents/releases.md). The template builds its plugin from
-# plugin/; fill-template.sh points a Module at module-ci.yml at the plugin's tag instead.
+# Builds and tests every push through the CI every Module shares, at the tag of the plugin
+# build.gradle applies: the two versions move together (libworks ADR 0003). It never publishes:
+# a Module's jar reaches a Consumer only through ~/.m2, and Modrinth and CurseForge, only from a
+# maintainer's machine (docs/agents/releases.md).
 name: CI
 
 on:
@@ -14,11 +14,4 @@ permissions:
 
 jobs:
   ci:
-    uses: ./.github/workflows/module-ci.yml
-
-  # The template's own: the upload, upstream and fill-template steps' tests, on localhost only.
-  scripts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: python3 -m unittest discover scripts/tests
+    uses: 5thlayer/libworks/.github/workflows/module-ci.yml@plugin-v0.4.2

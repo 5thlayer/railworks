@@ -1,7 +1,0 @@
-{
-  "pack": {
-    "description": {"translate": "libworks.gallery.pack.description"},
-    "min_format": [101, 1],
-    "max_format": [101, 1]
-  }
-}
