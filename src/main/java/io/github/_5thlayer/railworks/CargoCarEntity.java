@@ -18,7 +18,6 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -32,16 +31,12 @@ import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.HopperBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
-import net.neoforged.neoforge.common.util.BlockSnapshot;
-import net.neoforged.neoforge.event.EventHooks;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
@@ -52,8 +47,7 @@ import org.jspecify.annotations.Nullable;
  * which its menu, vanilla's three-row chest, shows when the car is used; nobody rides it. It is not a {@link Container} itself, so a hopper
  * cannot reach into it wherever it is: only while it is stopped at a Station does it give hoppers,
  * feeders and pipes its cargo, through {@link #automation()}, and a client sees that it is, to draw
- * its {@link #hopperSpots()}. Boarding and the rest are
- * {@link CarEntity}'s.
+ * its {@link #hopperSpots()}. Nobody rides it; coupling and the rest are {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {
 
@@ -140,8 +134,8 @@ public final class CargoCarEntity extends CarEntity {
         if (!held.is(Items.HOPPER) || !player.isSecondaryUseActive()) {
             return InteractionResult.PASS;
         }
-        if (level() instanceof ServerLevel server) {
-            placeHopper(server, player, held);
+        if (level() instanceof ServerLevel) {
+            placeHopper(player, hand);
         }
         return InteractionResult.SUCCESS;
     }
@@ -151,29 +145,25 @@ public final class CargoCarEntity extends CarEntity {
      * stopped at a Station: the spots are where it stands, so a hopper set while it passes would load
      * nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
      */
-    private void placeHopper(ServerLevel level, Player player, ItemStack held) {
+    private void placeHopper(Player player, InteractionHand hand) {
         if (automation() == null) {
             refuse(player, "message.railworks.hopper_not_at_station");
             return;
         }
         HopperSpots.Filling filling = hopperSpots().fillingNearest(player.getX(), player.getZ());
         BlockPos pos = new BlockPos(filling.spot().x(), filling.spot().y(), filling.spot().z());
-        if (!level.getBlockState(pos).canBeReplaced() || !player.mayBuild() || !level.mayInteract(player, pos)) {
+        // A click on a block that cannot be replaced would place the hopper beyond it instead.
+        if (!level().getBlockState(pos).canBeReplaced()) {
             refuse(player, "message.railworks.hopper_spot_taken");
             return;
         }
+        // Placed as vanilla places a hopper clicked against the spot's face toward the car, which
+        // points it at the car: its checks, sound, item data and NeoForge's place event included.
         Direction toward = Direction.getApproximateNearest(filling.towardX(), 0, filling.towardZ());
-        BlockState hopper = Blocks.HOPPER.defaultBlockState().setValue(HopperBlock.FACING, toward);
-        BlockSnapshot before = BlockSnapshot.create(level.dimension(), level, pos);
-        level.setBlockAndUpdate(pos, hopper);
-        // A protection mod may forbid it, as it may any block a player places.
-        if (EventHooks.onBlockPlace(player, before, toward.getOpposite())) {
-            before.restore(Block.UPDATE_ALL);
-            return;
+        BlockHitResult click = new BlockHitResult(Vec3.atCenterOf(pos), toward.getOpposite(), pos, false);
+        if (!player.getItemInHand(hand).useOn(new UseOnContext(player, hand, click)).consumesAction()) {
+            refuse(player, "message.railworks.hopper_spot_taken");
         }
-        level.playSound(null, pos, hopper.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 0.8F);
-        level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
-        held.consume(1, player);
     }
 
     private static void refuse(Player player, String message) {

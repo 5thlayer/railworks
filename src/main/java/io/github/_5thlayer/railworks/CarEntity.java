@@ -294,20 +294,11 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         // A car nobody rides is used for what it holds: its own use of the item in hand, else its menu.
         if (!rideable()) {
             InteractionResult used = useHeld(player, hand, held);
-            if (used != InteractionResult.PASS) {
-                return used;
-            }
-            if (!level().isClientSide()) {
-                openCustomInventoryScreen(player);
-            }
-            return InteractionResult.SUCCESS;
+            return used != InteractionResult.PASS ? used : openMenu(player);
         }
         // Sneaking at the car from outside opens its menu.
         if (player.isSecondaryUseActive()) {
-            if (!level().isClientSide()) {
-                openCustomInventoryScreen(player);
-            }
-            return InteractionResult.SUCCESS;
+            return openMenu(player);
         }
         if (held.is(Items.LEAD) && getFirstPassenger() instanceof Mob mob && mob instanceof Leashable leashable
                 && leashable.canBeLeashed()) {
@@ -335,12 +326,22 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return InteractionResult.SUCCESS;
     }
 
-    /** Whether players and led mobs board this kind of car; one nobody rides opens its menu when used. */
+    private InteractionResult openMenu(Player player) {
+        if (!level().isClientSide()) {
+            openCustomInventoryScreen(player);
+        }
+        return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * Whether players and led mobs board this kind of car: the one switch for riding it. One nobody
+     * rides opens its menu when used.
+     */
     protected boolean rideable() {
         return true;
     }
 
-    /** What this kind of car does with {@code held} before boarding, or before its menu opens; PASS for those. */
+    /** What this kind of car does with {@code held} before boarding, or before its menu opens; PASS to go on. */
     protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
         return InteractionResult.PASS;
     }

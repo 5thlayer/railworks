@@ -297,6 +297,15 @@ final class CargoLoadingTests {
                     if (player.containerMenu instanceof ChestMenu) {
                         helper.fail("a refused hopper opened the cargo instead", LOADING);
                     }
+                    // Nor where someone stands, on the far side.
+                    ServerPlayer far = sneaker(helper, FAR_SIDE_Z);
+                    BlockPos stood = spot(cargo.hopperSpots().fillingNearest(far.getX(), far.getZ()).spot());
+                    ServerPlayer standing = helper.makeMockServerPlayerInLevel();
+                    standing.snapTo(stood.getX() + 0.5, stood.getY(), stood.getZ() + 0.5);
+                    cargo.interact(far, InteractionHand.MAIN_HAND, Vec3.ZERO);
+                    if (!helper.getLevel().getBlockState(stood).isAir() || far.getMainHandItem().getCount() != 4) {
+                        helper.fail("a hopper was set where a player stood", LOADING);
+                    }
                 })
                 .thenSucceed();
     }
@@ -307,7 +316,7 @@ final class CargoLoadingTests {
         BlockPos spot = spot(cargo.hopperSpots().fillingNearest(player.getX(), player.getZ()).spot());
         cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
         if (!helper.getLevel().getBlockState(spot).isAir() || player.getMainHandItem().getCount() != 4) {
-            helper.fail("a hopper was set by a car stopped at no Station", LOADING);
+            helper.fail("a hopper was set by a car stopped at no Station", LocomotiveTests.STAND);
         }
         helper.succeed();
     }
