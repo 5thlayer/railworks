@@ -26,5 +26,6 @@
   "message.railworks.station_off_rail": "A Station goes beside the Rail or under it",
   "message.railworks.station_in_clearance": "A Station there would be in the way of a passing car",
   "tooltip.railworks.station.jade.name": "Name: %s",
-  "tooltip.railworks.station.jade.off_rail": "By no Rail"
+  "tooltip.railworks.station.jade.off_rail": "By no Rail",
+  "tooltip.railworks.cargo_car.jade.station": "At Station %s"
 }

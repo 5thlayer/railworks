@@ -65,11 +65,11 @@ A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electr
 _Avoid_: engine (Wireworks' steam engine), loco
 
 **Cargo car**:
-A car that carries items, loaded and unloaded only while stopped at a Station: by a hopper over its roof pointing down, and by one under the Rail beneath it, the two spots drawn while it is stopped there.
+A car that carries items, loaded and unloaded only while its Train is stopped at a Station: by a hopper over its roof pointing down, and by one under the Rail beneath it, the two spots drawn while it is stopped there.
 _Avoid_: wagon, freight car
 
 **Station**:
-A named block beside the Rail or under it, serving the nearest Span in reach: a car stopped within a block either way of the point of the Span nearest it is at the Station (ADR 0007). A Schedule names Stations, and several may share a name.
+A named block beside the Rail or under it, serving the nearest Span in reach: a Train at rest with any car within a block either way of the point of the Span nearest it is at the Station, every car of it (ADR 0007). A Schedule names Stations, and several may share a name.
 _Avoid_: stop (Voidworks' Stop), train stop, depot, platform
 
 **Schedule**:

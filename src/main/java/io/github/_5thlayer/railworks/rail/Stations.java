@@ -57,11 +57,18 @@ public final class Stations {
     }
 
     /**
-     * The Stations {@code car} of {@code train} is stopped at: those it is {@link #at} while its Train
-     * is at rest, and none while it moves. A Cargo car is loaded and unloaded only at these.
+     * The Stations {@code train} is stopped at: while it is at rest, those any of its cars is
+     * {@link #at}, and none while it moves. A Train is at a Station as a whole, as in Factorio, so
+     * every Cargo car of it is loaded and unloaded there, wherever along the Train it stands.
      */
-    public List<Station> stoppedAt(RailNetwork network, Train train, Car car) {
-        return !train.atRest() ? List.of() : at(network, train.placeOf(network, car));
+    public List<Station> stoppedAt(RailNetwork network, Train train) {
+        if (!train.atRest()) {
+            return List.of();
+        }
+        List<Place> places = train.cars().stream().map(car -> train.placeOf(network, car)).toList();
+        return stations.values().stream()
+                .filter(station -> places.stream().anyMatch(place -> station.serves(network, place)))
+                .toList();
     }
 
     public Collection<Station> all() {

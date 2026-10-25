@@ -475,7 +475,7 @@ final class CargoCarTests {
      * A survival player holding a Cargo car, aimed {@code side} car lengths along the Line from
      * {@code car}: +1 where a car would couple ahead of it, -1 behind, 0 at the car itself.
      */
-    private static ServerPlayer cargoPlayer(GameTestHelper helper, CarEntity car, int side) {
+    static ServerPlayer cargoPlayer(GameTestHelper helper, CarEntity car, int side) {
         return cargoPlayer(helper, car, side, -45.0F);
     }
 

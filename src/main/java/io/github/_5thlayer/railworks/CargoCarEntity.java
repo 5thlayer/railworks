@@ -3,9 +3,12 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.List;
+
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.HopperSpots;
+import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -51,9 +54,12 @@ public final class CargoCarEntity extends CarEntity {
         }
     };
 
-    /** Whether it is stopped at a Station, which a client sees to draw where hoppers go. */
-    private static final EntityDataAccessor<Boolean> DATA_AT_STATION =
-            SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
+    /**
+     * The name of the Station its Train is stopped at, or empty when it is at none: a client sees it
+     * to draw where hoppers go, and Jade shows it.
+     */
+    private static final EntityDataAccessor<String> DATA_STATION =
+            SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.STRING);
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -73,24 +79,31 @@ public final class CargoCarEntity extends CarEntity {
     }
 
     /**
-     * Its cargo to hoppers, feeders and pipes, NeoForge's item capability for automation: while it is
-     * stopped at a Station, and null while it moves, stands away from every Station, or is a client's.
+     * Its cargo to hoppers, feeders and pipes, NeoForge's item capability for automation: while its
+     * Train is stopped at a Station, wherever along the Train it stands, and null while the Train moves
+     * or stands away from every Station, or on a client.
      */
     public @Nullable ResourceHandler<ItemResource> automation() {
+        return stoppedAt().isEmpty() ? null : handler;
+    }
+
+    /** The Stations its Train is stopped at, on the server; none on a client or for a car no Train holds. */
+    private List<Station> stoppedAt() {
         Train train = train();
         if (train == null || !(level() instanceof ServerLevel server)) {
-            return null;
+            return List.of();
         }
-        return stoppedAtStation(server, train, train.car(carId())) ? handler : null;
+        return LevelStations.of(server).stations().stoppedAt(LevelRails.of(server).network(), train);
     }
 
-    private static boolean stoppedAtStation(ServerLevel level, Train train, Car car) {
-        return !LevelStations.of(level).stations().stoppedAt(LevelRails.of(level).network(), train, car).isEmpty();
-    }
-
-    /** Whether it is stopped at a Station, as the server last synced it: what the overlay draws by. */
+    /** Whether its Train is stopped at a Station, as the server last synced it: what the overlay draws by. */
     public boolean atStation() {
-        return entityData.get(DATA_AT_STATION);
+        return !stationName().isEmpty();
+    }
+
+    /** The name of the Station its Train is stopped at, the first placed of several; empty at none. */
+    public String stationName() {
+        return entityData.get(DATA_STATION);
     }
 
     /** Where a hopper loads it and where one unloads it, from its box where it stands. */
@@ -100,15 +113,14 @@ public final class CargoCarEntity extends CarEntity {
 
     @Override
     protected void syncCar(Car car) {
-        Train train = train();
-        entityData.set(DATA_AT_STATION, train != null && level() instanceof ServerLevel server
-                && stoppedAtStation(server, train, car));
+        List<Station> at = stoppedAt();
+        entityData.set(DATA_STATION, at.isEmpty() ? "" : at.getFirst().name());
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
         super.defineSynchedData(entityData);
-        entityData.define(DATA_AT_STATION, false);
+        entityData.define(DATA_STATION, "");
     }
 
     /** The menu, from the inventory key while riding and from sneaking at the car. */

@@ -10,6 +10,7 @@ import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.RailworksRegistries;
+import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.rail.HopperSpots;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
@@ -33,12 +34,13 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 
 /**
  * Loading a Cargo car at a Station through NeoForge's item capability and vanilla hoppers: the
- * capability is there while the car is stopped at a Station and not while it moves or stands away
- * from one, a client is told so, and hoppers placed as a survival player places them at the car's
- * {@link HopperSpots} fill it at one Station and empty it at the next, the Train driven between them
- * by hand. Which Stations a car is stopped at is {@code StationsTest}'s. All of
- * these tests share the {@code cargo_loading_} prefix, and stand on {@link LocomotiveTests}' Span,
- * the Locomotive placed at x 7.5 and its Cargo car coupled behind it at x 5.7.
+ * capability is there while the car's Train is stopped at a Station, whichever of its cars is by it,
+ * and not while it moves or stands away from one; the car flags it for clients; and hoppers placed
+ * as a survival player places them at the car's {@link HopperSpots} fill it at one Station and empty
+ * it at the next, the Train driven between them by hand. Which Stations a Train is stopped at is
+ * {@code StationsTest}'s. All of these tests share the {@code cargo_loading_} prefix, and stand on
+ * {@link LocomotiveTests}' Span, the Locomotive placed at x 7.5 and Cargo cars coupled behind it at
+ * x 5.7 and 3.9.
  */
 final class CargoLoadingTests {
 
@@ -46,6 +48,8 @@ final class CargoLoadingTests {
     private static final BlockPos LOADING = new BlockPos(5, 1, 2);
     /** Beside the Rail a block down, by where the Cargo car stops at the line's end. */
     private static final BlockPos UNLOADING = new BlockPos(7, 1, 2);
+    /** Beside the Rail a block down, by the Locomotive and not by the Cargo cars behind it. */
+    private static final BlockPos BY_LOCOMOTIVE = new BlockPos(7, 1, 2);
     /** Beside the Rail far from the Cargo car. */
     private static final BlockPos FAR = new BlockPos(2, 1, 2);
 
@@ -59,6 +63,8 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_a_car_flags_it_is_at_a_station_until_it_leaves", 40, CargoLoadingTests::syncsAtStation);
         tests.test("cargo_loading_hoppers_at_the_spots_fill_a_car_at_one_station_and_empty_it_at_the_next", 400,
                 CargoLoadingTests::fillsAndEmpties);
+        tests.test("cargo_loading_a_car_two_back_is_filled_when_the_locomotive_is_by_the_station", 200,
+                CargoLoadingTests::fillsTwoBack);
     }
 
     private static void presentAtStation(GameTestHelper helper) {
@@ -162,7 +168,7 @@ final class CargoLoadingTests {
                     }
                     var network = LevelRails.of(helper.getLevel()).network();
                     BlockPos next = helper.absolutePos(UNLOADING);
-                    var at = LevelStations.of(helper.getLevel()).stations().stoppedAt(network, cargo.train(), cargo.car());
+                    var at = LevelStations.of(helper.getLevel()).stations().stoppedAt(network, cargo.train());
                     if (!at.equals(List.of(new Station(next.getX(), next.getY(), next.getZ(), Station.DEFAULT_NAME)))) {
                         helper.fail("at the line's end the Cargo car is stopped at " + at + ", not only the next Station", UNLOADING);
                     }
@@ -185,6 +191,77 @@ final class CargoLoadingTests {
                     helper.getLevel().setBlockAndUpdate(filling.hopper, filling.wasAtHopper);
                 })
                 .thenSucceed();
+    }
+
+    private static void fillsTwoBack(GameTestHelper helper) {
+        CargoCarEntity first = cargoBehindLocomotive(helper);
+        LocomotiveEntity locomotive = locomotive(helper, first);
+        CargoCarEntity second = coupledBehind(helper, first);
+        // By the Locomotive, two cars ahead of the second Cargo car and too far from it to reach it alone.
+        station(helper, BY_LOCOMOTIVE);
+        var filling = new Object() {
+            BlockPos hopper;
+            BlockPos chest;
+            BlockState wasAtHopper;
+            BlockState wasAtChest;
+        };
+        helper.startSequence()
+                .thenWaitUntil(() -> registered(helper, BY_LOCOMOTIVE))
+                .thenExecute(() -> {
+                    var network = LevelRails.of(helper.getLevel()).network();
+                    var train = second.train();
+                    if (train != locomotive.train() || train.cars().size() != 3 || train.cars().getLast() != second.car()
+                            || !LevelStations.of(helper.getLevel()).stations().at(network, train.placeOf(network, second.car())).isEmpty()) {
+                        helper.fail("expected a Locomotive and two Cargo cars, the last away from the Station: " + train, BY_LOCOMOTIVE);
+                    }
+                    ServerPlayer namer = helper.makeMockServerPlayerInLevel();
+                    BlockPos stand = helper.absolutePos(LocomotiveTests.STAND);
+                    namer.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
+                    helper.getBlockEntity(BY_LOCOMOTIVE, StationBlockEntity.class).rename(namer, "Mine");
+                })
+                .thenWaitUntil(() -> {
+                    if (!second.stationName().equals("Mine") || !first.stationName().equals("Mine")) {
+                        helper.fail("the Cargo cars show they are at \"" + first.stationName() + "\" and \""
+                                + second.stationName() + "\", not the Mine their Locomotive is by", BY_LOCOMOTIVE);
+                    }
+                })
+                .thenExecute(() -> {
+                    filling.hopper = spot(second.hopperSpots().fill());
+                    filling.chest = filling.hopper.above();
+                    // Over the structure, where the test's barrier walls it in.
+                    filling.wasAtHopper = helper.getLevel().getBlockState(filling.hopper);
+                    filling.wasAtChest = helper.getLevel().getBlockState(filling.chest);
+                    helper.getLevel().setBlockAndUpdate(filling.hopper, Blocks.AIR.defaultBlockState());
+                    helper.getLevel().setBlockAndUpdate(filling.chest, Blocks.CHEST.defaultBlockState());
+                    chest(helper, filling.chest).setItem(0, new ItemStack(Items.IRON_ORE, 4));
+                    placeHopper(helper, filling.chest, Direction.DOWN, filling.hopper);
+                })
+                .thenWaitUntil(() -> {
+                    if (count(second) != 4 || count(first) != 0) {
+                        helper.fail("the hopper over the second Cargo car moved " + count(second) + " of 4 iron ore into it, and "
+                                + count(first) + " into the first", BY_LOCOMOTIVE);
+                    }
+                })
+                .thenExecute(() -> {
+                    helper.getLevel().setBlockAndUpdate(filling.chest, filling.wasAtChest);
+                    helper.getLevel().setBlockAndUpdate(filling.hopper, filling.wasAtHopper);
+                })
+                .thenSucceed();
+    }
+
+    /** A Cargo car placed and coupled behind {@code car}, which is the last of its Train. */
+    private static CargoCarEntity coupledBehind(GameTestHelper helper, CargoCarEntity car) {
+        LocomotiveTests.use(helper, CargoCarTests.cargoPlayer(helper, car, -1));
+        var train = car.train();
+        if (train == null || train.cars().getLast() == car.car()) {
+            throw helper.assertionException(BY_LOCOMOTIVE, net.minecraft.network.chat.Component.literal(
+                    "a second Cargo car did not couple behind the first: " + train));
+        }
+        if (!(LevelRails.of(helper.getLevel()).view(train.cars().getLast()) instanceof CargoCarEntity coupled)) {
+            throw helper.assertionException(BY_LOCOMOTIVE, net.minecraft.network.chat.Component.literal(
+                    "the car coupled behind is not a Cargo car"));
+        }
+        return coupled;
     }
 
     private static void syncsAtStation(GameTestHelper helper) {
