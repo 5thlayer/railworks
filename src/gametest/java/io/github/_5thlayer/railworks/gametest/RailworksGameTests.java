@@ -70,6 +70,7 @@ public final class RailworksGameTests {
         CargoCarTests.register(tests);
         AutoStringTests.register(tests);
         StationTests.register(tests);
+        CurveTests.register(tests);
     }
 
     private static Identifier id(String path) {

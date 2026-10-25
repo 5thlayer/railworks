@@ -109,7 +109,7 @@ public final class Trains {
                 if (place == null) {
                     continue;
                 }
-                double distance = distanceSquared(place.point(), aim);
+                double distance = distanceSquared(place.point(network), aim);
                 if (distance <= best) {
                     best = distance;
                     nearest = new Slot(train, end, place);

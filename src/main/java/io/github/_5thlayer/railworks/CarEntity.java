@@ -11,6 +11,7 @@ import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.RailCurve;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Train;
@@ -27,6 +28,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.InterpolationHandler;
@@ -228,19 +230,15 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (car == null || !(level() instanceof ServerLevel server)) {
             return;
         }
-        Place place = train.facing(LevelRails.of(server).network(), car);
-        Vec3 rail = CarPlacement.railPoint(place);
+        // On the Span's curve, heading and pitched the way it runs there toward the car's front.
+        RailNetwork network = LevelRails.of(server).network();
+        RailCurve.Pose pose = train.facing(network, car).pose(network);
+        Vec3 rail = CarPlacement.railPoint(pose.point());
         double speed = train.reversed(car) ? -train.speed() : train.speed();
-        Arm front = place.front();
-        Arm back = place.back();
-        double dx = front.x() - back.x();
-        double dy = front.y() - back.y();
-        double dz = front.z() - back.z();
-        double horizontal = Math.sqrt(dx * dx + dz * dz);
-        setYRot((float) (Mth.atan2(-dx, dz) * Mth.RAD_TO_DEG));
-        setXRot((float) (-Mth.atan2(dy, horizontal) * Mth.RAD_TO_DEG));
-        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        setDeltaMovement(dx / length * speed, dy / length * speed, dz / length * speed);
+        double horizontal = Math.sqrt(pose.dx() * pose.dx() + pose.dz() * pose.dz());
+        setYRot((float) (Mth.atan2(-pose.dx(), pose.dz()) * Mth.RAD_TO_DEG));
+        setXRot((float) (-Mth.atan2(pose.dy(), horizontal) * Mth.RAD_TO_DEG));
+        setDeltaMovement(pose.dx() * speed, pose.dy() * speed, pose.dz() * speed);
         setPos(rail.x, rail.y, rail.z);
     }
 
@@ -406,6 +404,13 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     @Override
     protected boolean canAddPassenger(Entity passenger) {
         return getPassengers().isEmpty();
+    }
+
+    /** The seat stands square to the car's floor, so a rider leans back on a climb and forward on a descent. */
+    @Override
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
+        Vec3 seat = getDefaultPassengerAttachmentPoint(this, passenger, dimensions.attachments()).yRot(getYRot() * Mth.DEG_TO_RAD);
+        return seat.xRot(-getXRot() * Mth.DEG_TO_RAD).yRot(-getYRot() * Mth.DEG_TO_RAD);
     }
 
     // No getControllingPassenger: the server drives the car, and a controlling passenger would make

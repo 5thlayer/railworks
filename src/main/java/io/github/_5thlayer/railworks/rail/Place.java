@@ -47,13 +47,16 @@ public record Place(Span span, Arm front, double toFront) {
         return span.otherEnd(front);
     }
 
-    /** Where it is, in Arm coordinates: along the Span, {@code toFront} short of its front. */
-    public Point point() {
-        Arm back = back();
-        double t = toFront / span.length();
-        return new Point(front.x() + (back.x() - front.x()) * t,
-                front.y() + (back.y() - front.y()) * t,
-                front.z() + (back.z() - front.z()) * t);
+    /** Where it is, in Arm coordinates: on the Span's curve, {@code toFront} short of its front. */
+    public Point point(RailNetwork network) {
+        return pose(network).point();
+    }
+
+    /** Where it is on the Span's curve, in Arm coordinates, and the way the curve runs there toward its front. */
+    public RailCurve.Pose pose(RailNetwork network) {
+        boolean frontIsB = front.equals(span.b());
+        RailCurve.Pose pose = network.curve(span).at(frontIsB ? span.length() - toFront : toFront);
+        return frontIsB ? pose : pose.reversed();
     }
 
     /** The same spot facing the other way. */
