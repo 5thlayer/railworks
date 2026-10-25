@@ -65,8 +65,8 @@ A car that carries items, loaded and unloaded only while stopped at a Station.
 _Avoid_: wagon, freight car
 
 **Station**:
-A named place on the Rail where a Train stops. A schedule names Stations, and several may share a name.
-_Avoid_: stop (Voidworks' Stop), train stop, depot
+A named block beside the Rail or under it, serving the nearest Span in reach: a car stopped within a block either way of the point of the Span nearest it is at the Station (ADR 0007). A Schedule names Stations, and several may share a name.
+_Avoid_: stop (Voidworks' Stop), train stop, depot, platform
 
 **Schedule**:
 The list of Stations a Train runs through, each with when to leave.
