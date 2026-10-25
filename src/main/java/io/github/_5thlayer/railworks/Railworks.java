@@ -7,6 +7,7 @@ import io.github._5thlayer.railworks.client.RailworksClient;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
@@ -24,7 +25,8 @@ public final class Railworks {
 
     private static final String NETWORK_VERSION = "1";
 
-    public Railworks(IEventBus modBus) {
+    public Railworks(IEventBus modBus, ModContainer container) {
+        RailworksConfig.register(container, modBus);
         RailworksRegistries.register(modBus);
         modBus.addListener(WorksTabContents::add);
         modBus.addListener(Railworks::registerPayloads);

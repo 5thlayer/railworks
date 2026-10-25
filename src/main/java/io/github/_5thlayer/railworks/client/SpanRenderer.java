@@ -125,11 +125,11 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
 
     @Override
     public int getViewDistance() {
-        return BlockEntityRenderer.super.getViewDistance() + SpanRules.LENGTH_LIMIT;
+        return BlockEntityRenderer.super.getViewDistance() + (int) Math.ceil(SpanRules.lengthLimit());
     }
 
     @Override
     public AABB getRenderBoundingBox(BlockEntity pylon) {
-        return new AABB(pylon.getBlockPos()).inflate(SpanRules.LENGTH_LIMIT);
+        return new AABB(pylon.getBlockPos()).inflate(SpanRules.lengthLimit());
     }
 }

@@ -29,7 +29,7 @@ public final class PendingEnd {
         double dx = holder.x() - (anchor.x() + 0.5);
         double dy = holder.y() - (anchor.y() + 0.5);
         double dz = holder.z() - (anchor.z() + 0.5);
-        double reach = SpanRules.LENGTH_LIMIT + holder.interactionRange();
+        double reach = SpanRules.lengthLimit() + holder.interactionRange();
         boolean inReach = dx * dx + dy * dy + dz * dz <= reach * reach;
         return armStanding && holder.railInMainHand() && holder.sameDimension() && inReach;
     }

@@ -3,6 +3,8 @@
 
 package io.github._5thlayer.railworks;
 
+import java.math.BigDecimal;
+
 import io.github._5thlayer.railworks.rail.PendingEnd;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Stringing;
@@ -84,7 +86,8 @@ public final class SpanGesture {
             case CANCELLED -> rail.remove(RailworksRegistries.PENDING_SPAN.get());
             // A refusal changes nothing, the held end included.
             case TOO_LONG -> refused(server, player,
-                    Component.translatable("message.railworks.too_long", SpanRules.LENGTH_LIMIT));
+                    Component.translatable("message.railworks.too_long",
+                            BigDecimal.valueOf(SpanRules.lengthLimit()).stripTrailingZeros().toPlainString()));
             case ARM_FULL -> refused(server, player,
                     Component.translatable("message.railworks.arm_full", SpanRules.SPANS_PER_ARM));
             case SHORT_OF_RAIL -> refused(server, player, Component.translatable("message.railworks.short_of_rail",

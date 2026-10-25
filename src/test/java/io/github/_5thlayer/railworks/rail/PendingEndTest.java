@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class PendingEndTest {
 
+    private static final int LIMIT = (int) SpanRules.DEFAULT_LENGTH_LIMIT;
     private static final Arm ANCHOR = new Arm(0, 5, 0);
 
     private static PendingEnd.Holder at(double x, boolean rail, boolean sameDimension) {
@@ -28,8 +29,8 @@ class PendingEndTest {
 
     @Test
     void droppedWhenThePlayerWalksBeyondTheLongestSpanAndTheirReach() {
-        assertTrue(PendingEnd.stillHeld(ANCHOR, true, at(SpanRules.LENGTH_LIMIT + 4, true, true)));
-        assertFalse(PendingEnd.stillHeld(ANCHOR, true, at(SpanRules.LENGTH_LIMIT + 6, true, true)));
+        assertTrue(PendingEnd.stillHeld(ANCHOR, true, at(LIMIT + 4, true, true)));
+        assertFalse(PendingEnd.stillHeld(ANCHOR, true, at(LIMIT + 6, true, true)));
     }
 
     @Test

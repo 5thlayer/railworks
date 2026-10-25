@@ -48,10 +48,10 @@ public final class Stringing {
                 || network.spansAt(target).size() >= SpanRules.SPANS_PER_ARM) {
             return new Outcome(Result.ARM_FULL, 0);
         }
-        int cost = SpanRules.cost(anchor, target);
-        if (cost > SpanRules.LENGTH_LIMIT) {
+        if (SpanRules.tooLong(anchor, target)) {
             return new Outcome(Result.TOO_LONG, 0);
         }
+        int cost = SpanRules.cost(anchor, target);
         if (railHeld < cost) {
             return new Outcome(Result.SHORT_OF_RAIL, 0);
         }

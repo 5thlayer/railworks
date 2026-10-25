@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class StringingTest {
@@ -17,6 +18,15 @@ class StringingTest {
     private static final Arm D = new Arm(30, 5, 0);
 
     private final RailNetwork network = new RailNetwork();
+
+    @AfterEach
+    void resetLimit() {
+        SpanRules.configure(SpanRules.DEFAULT_LENGTH_LIMIT);
+    }
+
+    private static int limit() {
+        return (int) SpanRules.lengthLimit();
+    }
 
     @Test
     void stringsASpanAndSpendsItsCost() {
@@ -47,7 +57,7 @@ class StringingTest {
 
     @Test
     void refusesPastTheLengthLimit() {
-        var far = new Arm(SpanRules.LENGTH_LIMIT + 1, 5, 0);
+        var far = new Arm(limit() + 1, 5, 0);
         var outcome = Stringing.click(network, A, far, 1000);
         assertEquals(Stringing.Result.TOO_LONG, outcome.result());
         assertFalse(network.contains(A, far));
@@ -55,10 +65,29 @@ class StringingTest {
 
     @Test
     void stringsAtTheLengthLimit() {
-        var edge = new Arm(SpanRules.LENGTH_LIMIT, 5, 0);
+        var edge = new Arm(limit(), 5, 0);
         var outcome = Stringing.click(network, A, edge, 1000);
         assertEquals(Stringing.Result.STRUNG, outcome.result());
-        assertEquals(SpanRules.LENGTH_LIMIT, outcome.rail());
+        assertEquals(limit(), outcome.rail());
+    }
+
+    @Test
+    void aConfiguredLimitMovesBothTheRefusalAndTheCost() {
+        SpanRules.configure(100.0);
+        var outcome = Stringing.click(network, A, new Arm(80, 5, 0), 1000);
+        assertEquals(Stringing.Result.STRUNG, outcome.result());
+        assertEquals(80, outcome.rail());
+        SpanRules.configure(10.0);
+        assertEquals(Stringing.Result.TOO_LONG, Stringing.click(network, A, new Arm(11, 5, 0), 1000).result());
+    }
+
+    @Test
+    void aFractionalLimitAllowsALengthUnderItAndChargesItsCeiling() {
+        SpanRules.configure(10.5);
+        var outcome = Stringing.click(network, A, new Arm(10, 5, 3), 1000);
+        // sqrt(109) = 10.44, inside 10.5, costing 11
+        assertEquals(Stringing.Result.STRUNG, outcome.result());
+        assertEquals(11, outcome.rail());
     }
 
     @Test

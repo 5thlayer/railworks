@@ -7,10 +7,10 @@
     "I "
   ],
   "key": {
-    "I": "minecraft:iron_ingot"
+    "I": "#c:ingots/iron"
   },
   "result": {
     "id": "railworks:pylon",
-    "count": 2
+    "count": 1
   }
 }

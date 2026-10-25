@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 class SpanRulesTest {
 
     private static final Arm ORIGIN = new Arm(0, 0, 0);
+    private static final int LIMIT = (int) SpanRules.DEFAULT_LENGTH_LIMIT;
 
     @Test
     void aStraightRunCostsItsLength() {
@@ -45,14 +46,19 @@ class SpanRulesTest {
 
     @Test
     void theLimitItselfIsAllowedAndOneMoreIsNot() {
-        assertFalse(SpanRules.tooLong(ORIGIN, new Arm(SpanRules.LENGTH_LIMIT, 0, 0)));
-        assertTrue(SpanRules.tooLong(ORIGIN, new Arm(SpanRules.LENGTH_LIMIT + 1, 0, 0)));
+        assertFalse(SpanRules.tooLong(ORIGIN, new Arm(LIMIT, 0, 0)));
+        assertTrue(SpanRules.tooLong(ORIGIN, new Arm(LIMIT + 1, 0, 0)));
     }
 
     @Test
     void aLengthJustPastTheLimitRoundsUpToRefused() {
-        // sqrt(64^2 + 1) is a hair over the limit and costs 65
-        assertTrue(SpanRules.tooLong(ORIGIN, new Arm(SpanRules.LENGTH_LIMIT, 1, 0)));
+        // sqrt(32^2 + 1) is a hair over the limit and costs 33
+        assertTrue(SpanRules.tooLong(ORIGIN, new Arm(LIMIT, 1, 0)));
+    }
+
+    @Test
+    void theDefaultLimitIsAWireworksTransmissionPolesReach() {
+        assertEquals(32, LIMIT);
     }
 
     @Test

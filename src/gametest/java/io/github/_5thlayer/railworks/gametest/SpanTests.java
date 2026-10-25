@@ -116,7 +116,7 @@ final class SpanTests {
     }
 
     private static void tooLong(GameTestHelper helper) {
-        // 70 blocks apart on x, past the 64 limit; the columns stand where the test never looks.
+        // 70 blocks apart on x, past the 32 limit; the columns stand where the test never looks.
         BlockPos far = A.offset(70, 0, 0);
         helper.setBlock(far, RailworksRegistries.PYLON.get().defaultBlockState());
         ServerPlayer player = railPlayer(helper, 64);
