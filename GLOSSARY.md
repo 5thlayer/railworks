@@ -38,6 +38,10 @@ _Avoid_: bracket, node, attachment point
 The Rail between two Arms. It curves through each Arm, climbs and bends only within its limits, and keeps the space below it clear. One Train holds a Span at a time.
 _Avoid_: segment, section, block (Factorio's rail block), link
 
+**Line**:
+Spans joined Arm to Arm that a Train can run along without leaving the Rail. A line's end is an Arm with one Span.
+_Avoid_: route (a Schedule's word), track
+
 **Junction**:
 An Arm with three or more Spans. Any two of them that bend gently enough are a way through it; nothing is switched.
 _Avoid_: switch, points, fork
