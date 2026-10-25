@@ -93,7 +93,15 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
         }
     }
 
-    /** A square tube from this Arm to {@code end}, as one triangle strip around its four sides. */
+    /**
+     * A square tube from this Arm to {@code end}, as one triangle strip around its four sides.
+     *
+     * <p>The pipeline draws every Span of a frame into one buffer, so consecutive Spans join into one
+     * strip, and the triangles between one Span's end and the next one's start would fill the space
+     * between them. The strip therefore repeats its first and last vertex twice, as Wireworks'
+     * {@code WireStrip} does: every triangle that spans two Spans is zero-area, and the even count
+     * keeps the winding.
+     */
     private static void drawSpan(Matrix4f pose, VertexConsumer buffer, Vec3 end, int light) {
         Vec3 start = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
         Vec3 along = end.subtract(start).normalize();
@@ -103,12 +111,16 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
         Vec3[] corners = {
                 side.add(lift), side.subtract(lift), side.reverse().subtract(lift), side.reverse().add(lift)
         };
+        vertex(pose, buffer, start.add(corners[0]), SHADE[0], light);
+        vertex(pose, buffer, start.add(corners[0]), SHADE[0], light);
         for (int i = 0; i <= corners.length; i++) {
             Vec3 corner = corners[i % corners.length];
             float shade = SHADE[i % SHADE.length];
             vertex(pose, buffer, start.add(corner), shade, light);
             vertex(pose, buffer, end.add(corner), shade, light);
         }
+        vertex(pose, buffer, end.add(corners[0]), SHADE[0], light);
+        vertex(pose, buffer, end.add(corners[0]), SHADE[0], light);
     }
 
     private static void vertex(Matrix4f pose, VertexConsumer buffer, Vec3 at, float shade, int light) {
