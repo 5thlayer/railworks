@@ -17,7 +17,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  *
  * <p>Pure: no Minecraft types.
  *
- * @param x the Station block's position, as an Arm's is
+ * <p>Its {@code x}, {@code y} and {@code z} are its block's position, as an Arm's are.
  */
 public record Station(int x, int y, int z, String name) {
 
@@ -37,8 +37,16 @@ public record Station(int x, int y, int z, String name) {
             Codec.STRING.fieldOf("name").forGetter(Station::name)
     ).apply(i, Station::new));
 
-    /** The Span a Station serves, and how far along it from its first end the Station's foot is. */
-    public record Stop(Span span, double fromA, double distance) {
+    /**
+     * A Station's foot: the point of a Span nearest it, as how far along the Span from its first end
+     * it is, and how far the Station's centre is from it.
+     */
+    public record Foot(Span span, double fromA, double distance) {
+
+        /** The foot as a Place, heading for the Span's second end. */
+        public Place place() {
+            return new Place(span, span.b(), span.length() - fromA);
+        }
     }
 
     /**
@@ -62,7 +70,7 @@ public record Station(int x, int y, int z, String name) {
         return name.isEmpty() ? Optional.empty() : Optional.of(name);
     }
 
-    public Station named(String name) {
+    public Station withName(String name) {
         return new Station(x, y, z, name);
     }
 
@@ -71,11 +79,11 @@ public record Station(int x, int y, int z, String name) {
      * two as near, the one whose ends sort first, so every caller picks the same. Empty when the Station
      * is by no Rail.
      */
-    public Optional<Stop> stop(RailNetwork network) {
+    public Optional<Foot> foot(RailNetwork network) {
         return network.all().stream()
-                .map(this::stopOn)
+                .map(this::footOn)
                 .filter(s -> s.distance() <= REACH)
-                .min(Comparator.comparingDouble(Stop::distance)
+                .min(Comparator.comparingDouble(Foot::distance)
                         .thenComparing(s -> s.span().a())
                         .thenComparing(s -> s.span().b()));
     }
@@ -83,15 +91,15 @@ public record Station(int x, int y, int z, String name) {
     /** Whether a car at {@code place} is at this Station: on the Span it serves, within its stretch. */
     public boolean serves(RailNetwork network, Place place) {
         // Cheap first: a Station out of reach of this Span cannot serve it, whatever else is near.
-        Stop here = stopOn(place.span());
+        Foot here = footOn(place.span());
         if (here.distance() > REACH || Math.abs(fromA(place) - here.fromA()) > STRETCH) {
             return false;
         }
-        return stop(network).map(s -> sameSpan(s.span(), place.span())).orElse(false);
+        return foot(network).map(s -> sameSpan(s.span(), place.span())).orElse(false);
     }
 
     /** The foot of this Station on {@code span}: the point of the Span nearest the block's centre. */
-    Stop stopOn(Span span) {
+    Foot footOn(Span span) {
         // The block's centre in Arm coordinates, where the line from Arm to Arm is the flange's underside.
         double cx = x + 0.5 - RailGeometry.ATTACH_X;
         double cy = y + 0.5 - RailGeometry.ATTACH_Y;
@@ -107,7 +115,7 @@ public record Station(int x, int y, int z, String name) {
         double px = a.x() + dx * t - cx;
         double py = a.y() + dy * t - cy;
         double pz = a.z() + dz * t - cz;
-        return new Stop(span, t * length, Math.sqrt(px * px + py * py + pz * pz));
+        return new Foot(span, t * length, Math.sqrt(px * px + py * py + pz * pz));
     }
 
     /** How far {@code place} is along its Span from the Span's first end. */

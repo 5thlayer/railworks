@@ -41,7 +41,7 @@ public class StationJadePlugin implements IWailaPlugin {
                 return;
             }
             tooltip.add(Component.translatable("tooltip.railworks.station.jade.name", station.name()));
-            if (station.station().stop(ClientRails.network()).isEmpty()) {
+            if (station.station().foot(ClientRails.network()).isEmpty()) {
                 tooltip.add(Component.translatable("tooltip.railworks.station.jade.off_rail"));
             }
         }

@@ -6,10 +6,7 @@ package io.github._5thlayer.railworks;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.component.DataComponentGetter;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -88,16 +85,6 @@ public final class StationBlockEntity extends BlockEntity {
     protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
         name = input.getStringOr("name", Station.DEFAULT_NAME);
-    }
-
-    /** A Station item renamed in an anvil places a Station of that name. */
-    @Override
-    protected void applyImplicitComponents(DataComponentGetter components) {
-        super.applyImplicitComponents(components);
-        Component custom = components.get(DataComponents.CUSTOM_NAME);
-        if (custom != null) {
-            Station.name(custom.getString()).ifPresent(n -> name = n);
-        }
     }
 
     @Override

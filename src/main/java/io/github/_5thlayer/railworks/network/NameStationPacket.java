@@ -12,6 +12,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -35,12 +36,13 @@ public record NameStationPacket(BlockPos pos, String name) implements CustomPack
     }
 
     public static void handle(NameStationPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            var player = context.player();
-            if (player.level().isLoaded(packet.pos())
-                    && player.level().getBlockEntity(packet.pos()) instanceof StationBlockEntity station) {
-                station.rename(player, packet.name());
-            }
-        });
+        context.enqueueWork(() -> packet.apply(context.player()));
+    }
+
+    /** What the server does with it from {@code player}: renames the Station there, if there is one. */
+    public boolean apply(Player player) {
+        return player.level().isLoaded(pos)
+                && player.level().getBlockEntity(pos) instanceof StationBlockEntity station
+                && station.rename(player, name);
     }
 }

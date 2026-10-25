@@ -40,21 +40,21 @@ class StationTest {
 
     @Test
     void aStationBesideTheRailServesItsSpan() {
-        Station.Stop stop = beside(4).stop(network).orElseThrow();
+        Station.Foot stop = beside(4).foot(network).orElseThrow();
         assertEquals(AB, stop.span());
         assertEquals(4.0, stop.fromA(), 1e-9);
     }
 
     @Test
     void aStationUnderTheRailServesItsSpan() {
-        assertTrue(new Station(4, 5, 0, "Mine").stop(network).isPresent());
+        assertTrue(new Station(4, 5, 0, "Mine").foot(network).isPresent());
     }
 
     @Test
     void aStationTwoBlocksOffOrAboveTheRailIsByNoRail() {
-        assertTrue(new Station(4, 6, 2, "Mine").stop(network).isEmpty());
-        assertTrue(new Station(4, 7, 0, "Mine").stop(network).isEmpty());
-        assertTrue(new Station(4, 3, 0, "Mine").stop(network).isEmpty());
+        assertTrue(new Station(4, 6, 2, "Mine").foot(network).isEmpty());
+        assertTrue(new Station(4, 7, 0, "Mine").foot(network).isEmpty());
+        assertTrue(new Station(4, 3, 0, "Mine").foot(network).isEmpty());
     }
 
     @Test
@@ -77,7 +77,7 @@ class StationTest {
     @Test
     void aStationByAnArmIsReachedFromItsEnd() {
         Station station = beside(0);
-        assertEquals(0.0, station.stop(network).orElseThrow().fromA(), 1e-9);
+        assertEquals(0.0, station.foot(network).orElseThrow().fromA(), 1e-9);
         assertTrue(station.serves(network, along(AB, 0.0)));
     }
 
@@ -88,7 +88,7 @@ class StationTest {
         sloped.add(climb);
         // Halfway up, the Rail is at y 6 in Arm coordinates: a block beside it at that height serves it.
         Station station = new Station(4, 7, 1, "Hill");
-        Station.Stop stop = station.stop(sloped).orElseThrow();
+        Station.Foot stop = station.foot(sloped).orElseThrow();
         assertEquals(climb, stop.span());
         assertTrue(station.serves(sloped, along(climb, stop.fromA())));
     }
@@ -107,7 +107,7 @@ class StationTest {
         Span near = Span.of(new Arm(0, 5, 1), new Arm(10, 5, 1), 10);
         network.add(near);
         Station station = new Station(4, 5, 1, "Mine");
-        assertEquals(near, station.stop(network).orElseThrow().span());
+        assertEquals(near, station.foot(network).orElseThrow().span());
         assertTrue(station.serves(network, along(near, 4.5)));
         assertFalse(station.serves(network, along(AB, 4.5)));
     }
@@ -119,15 +119,15 @@ class StationTest {
         RailNetwork reversed = new RailNetwork();
         reversed.add(other);
         reversed.add(AB);
-        assertEquals(AB, beside(4).stop(network).orElseThrow().span());
-        assertEquals(AB, beside(4).stop(reversed).orElseThrow().span());
+        assertEquals(AB, beside(4).foot(network).orElseThrow().span());
+        assertEquals(AB, beside(4).foot(reversed).orElseThrow().span());
     }
 
     @Test
     void aStationWhoseSpanIsCutServesNothingUntilOneIsStrungAgain() {
         Station station = beside(4);
         network.remove(A, B);
-        assertTrue(station.stop(network).isEmpty());
+        assertTrue(station.foot(network).isEmpty());
         network.add(AB);
         assertTrue(station.serves(network, along(AB, 4.5)));
     }
@@ -157,7 +157,7 @@ class StationTest {
     void renamingAStationReplacesItAtItsBlock() {
         Stations stations = new Stations();
         stations.put(beside(4));
-        stations.put(beside(4).named("Smelter"));
+        stations.put(beside(4).withName("Smelter"));
         assertEquals(1, stations.all().size());
         assertEquals("Smelter", stations.get(4, 6, 1).name());
         stations.remove(4, 6, 1);
@@ -168,7 +168,7 @@ class StationTest {
     void stationsRoundTripThroughTheCodec() {
         Stations stations = new Stations();
         stations.put(beside(2));
-        stations.put(beside(8).named("Smelter"));
+        stations.put(beside(8).withName("Smelter"));
         var json = Stations.CODEC.encodeStart(JsonOps.INSTANCE, stations).getOrThrow();
         Stations read = Stations.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow();
         assertEquals(List.copyOf(stations.all()), List.copyOf(read.all()));

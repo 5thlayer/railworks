@@ -11,13 +11,13 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
+import io.github._5thlayer.railworks.network.NameStationPacket;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Stations;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
@@ -64,7 +64,6 @@ final class StationTests {
         tests.test("station_is_not_named_from_out_of_reach", 20, StationTests::notNamedFromAfar);
         tests.test("station_name_is_kept_across_a_save_and_reload", 20, StationTests::nameSaved);
         tests.test("station_names_may_be_shared", 20, StationTests::sharedNames);
-        tests.test("station_renamed_item_places_a_station_of_that_name", 20, StationTests::renamedItem);
         tests.test("station_breaking_takes_it_out_of_the_level", 20, StationTests::breaking);
         tests.test("station_serves_the_stretch_of_its_span_beside_it", 20, StationTests::serves);
     }
@@ -170,16 +169,6 @@ final class StationTests {
         placed(helper, player, UNDER).rename(player, name);
         if (stations(helper).named(name).size() != 2) {
             helper.fail("two Stations named alike are " + stations(helper).named(name), BESIDE);
-        }
-        helper.succeed();
-    }
-
-    private static void renamedItem(GameTestHelper helper) {
-        ServerPlayer player = player(helper);
-        player.getMainHandItem().set(DataComponents.CUSTOM_NAME,
-                Component.literal("Depot"));
-        if (!placed(helper, player, BESIDE).name().equals("Depot")) {
-            helper.fail("a Station item named Depot placed a Station not called Depot", BESIDE);
         }
         helper.succeed();
     }

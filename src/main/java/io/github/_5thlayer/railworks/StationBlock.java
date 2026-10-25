@@ -52,7 +52,7 @@ public final class StationBlock extends Block implements EntityBlock {
         return InteractionResult.SUCCESS;
     }
 
-    /** In the level's Stations at once, under the name an anvil gave the item if it had one. */
+    /** In the level's Stations at once, rather than a tick later as its block entity loads. */
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);

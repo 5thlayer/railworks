@@ -21,17 +21,25 @@ public final class StationPlacement {
     private StationPlacement() {
     }
 
-    /** Why a Station at {@code pos} would be refused, or empty where it may go. */
+    /** How finely the Clearance is checked along the stretch, in blocks. */
+    private static final double SWEEP_STEP = 0.25;
+
+    /**
+     * Why a Station at {@code pos} would be refused, or empty where it may go. The Clearance is checked
+     * along the whole stretch, since on a slope a car short of the foot can sit lower than at it.
+     */
     public static Optional<RailworksRefusal> refusal(RailNetwork network, BlockPos pos) {
-        var stop = new Station(pos.getX(), pos.getY(), pos.getZ(), Station.DEFAULT_NAME).stop(network);
-        if (stop.isEmpty()) {
+        var foot = new Station(pos.getX(), pos.getY(), pos.getZ(), Station.DEFAULT_NAME).foot(network);
+        if (foot.isEmpty()) {
             return Optional.of(RailworksRefusal.STATION_OFF_RAIL);
         }
-        var span = stop.get().span();
-        Place foot = new Place(span, span.b(), span.length() - stop.get().fromA());
-        AABB car = LocomotivePlacement.carBox(LocomotivePlacement.railPoint(foot));
-        if (new AABB(pos).intersects(car)) {
-            return Optional.of(RailworksRefusal.STATION_IN_CLEARANCE);
+        AABB block = new AABB(pos);
+        Place at = foot.get().place();
+        for (double by = -Station.STRETCH; by <= Station.STRETCH + 1e-9; by += SWEEP_STEP) {
+            Place car = at.move(network, by).place();
+            if (block.intersects(LocomotivePlacement.carBox(LocomotivePlacement.railPoint(car)))) {
+                return Optional.of(RailworksRefusal.STATION_IN_CLEARANCE);
+            }
         }
         return Optional.empty();
     }

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.mojang.serialization.Codec;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Every Station in a level, one to a block, so a Schedule can find each Station of a name and a car
@@ -36,12 +37,12 @@ public final class Stations {
     }
 
     /** Removes the Station at this block and returns it, or null if there was none. */
-    public Station remove(int x, int y, int z) {
+    public @Nullable Station remove(int x, int y, int z) {
         return stations.remove(List.of(x, y, z));
     }
 
     /** The Station at this block, or null if there is none. */
-    public Station get(int x, int y, int z) {
+    public @Nullable Station get(int x, int y, int z) {
         return stations.get(List.of(x, y, z));
     }
 

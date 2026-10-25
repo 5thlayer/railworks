@@ -53,7 +53,7 @@ public final class RailworksRegistries {
                     .updateInterval(1)
                     .noSummon());
 
-    /** A named place by the Rail that a Train stops at. */
+    /** A named block beside or under the Rail, which a car stopped by it is at. */
     public static final DeferredBlock<StationBlock> STATION = BLOCKS.registerBlock(StationBlock.BLOCK_NAME, StationBlock::new);
     public static final DeferredItem<StationItem> STATION_ITEM =
             ITEMS.registerItem(StationBlock.BLOCK_NAME, props -> new StationItem(STATION.get(), props));
