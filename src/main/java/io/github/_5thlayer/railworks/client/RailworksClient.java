@@ -8,7 +8,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-/** The client half of the Rail: the girders between Arms. Called only on the client, from {@code Railworks}. */
+/** The client half of the Rail: the Rail between Arms. Called only on the client, from {@code Railworks}. */
 public final class RailworksClient {
 
     private RailworksClient() {

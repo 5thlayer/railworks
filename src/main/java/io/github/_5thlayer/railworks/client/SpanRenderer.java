@@ -29,13 +29,13 @@ import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The Rail between Arms, drawn as a straight girder: a square tube from the Arm of this Pylon to the
+ * The Rail between Arms, drawn as a straight beam: a square tube from the Arm of this Pylon to the
  * other end of each Span it is the first end of, so exactly one end draws a Span. Only the top
  * segment of a column has an Arm. Placeholder art; the curved Rail is a later ticket.
  */
 public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, SpanRenderer.State> {
 
-    /** Where on the top segment the girder hangs from. */
+    /** Where on the top segment the Rail hangs from. */
     private static final double ATTACH_HEIGHT = 0.8;
     private static final float HALF_WIDTH = 0.12F;
     /** Rust red, with the four sides shaded apart. */
@@ -45,7 +45,7 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     private static final float B = 0.18F;
 
     public static final class State extends BlockEntityRenderState {
-        /** Index-aligned: where each girder ends, relative to this block's origin, and its light. */
+        /** Index-aligned: where each Rail ends, relative to this block's origin, and its light. */
         final List<Vec3> ends = new ArrayList<>();
         final List<Integer> lights = new ArrayList<>();
     }
@@ -89,12 +89,12 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
             Vec3 end = state.ends.get(i);
             int light = state.lights.get(i);
             collector.submitCustomGeometry(poseStack, RenderTypes.leash(),
-                    (pose, buffer) -> girder(pose.pose(), buffer, end, light));
+                    (pose, buffer) -> drawSpan(pose.pose(), buffer, end, light));
         }
     }
 
     /** A square tube from this Arm to {@code end}, as one triangle strip around its four sides. */
-    private static void girder(Matrix4f pose, VertexConsumer buffer, Vec3 end, int light) {
+    private static void drawSpan(Matrix4f pose, VertexConsumer buffer, Vec3 end, int light) {
         Vec3 start = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
         Vec3 along = end.subtract(start).normalize();
         Vec3 up = Math.abs(along.y) > 0.99 ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
@@ -117,7 +117,7 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
                 .setLight(light);
     }
 
-    /** A girder leaves the frustum long after the Pylon that draws it does. */
+    /** A Rail leaves the frustum long after the Pylon that draws it does. */
     @Override
     public boolean shouldRenderOffScreen() {
         return true;

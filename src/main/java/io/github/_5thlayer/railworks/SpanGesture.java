@@ -66,23 +66,18 @@ public final class SpanGesture {
             rail.set(RailworksRegistries.PENDING_SPAN.get(), GlobalPos.of(server.dimension(), arm));
             return InteractionResult.SUCCESS_SERVER;
         }
-        boolean infinite = player.hasInfiniteMaterials();
-        int held = infinite ? Integer.MAX_VALUE : count(player);
-        Stringing.Outcome outcome = LevelRails.of(server).click(server, pending.pos(), arm, held);
+        // Creative players pay and are refunded like anyone: a free Span cut for Rail would be a duplicator.
+        Stringing.Outcome outcome = LevelRails.of(server).click(server, pending.pos(), arm, count(player));
         switch (outcome.result()) {
             case STRUNG -> {
                 rail.remove(RailworksRegistries.PENDING_SPAN.get());
-                if (!infinite) {
-                    spend(player, outcome.rail());
-                }
+                spend(player, outcome.rail());
                 play(server, arm, SoundEvents.CHAIN_PLACE);
                 along(server, pending.pos(), arm, ParticleTypes.ELECTRIC_SPARK);
             }
             case CUT -> {
                 rail.remove(RailworksRegistries.PENDING_SPAN.get());
-                if (!infinite) {
-                    refund(player, outcome.rail());
-                }
+                refund(player, outcome.rail());
                 play(server, arm, SoundEvents.CHAIN_BREAK);
                 along(server, pending.pos(), arm, ParticleTypes.SMOKE);
             }

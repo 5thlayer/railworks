@@ -53,6 +53,7 @@ final class SpanTests {
         tests.test("span_repeating_the_gesture_cuts_and_refunds", 20, SpanTests::cutRefunds);
         tests.test("span_breaking_a_pylon_cuts_its_spans_and_refunds_them", 20, SpanTests::breakingRefunds);
         tests.test("span_stacking_a_segment_keeps_the_spans", 20, SpanTests::stackingKeepsSpans);
+        tests.test("span_joining_two_columns_cuts_the_lower_arms_spans", 20, SpanTests::joiningCutsLowerArm);
         tests.test("span_the_arm_is_the_top_segment", 20, SpanTests::armIsTheTop);
     }
 
@@ -236,6 +237,21 @@ final class SpanTests {
             helper.fail("the Span did not move up to the stacked column's new Arm", A.above());
         }
         expectStrung(helper, A, B, false, "the old top segment");
+        helper.succeed();
+    }
+
+    private static void joiningCutsLowerArm(GameTestHelper helper) {
+        ServerPlayer player = railPlayer(helper, 20);
+        use(helper, player, A);
+        use(helper, player, B);
+        // A second column two above A's, then a segment placed in the gap joins them.
+        helper.setBlock(A.above(2), RailworksRegistries.PYLON.get().defaultBlockState());
+        helper.setBlock(A.above(), RailworksRegistries.PYLON.get().defaultBlockState());
+        expectStrung(helper, A, B, false, "joining A's column to another above it");
+        int refunded = dropped(helper, A, RailworksRegistries.RAIL.get());
+        if (refunded != 8) {
+            helper.fail("the lower Arm's Span should drop its 8 Rail, dropped " + refunded, A);
+        }
         helper.succeed();
     }
 
