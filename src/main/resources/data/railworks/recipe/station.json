@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    "IRI",
+    "III"
+  ],
+  "key": {
+    "S": "#minecraft:signs",
+    "I": "#c:ingots/iron",
+    "R": "railworks:rail"
+  },
+  "result": {
+    "id": "railworks:station",
+    "count": 1
+  }
+}

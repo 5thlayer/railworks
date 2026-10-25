@@ -361,4 +361,227 @@ class TrainTest {
         assertEquals(90_000L, fuel(back).storedJoules());
         assertEquals(4_000_000L, fuel(back).lastLitJoules());
     }
+
+    // ---- weight ----
+
+    /** A fuelled Burner Locomotive with a Cargo car behind it. */
+    private static Train withCargo(Span span, Arm front, double toFront) {
+        Locomotive locomotive = Locomotive.burner();
+        locomotive.fuel().light(1_000_000_000L);
+        return Train.of(new Place(span, front, toFront), List.of(locomotive, CargoCar.create()));
+    }
+
+    @Test
+    void everyCarAddsWeight() {
+        assertEquals(LocomotiveSpec.MASS_KG + CargoCar.MASS_KG, withCargo(network.get(A, B), B, 5.0).mass(), EPS);
+    }
+
+    @Test
+    void aHeavierTrainAcceleratesMoreSlowly() {
+        Train light = atStart();
+        Train heavy = withCargo(network.get(A, B), B, 15.0);
+        tick(light, Throttle.FORWARD, 1);
+        tick(heavy, Throttle.FORWARD, 1);
+        // The Locomotive's 2,000 kg pulls 3,000 kg: two thirds of its own acceleration.
+        assertEquals(0.1, light.speed(), EPS);
+        assertEquals(0.1 * 2.0 / 3.0, heavy.speed(), EPS);
+    }
+
+    @Test
+    void aHeavierTrainBrakesMoreSlowly() {
+        Train light = atStart();
+        Train heavy = withCargo(network.get(A, B), B, 15.0);
+        tick(light, Throttle.FORWARD, 6);
+        tick(heavy, Throttle.FORWARD, 9);
+        assertEquals(light.speed(), heavy.speed(), EPS, "both at 0.6 blocks a tick");
+        tick(light, Throttle.BACK, 1);
+        tick(heavy, Throttle.BACK, 1);
+        // Only the Locomotive brakes, so a Cargo car's weight stretches the stop.
+        assertEquals(0.6 - 0.25, light.speed(), EPS);
+        assertEquals(0.6 - 0.25 * 2.0 / 3.0, heavy.speed(), EPS);
+    }
+
+    @Test
+    void aHeavierTrainRunningDryBrakesMoreSlowlyToo() {
+        Locomotive locomotive = Locomotive.burner();
+        locomotive.fuel().light(5 * FULL_BURN);
+        Train train = Train.of(new Place(network.get(A, B), B, 15.0), List.of(locomotive, CargoCar.create()));
+        tick(train, Throttle.FORWARD, 5);
+        double before = train.speed();
+        tick(train, Throttle.FORWARD, 1);
+        assertEquals(before - 0.25 * 2.0 / 3.0, train.speed(), EPS);
+    }
+
+    // ---- facing ----
+
+    @Test
+    void aReversedLocomotiveDrivesTheTrainItsOwnForward() {
+        Locomotive front = Locomotive.burner();
+        Locomotive back = Locomotive.burner();
+        front.fuel().light(1_000_000_000L);
+        back.fuel().light(1_000_000_000L);
+        Train train = Train.of(new Place(network.get(A, B), B, 10.0), List.of(front, CargoCar.create()));
+        train = train.coupled(network, Train.End.BACK, back, true);
+        assertTrue(train.reversed(back));
+        long frontFuel = front.fuel().storedJoules();
+        train.tick(network, Throttle.FORWARD, back, car -> 0L, span -> false);
+        assertTrue(train.speed() < 0.0, "forward from the back cab runs the Train backward");
+        assertEquals(frontFuel, front.fuel().storedJoules(), "the Locomotive facing away does not pull");
+        // One Locomotive's 2,000 kg pulls 5,000 kg.
+        assertEquals(-0.1 * 2.0 / 5.0, train.speed(), EPS);
+    }
+
+    @Test
+    void aReversedCarFacesTheOtherWayAtItsPlace() {
+        Train train = withCargo(network.get(A, B), B, 10.0);
+        Car cargo = train.cars().get(1);
+        Train turned = Train.of(train.head(), train.cars().getFirst())
+                .coupled(network, Train.End.BACK, CargoCar.create(), true);
+        Car reversed = turned.cars().get(1);
+        assertEquals(B, turned.placeOf(network, reversed).front());
+        assertEquals(A, turned.facing(network, reversed).front());
+        assertEquals(B, train.facing(network, cargo).front());
+    }
+
+    // ---- coupling ----
+
+    @Test
+    void aCarCouplesBehindTheLastCar() {
+        Train train = atStart().coupled(network, Train.End.BACK, CargoCar.create(), false);
+        assertTrue(train == null, "at a line's end there is no room behind");
+        Train mid = train(network.get(A, B), B, 10.0);
+        CargoCar cargo = CargoCar.create();
+        Train coupled = mid.coupled(network, Train.End.BACK, cargo, false);
+        assertEquals(List.of(mid.cars().getFirst(), cargo), coupled.cars());
+        assertEquals(mid.head(), coupled.head());
+        assertEquals(10.0 + (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0, coupled.placeOf(network, cargo).toFront(), EPS);
+    }
+
+    @Test
+    void aCarCouplesAheadOfTheFirstCarAndLeadsTheTrain() {
+        Train mid = train(network.get(A, B), B, 10.0);
+        CargoCar cargo = CargoCar.create();
+        Train coupled = mid.coupled(network, Train.End.FRONT, cargo, false);
+        assertEquals(cargo, coupled.cars().getFirst());
+        assertEquals(10.0 - 1.8, coupled.head().toFront(), EPS);
+        assertEquals(10.0, coupled.placeOf(network, mid.cars().getFirst()).toFront(), EPS, "the old first car stays put");
+    }
+
+    @Test
+    void aMovingTrainTakesNoCar() {
+        Train train = atStart();
+        tick(train, Throttle.FORWARD, 2);
+        assertEquals(null, train.coupled(network, Train.End.FRONT, CargoCar.create(), false));
+        assertEquals(null, withMoving().uncoupled(network, 1));
+    }
+
+    private Train withMoving() {
+        Train train = withCargo(network.get(A, B), B, 15.0);
+        tick(train, Throttle.FORWARD, 2);
+        return train;
+    }
+
+    @Test
+    void uncouplingPartsTheTrainWhereItsCarsStood() {
+        Train train = withCargo(network.get(B, C), C, 19.5);
+        Car first = train.cars().get(0);
+        Car second = train.cars().get(1);
+        Place behind = train.placeOf(network, second);
+        List<Train> parts = train.uncoupled(network, 1);
+        assertEquals(List.of(first), parts.get(0).cars());
+        assertEquals(List.of(second), parts.get(1).cars());
+        assertEquals(train.head(), parts.get(0).head());
+        assertEquals(behind, parts.get(1).head());
+        assertEquals(null, train.uncoupled(network, 0), "no coupler ahead of the first car");
+    }
+
+    @Test
+    void uncouplingKeepsEachCarFacingItsWay() {
+        Locomotive back = Locomotive.burner();
+        Train train = withCargo(network.get(A, B), B, 5.0).coupled(network, Train.End.BACK, back, true);
+        Train last = train.uncoupled(network, 2).get(1);
+        assertTrue(last.reversed(back));
+        assertEquals(A, last.facing(network, back).front());
+    }
+
+    @Test
+    void theCouplerUsedIsOnTheSideOfTheCarUsedOrElseTheOther() {
+        Train train = withCargo(network.get(A, B), B, 5.0).coupled(network, Train.End.BACK, CargoCar.create(), true);
+        Car first = train.cars().get(0);
+        Car middle = train.cars().get(1);
+        Car last = train.cars().get(2);
+        assertEquals(1, train.coupler(middle, 1), "ahead of the middle car");
+        assertEquals(2, train.coupler(middle, -1), "behind it");
+        assertEquals(1, train.coupler(first, 1), "nothing ahead of the first car, so the one behind it");
+        // The last car faces back, so its own ahead is the Train's end.
+        assertEquals(2, train.coupler(last, 1));
+        assertEquals(2, train.coupler(last, -1));
+        Train alone = atStart();
+        assertEquals(-1, alone.coupler(alone.cars().getFirst(), 1));
+    }
+
+    @Test
+    void aCarGoneFromTheMiddleLeavesTwoTrains() {
+        Train train = withCargo(network.get(A, B), B, 5.0).coupled(network, Train.End.BACK, CargoCar.create(), false);
+        List<Train> left = train.without(network, train.cars().get(1));
+        assertEquals(2, left.size());
+        assertEquals(train.placeOf(network, train.cars().get(2)), left.get(1).head());
+        assertEquals(1, train.without(network, train.cars().getFirst()).size());
+        Train alone = atStart();
+        assertTrue(alone.without(network, alone.cars().getFirst()).isEmpty());
+    }
+
+    // ---- the Spans it holds ----
+
+    @Test
+    void itHoldsTheSpansItsCarsBodiesReachInto() {
+        // Its middle 0.5 from B, its front half 0.9 long: over B and into the Span beyond.
+        Train train = train(network.get(A, B), B, 0.5);
+        assertEquals(List.of(network.get(B, C), network.get(A, B)), train.spans(network));
+    }
+
+    @Test
+    void itStopsAtTheArmOfASpanAnotherTrainHolds() {
+        Train train = train(network.get(A, B), B, 5.0);
+        fuel(train).light(1_000_000_000L);
+        Span ahead = network.get(B, C);
+        for (int i = 0; i < 40; i++) {
+            train.tick(network, Throttle.FORWARD, train.cars().getFirst(), car -> 0L, ahead::equals);
+        }
+        assertEquals(0.0, train.speed(), EPS);
+        assertEquals(Locomotive.LENGTH / 2.0, train.head().toFront(), EPS, "its front at B");
+        assertEquals(List.of(network.get(A, B)), train.spans(network));
+    }
+
+    @Test
+    void aTrainOfCarsRoundTripsThroughItsCodecWithItsCarsAndTheirFacing() {
+        Train train = withCargo(network.get(A, B), B, 5.0).coupled(network, Train.End.BACK, Locomotive.burner(), true);
+        var json = Train.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, train).getOrThrow();
+        Train back = Train.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, json).getOrThrow();
+        assertEquals(train.cars().stream().map(Car::id).toList(), back.cars().stream().map(Car::id).toList());
+        assertEquals(train.cars().stream().map(Car::kind).toList(), back.cars().stream().map(Car::kind).toList());
+        assertTrue(back.reversed(back.cars().get(2)));
+        assertFalse(back.reversed(back.cars().get(1)));
+        assertEquals(train.spans(network), back.spans(network));
+    }
+
+    @Test
+    void whenTheLocomotivesFacingTheWayItRunsAreDryTheOthersPull() {
+        Locomotive front = Locomotive.burner();
+        Locomotive back = Locomotive.burner();
+        back.fuel().light(1_000_000_000L);
+        Train train = Train.of(new Place(network.get(A, B), B, 10.0), front)
+                .coupled(network, Train.End.BACK, back, true);
+        train.tick(network, Throttle.FORWARD, front, car -> 0L, span -> false);
+        // The dry front Locomotive pulls nothing, so the fuelled one facing back pulls 4,000 kg.
+        assertEquals(0.1 * 2.0 / 4.0, train.speed(), EPS);
+    }
+
+    @Test
+    void aCarCouplesOnlyWhereItsWholeBodyIsOnTheLine() {
+        // Its back 1.8 + 0.9 from A: a 1.8-block car fits behind it, a hair more does not.
+        Train train = train(network.get(A, B), B, 20.0 - 2.7);
+        assertTrue(train.slot(network, Train.End.BACK, 1.8) != null);
+        assertEquals(null, train.slot(network, Train.End.BACK, 1.81));
+    }
 }

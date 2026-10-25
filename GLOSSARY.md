@@ -56,6 +56,10 @@ _Avoid_: loading gauge, hitbox
 Cars coupled on the Rail that move as one.
 _Avoid_: monorail, consist
 
+**Car**:
+One of the Locomotives and Cargo cars a Train is made of, coupled to the car ahead and the car behind. It faces the Train's way or the other, so a Train can have a Locomotive facing out at each end. Placing one beside an end of a Train at rest couples it there; shears uncouple it.
+_Avoid_: wagon, carriage, vehicle, rolling stock
+
 **Locomotive**:
 A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electric Locomotive runs on FE.
 _Avoid_: engine (Wireworks' steam engine), loco
@@ -65,8 +69,8 @@ A car that carries items, loaded and unloaded only while stopped at a Station.
 _Avoid_: wagon, freight car
 
 **Station**:
-A named place on the Rail where a Train stops. A schedule names Stations, and several may share a name.
-_Avoid_: stop (Voidworks' Stop), train stop, depot
+A named block beside the Rail or under it, serving the nearest Span in reach: a car stopped within a block either way of the point of the Span nearest it is at the Station (ADR 0007). A Schedule names Stations, and several may share a name.
+_Avoid_: stop (Voidworks' Stop), train stop, depot, platform
 
 **Schedule**:
 The list of Stations a Train runs through, each with when to leave.

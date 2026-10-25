@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.UUID;
 import java.util.function.LongSupplier;
 
 import com.mojang.serialization.Codec;
@@ -11,7 +12,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
  * A Burner Locomotive: the car of a {@link Train} that pulls it, for as long as its joule fuel
- * buffer pays a tick of full power. Where it is and how fast it goes are its Train's.
+ * buffer pays a tick of full power, and brakes it, fuelled or not. Where it is and how fast it goes
+ * are its Train's; which way it faces in its Train is the Train's too.
  *
  * <p>Pure: no Minecraft types.
  */
@@ -19,28 +21,36 @@ public final class Locomotive implements Car {
 
     public static final String KIND = "locomotive";
 
-    /** Blocks along the Line: the 1.8-block body {@code LocomotiveRenderer} draws. */
+    /** Blocks along the Line: the 1.8-block body {@code CarRenderer} draws. */
     public static final double LENGTH = 1.8;
 
     static final MapCodec<Locomotive> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+            ID_FIELD.forGetter(Locomotive::id),
             Codec.LONG.fieldOf("fuel").forGetter(l -> l.fuel.storedJoules()),
             Codec.LONG.fieldOf("last_lit").forGetter(l -> l.fuel.lastLitJoules())
     ).apply(i, Locomotive::restore));
 
+    private final UUID id;
     private final FuelBuffer fuel = new FuelBuffer();
 
-    private Locomotive() {
+    private Locomotive(UUID id) {
+        this.id = id;
     }
 
     /** A Burner Locomotive with an empty buffer. */
     public static Locomotive burner() {
-        return new Locomotive();
+        return new Locomotive(UUID.randomUUID());
     }
 
-    static Locomotive restore(long fuel, long lastLit) {
-        Locomotive locomotive = new Locomotive();
+    static Locomotive restore(UUID id, long fuel, long lastLit) {
+        Locomotive locomotive = new Locomotive(id);
         locomotive.fuel.load(fuel, lastLit);
         return locomotive;
+    }
+
+    @Override
+    public UUID id() {
+        return id;
     }
 
     @Override
@@ -90,5 +100,10 @@ public final class Locomotive implements Car {
         }
         fuel.light(lit);
         return fuel.drawTick(perTick);
+    }
+
+    @Override
+    public String toString() {
+        return "Locomotive[" + id + "]";
     }
 }

@@ -20,7 +20,9 @@ package io.github._5thlayer.railworks.rail;
  * Acceleration is the other number nothing gives: Factorio's depends on the Train's mass and a
  * power curve, so a constant half the braking is this Module's own pick, for a Locomotive pulling
  * only itself: a Train's acceleration is its fuelled Locomotives' pull over its whole mass. Braking
- * and friction are each car's own, so they slow a Train the same whatever its length.
+ * is the same for a Locomotive alone, and is its Locomotives' brakes over its whole mass, so every
+ * Cargo car stretches a stop as it does a start. Friction is each car's own, so it slows a Train
+ * the same whatever its length.
  *
  * <p>Speeds are in blocks a second and accelerations in blocks a second squared for the config's
  * sake; the model works in ticks. Pure: no Minecraft types.

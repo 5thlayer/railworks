@@ -3,18 +3,27 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
-import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Stringing;
+import io.github._5thlayer.railworks.rail.Throttle;
+import io.github._5thlayer.railworks.rail.Train;
+import io.github._5thlayer.railworks.rail.Trains;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.Identifier;
@@ -26,35 +35,40 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * A level's Spans, saved with it. The rules are {@link Stringing}'s and the storage
- * {@link RailNetwork}'s; this is where the two meet a world.
+ * A level's Spans and its Trains, saved with it. The rules are {@link Stringing}'s and the storage
+ * {@link RailNetwork}'s and {@link Trains}'; this is where they meet a world. It also knows each car's
+ * loaded entity, its view, so a Train's tick can read its drivers' keys and its Locomotives' fuel
+ * slots and move every car it has in view.
  */
 public final class LevelRails extends SavedData {
 
-    private static final Codec<LevelRails> CODEC = RailNetwork.CODEC
-            .xmap(LevelRails::new, data -> data.network)
-            .fieldOf("spans")
-            .codec();
+    private static final Codec<LevelRails> CODEC = RecordCodecBuilder.create(i -> i.group(
+            RailNetwork.CODEC.fieldOf("spans").forGetter(data -> data.network),
+            Trains.CODEC.optionalFieldOf("trains").forGetter(data -> Optional.of(data.trains))
+    ).apply(i, (network, trains) -> new LevelRails(network, trains.orElseGet(Trains::new))));
 
     public static final SavedDataType<LevelRails> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(Railworks.MOD_ID, "spans"),
             LevelRails::new, CODEC);
 
     private final RailNetwork network;
+    private final Trains trains;
+    /** Each loaded car's entity, by its car's id. */
+    private final Map<UUID, CarEntity> views = new HashMap<>();
 
     public LevelRails() {
-        this(new RailNetwork());
+        this(new RailNetwork(), new Trains());
     }
 
-    private LevelRails(RailNetwork network) {
+    private LevelRails(RailNetwork network, Trains trains) {
         this.network = network;
+        this.trains = trains;
     }
 
     public static LevelRails of(ServerLevel level) {
@@ -63,6 +77,129 @@ public final class LevelRails extends SavedData {
 
     public RailNetwork network() {
         return network;
+    }
+
+    public Trains trains() {
+        return trains;
+    }
+
+    // ---- the Trains ----
+
+    /** {@code car} is in view: its Train's tick moves it. */
+    void bind(CarEntity car) {
+        if (car.carId() != null) {
+            views.put(car.carId(), car);
+        }
+    }
+
+    void unbind(CarEntity car) {
+        if (car.carId() != null) {
+            views.remove(car.carId(), car);
+        }
+    }
+
+    /** The loaded entity of {@code car}, or null when it has none in view. */
+    public CarEntity view(Car car) {
+        CarEntity view = views.get(car.id());
+        return view == null || view.isRemoved() ? null : view;
+    }
+
+    /** A new Train, set on the Rail: it is saved and ticks from now on. */
+    public void add(Train train) {
+        trains.add(train);
+        setDirty();
+    }
+
+    /**
+     * One tick of {@code train}, from its first car's view: the keys of the first player driving one
+     * of its Locomotives, each Locomotive's fuel slot, and every car it has in view set where the
+     * model now puts it.
+     */
+    void tick(ServerLevel level, Train train) {
+        Car driven = train.cars().getFirst();
+        Throttle throttle = Throttle.NONE;
+        for (Car car : train.cars()) {
+            if (view(car) instanceof LocomotiveEntity locomotive && locomotive.throttle() != Throttle.NONE) {
+                driven = car;
+                throttle = locomotive.throttle();
+                break;
+            }
+        }
+        double speed = train.speed();
+        Place head = train.head();
+        train.tick(network, throttle, driven,
+                locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L,
+                trains.takenFrom(network, train));
+        if (train.speed() != speed || !train.head().equals(head)) {
+            setDirty();
+        }
+        for (Car car : train.cars()) {
+            CarEntity view = view(car);
+            if (view != null) {
+                view.moveToModel(train);
+                view.syncFromModel(train);
+            }
+        }
+    }
+
+    /** {@code train} fell off the Rail: it is gone, and each of its cars in view breaks, dropping itself and what it holds. */
+    void derail(ServerLevel level, Train train) {
+        trains.remove(train);
+        setDirty();
+        for (Car car : train.cars()) {
+            CarEntity view = view(car);
+            if (view != null) {
+                view.breakOff(level);
+            }
+        }
+    }
+
+    /** Parts {@code train} at coupler {@code at}; null, changing nothing, while it moves. */
+    List<Train> uncouple(ServerLevel level, Train train, int at) {
+        List<Train> parts = trains.uncouple(network, train, at);
+        if (parts != null) {
+            setDirty();
+            parts.forEach(part -> refresh(part));
+        }
+        return parts;
+    }
+
+    /** Couples {@code car} into {@code slot}'s Train; null, changing nothing, where it cannot. */
+    Train couple(Trains.Slot slot, Car car, boolean reversed) {
+        Train coupled = trains.couple(network, slot, car, reversed);
+        if (coupled != null) {
+            setDirty();
+            refresh(coupled);
+        }
+        return coupled;
+    }
+
+    /** The car with this id is gone for good: its Train closes up without it. */
+    void carGone(UUID carId) {
+        Train train = trains.of(carId);
+        views.remove(carId);
+        if (train == null) {
+            return;
+        }
+        trains.removeCar(network, carId);
+        setDirty();
+        for (Car car : train.cars()) {
+            Train now = trains.of(car.id());
+            if (now != null) {
+                refresh(now);
+            }
+        }
+    }
+
+    /** Sets every car of {@code train} in view where the model puts it, and what a client sees of it. */
+    private void refresh(Train train) {
+        for (Car car : train.cars()) {
+            CarEntity view = view(car);
+            if (view != null) {
+                view.moveToModel(train);
+                view.syncFromModel(train);
+            }
+        }
     }
 
     public boolean contains(BlockPos a, BlockPos b) {
@@ -97,11 +234,10 @@ public final class LevelRails extends SavedData {
         List<Span> moving = network.spansAt(from);
         Arm to = PylonColumn.arm(pos);
         network.rekey(from, to);
-        // A car riding one of those Spans stays on it, its Arm now one segment higher.
-        AABB around = new AABB(PylonColumn.block(from)).inflate(SpanRules.lengthLimit() + LocomotiveEntity.HEIGHT + 1.0);
-        for (LocomotiveEntity car : level.getEntitiesOfClass(LocomotiveEntity.class, around)) {
-            car.armMoved(network, from, to);
-        }
+        // A Train riding one of those Spans stays on it, its Arm now one segment higher.
+        trains.moveArm(network, from, to);
+        trains.all().forEach(this::refresh);
+        setDirty();
         if (!moving.isEmpty()) {
             changed(level, moving.stream().flatMap(s -> Stream.of(s.a(), s.b())).toArray(Arm[]::new));
         }

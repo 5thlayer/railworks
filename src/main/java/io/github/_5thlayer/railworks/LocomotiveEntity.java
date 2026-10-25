@@ -3,68 +3,40 @@
 
 package io.github._5thlayer.railworks;
 
-import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
-import io.github._5thlayer.railworks.rail.Place;
-import io.github._5thlayer.railworks.rail.RailNetwork;
-import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Throttle;
 import io.github._5thlayer.railworks.rail.Train;
-import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.InterpolationHandler;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.HasCustomInventoryScreen;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.VehicleEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
  * A Burner Locomotive in the world: the view of its {@link Locomotive}, a car in a {@link Train}.
- * The model runs the drive and holds the place, speed and heading (the Train's) and the joule fuel
- * (the car's); this entity feeds it the driver's keys and the fuel slot, rides the Rail where the
- * model puts its car, and mirrors the numbers a client shows (Jade, the renderer's heading) into
- * synched data.
+ * The model runs the drive and holds the joule fuel (the car's); this entity feeds it the driver's
+ * keys and the fuel slot, and mirrors the fuel a client shows (Jade) into synched data.
  *
- * <p>Using it with fuel in hand fills the fuel slot; using it otherwise boards it, and sneaking
- * gets off (vanilla's dismount). It comes off the Rail, dropping itself and its fuel, when the Span
- * it rides is cut.
+ * <p>Fuel in hand fills the fuel slot rather than boarding; the rest is {@link CarEntity}'s.
  */
-public final class LocomotiveEntity extends VehicleEntity implements HasCustomInventoryScreen {
+public final class LocomotiveEntity extends CarEntity {
 
-    public static final float WIDTH = 1.0F;
-    public static final float HEIGHT = 2.75F;
-
-    private static final EntityDataAccessor<BlockPos> DATA_SPAN_A =
-            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BLOCK_POS);
-    private static final EntityDataAccessor<BlockPos> DATA_SPAN_B =
-            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BLOCK_POS);
-    private static final EntityDataAccessor<Boolean> DATA_FRONT_B =
-            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Float> DATA_SPEED =
-            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Long> DATA_FUEL =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Long> DATA_FUEL_CAPACITY =
@@ -72,11 +44,6 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
 
-    /** Steps the client's car toward each position the server sends, as a boat's does, rather than snapping to it. */
-    private final InterpolationHandler interpolation = new InterpolationHandler(this, 3);
-    private @Nullable Train train;
-    /** Its car in {@link #train}. */
-    private @Nullable Locomotive locomotive;
     /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
         @Override
@@ -90,58 +57,19 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
 
     public LocomotiveEntity(EntityType<? extends LocomotiveEntity> type, Level level) {
         super(type, level);
-        this.noPhysics = true;
-        this.setNoGravity(true);
     }
 
-    /** Sets this car on the Rail as {@code locomotive} in {@code train}; the entity is its view from then on. */
-    public void setTrain(Train train, Locomotive locomotive) {
-        if (!train.cars().contains(locomotive)) {
-            throw new IllegalArgumentException(locomotive + " is not a car of " + train);
-        }
-        this.train = train;
-        this.locomotive = locomotive;
-        moveToModel();
-        syncFromModel();
+    @Override
+    public CarKind carKind() {
+        return CarKind.LOCOMOTIVE;
     }
 
-    public @Nullable Train train() {
-        return train;
-    }
-
+    /** Its car, on the server. */
     public @Nullable Locomotive locomotive() {
-        return locomotive;
-    }
-
-    /** Whether some Locomotive in {@code level} rides {@code span}: one Train holds a Span at a time. */
-    public static boolean holding(Level level, Span span) {
-        AABB around = new AABB(span.a().x(), span.a().y(), span.a().z(), span.b().x(), span.b().y(), span.b().z())
-                .inflate(HEIGHT + 1.0);
-        return !level.getEntitiesOfClass(LocomotiveEntity.class, around, car -> car.holds(span)).isEmpty();
-    }
-
-    /** The Arm at {@code from} moved to {@code to} with its Spans: this car stays on its Span. */
-    public void armMoved(RailNetwork network, Arm from, Arm to) {
-        if (train != null) {
-            train.moveArm(network, from, to);
-            moveToModel();
-            syncFromModel();
-        }
-    }
-
-    /** Whether this car rides {@code span}, as the client knows it from synched data. */
-    public boolean holds(Span span) {
-        BlockPos a = entityData.get(DATA_SPAN_A);
-        BlockPos b = entityData.get(DATA_SPAN_B);
-        return a.equals(PylonColumn.block(span.a())) && b.equals(PylonColumn.block(span.b()));
+        return car() instanceof Locomotive locomotive ? locomotive : null;
     }
 
     // ---- what a client shows ----
-
-    /** Blocks a second, positive the way it faces. */
-    public double speedPerSecond() {
-        return LocomotiveSpec.blocksPerSecond(entityData.get(DATA_SPEED));
-    }
 
     public long fuelJoules() {
         return entityData.get(DATA_FUEL);
@@ -156,43 +84,19 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         return entityData.get(DATA_FUEL_ITEM);
     }
 
-    // ---- the tick ----
-
     @Override
-    public void tick() {
-        if (getHurtTime() > 0) {
-            setHurtTime(getHurtTime() - 1);
+    protected void syncCar(Car car) {
+        if (car instanceof Locomotive locomotive) {
+            entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
+            entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         }
-        if (getDamage() > 0.0F) {
-            setDamage(getDamage() - 1.0F);
-        }
-        super.tick();
-        interpolation.interpolate();
-        if (level() instanceof ServerLevel server) {
-            tickServer(server);
-        }
+        entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
     }
 
-    private void tickServer(ServerLevel level) {
-        if (train == null || locomotive == null) {
-            discard();
-            return;
-        }
-        RailNetwork network = LevelRails.of(level).network();
-        if (!train.onRail(network)) {
-            // A Span it rode was cut, or its Arm moved: it falls off the Rail as an item.
-            destroy(level, damageSources().generic());
-            return;
-        }
-        // The first car's view runs its Train's tick: a Train moves once a tick, whatever its length.
-        if (train.cars().getFirst() == locomotive) {
-            train.tick(network, throttle(), each -> each == locomotive ? ignite() : 0L);
-        }
-        moveToModel();
-        syncFromModel();
-    }
+    // ---- the drive ----
 
-    private Throttle throttle() {
+    /** Its driver's keys: forward or back the way this car faces. */
+    Throttle throttle() {
         if (getFirstPassenger() instanceof ServerPlayer driver) {
             Input input = driver.getLastClientInput();
             if (input.forward() != input.backward()) {
@@ -203,7 +107,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     }
 
     /** Burns one fuel item from the slot whole and says what it was worth; 0 when there is none. */
-    private long ignite() {
+    long ignite() {
         ItemStack fuel = cab.getItem(LocomotiveMenu.FUEL);
         long joules = fuelValue(level(), fuel);
         if (joules <= 0L) {
@@ -222,74 +126,18 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         return stack.isEmpty() ? 0L : LocomotiveSpec.joules(stack.getBurnTime(null, level.fuelValues()));
     }
 
-    private void moveToModel() {
-        if (train == null || locomotive == null) {
-            return;
-        }
-        Place place = place();
-        Vec3 rail = LocomotivePlacement.railPoint(place);
-        double speed = train.speed();
-        Arm front = place.front();
-        Arm back = place.back();
-        double dx = front.x() - back.x();
-        double dy = front.y() - back.y();
-        double dz = front.z() - back.z();
-        double horizontal = Math.sqrt(dx * dx + dz * dz);
-        setYRot((float) (Mth.atan2(-dx, dz) * Mth.RAD_TO_DEG));
-        setXRot((float) (-Mth.atan2(dy, horizontal) * Mth.RAD_TO_DEG));
-        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        setDeltaMovement(dx / length * speed, dy / length * speed, dz / length * speed);
-        setPos(rail.x, rail.y, rail.z);
-    }
-
-    /** Where its car is in its Train; the first car's place needs no Rail. */
-    private Place place() {
-        return level() instanceof ServerLevel server
-                ? train.placeOf(LevelRails.of(server).network(), locomotive)
-                : train.head();
-    }
-
-    private void syncFromModel() {
-        if (train == null || locomotive == null) {
-            return;
-        }
-        Place place = place();
-        entityData.set(DATA_SPAN_A, PylonColumn.block(place.span().a()));
-        entityData.set(DATA_SPAN_B, PylonColumn.block(place.span().b()));
-        entityData.set(DATA_FRONT_B, place.front().equals(place.span().b()));
-        entityData.set(DATA_SPEED, (float) train.speed());
-        entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
-        entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
-        entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
-    }
-
     // ---- using it ----
 
+    /** Fuel in hand fills the slot as a shortcut; fuel the slot cannot take boards instead. */
     @Override
-    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location) {
-        InteractionResult inherited = super.interact(player, hand, location);
-        if (inherited != InteractionResult.PASS) {
-            return inherited;
-        }
-        // Sneaking at the car from outside opens its menu.
-        if (player.isSecondaryUseActive()) {
-            if (!level().isClientSide()) {
-                openCustomInventoryScreen(player);
-            }
-            return InteractionResult.SUCCESS;
-        }
-        ItemStack held = player.getItemInHand(hand);
-        // Fuel in hand fills the slot as a shortcut; fuel the slot cannot take boards instead.
+    protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
         if (fuelValue(level(), held) > 0L && fuelRoomFor(held) > 0) {
             if (!level().isClientSide()) {
                 fillFuel(held);
             }
             return InteractionResult.SUCCESS;
         }
-        if (!level().isClientSide() && !player.startRiding(this)) {
-            return InteractionResult.PASS;
-        }
-        return InteractionResult.SUCCESS;
+        return InteractionResult.PASS;
     }
 
     /** How many of {@code held} the fuel slot takes: it holds the same fuel or nothing. */
@@ -317,62 +165,19 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     /** The menu, from the inventory key while riding and from sneaking at the car. */
     @Override
     public void openCustomInventoryScreen(Player player) {
-        if (player instanceof ServerPlayer server) {
-            server.openMenu(new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
-                    Component.translatable("entity.railworks.burner_locomotive")));
-        }
-    }
-
-    @Override
-    public InterpolationHandler getInterpolation() {
-        return interpolation;
-    }
-
-    @Override
-    public boolean isPickable() {
-        return !isRemoved();
-    }
-
-    @Override
-    public boolean isPushable() {
-        return false;
-    }
-
-    @Override
-    protected boolean canAddPassenger(Entity passenger) {
-        return getPassengers().isEmpty();
-    }
-
-    // No getControllingPassenger: the server drives the car, and a controlling passenger would make
-    // it client-authoritative, so the client would drop the server's positions for it and the rider
-    // would not move until they got off.
-
-    /** Off the car onto the first floor below it, since it rides well above the ground. */
-    @Override
-    public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
-        BlockPos.MutableBlockPos probe = BlockPos.containing(getX(), getY(), getZ()).mutable();
-        for (int drop = 0; drop < 24 && !level().isOutsideBuildHeight(probe); drop++) {
-            double floor = level().getBlockFloorHeight(probe);
-            Vec3 spot = new Vec3(getX(), probe.getY() + floor, getZ());
-            if (Double.isFinite(floor) && level().noCollision(passenger, passenger.getBoundingBox().move(
-                    spot.subtract(passenger.position())))) {
-                return spot;
-            }
-            probe.move(0, -1, 0);
-        }
-        return super.getDismountLocationForPassenger(passenger);
+        open(player, new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
+                Component.translatable("entity.railworks.burner_locomotive")));
     }
 
     // ---- breaking it ----
 
     @Override
-    protected void destroy(ServerLevel level, DamageSource source) {
+    protected void dropContents(ServerLevel level) {
         for (int slot = 0; slot < cab.getContainerSize(); slot++) {
             if (!cab.getItem(slot).isEmpty()) {
                 spawnAtLocation(level, cab.removeItemNoUpdate(slot));
             }
         }
-        super.destroy(level, source);
     }
 
     @Override
@@ -380,20 +185,11 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         return RailworksRegistries.LOCOMOTIVE.get();
     }
 
-    @Override
-    public ItemStack getPickResult() {
-        return new ItemStack(getDropItem());
-    }
-
     // ---- saving ----
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
         super.defineSynchedData(entityData);
-        entityData.define(DATA_SPAN_A, BlockPos.ZERO);
-        entityData.define(DATA_SPAN_B, BlockPos.ZERO);
-        entityData.define(DATA_FRONT_B, false);
-        entityData.define(DATA_SPEED, 0.0F);
         entityData.define(DATA_FUEL, 0L);
         entityData.define(DATA_FUEL_CAPACITY, 0L);
         entityData.define(DATA_FUEL_ITEM, ItemStack.EMPTY);
@@ -401,29 +197,20 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
 
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
-        if (train != null && locomotive != null) {
-            output.store("train", Train.CODEC, train);
-            output.putInt("car", train.cars().indexOf(locomotive));
-        }
+        super.addAdditionalSaveData(output);
         cab.storeAsItemList(output.list("cab", ItemStack.OPTIONAL_CODEC));
     }
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
-        input.read("train", Train.CODEC)
-                // A Locomotive saved before Trains had cars.
-                .or(() -> input.read("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC))
-                .ifPresent(loaded -> {
-                    int car = input.getIntOr("car", 0);
-                    if (car >= 0 && car < loaded.cars().size() && loaded.cars().get(car) instanceof Locomotive view) {
-                        setTrain(loaded, view);
-                    }
-                });
+        super.readAdditionalSaveData(input);
+        if (carId() == null) {
+            // A Locomotive saved with its own Train, before the level held Trains, or before Trains
+            // had cars, when the Locomotive was the whole Train.
+            input.read("train", Train.CODEC).ifPresentOrElse(
+                    train -> adoptLegacy(train, input.getIntOr("car", 0)),
+                    () -> input.read("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC).ifPresent(train -> adoptLegacy(train, 0)));
+        }
         cab.fromItemList(input.listOrEmpty("cab", ItemStack.OPTIONAL_CODEC));
-    }
-
-    /** Which end the car faces, for the renderer: true when it is the Span's second end. */
-    public boolean facesSecondEnd() {
-        return entityData.get(DATA_FRONT_B);
     }
 }

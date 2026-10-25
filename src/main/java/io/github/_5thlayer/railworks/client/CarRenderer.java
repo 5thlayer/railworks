@@ -6,7 +6,7 @@ package io.github._5thlayer.railworks.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -18,13 +18,14 @@ import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 
 /**
- * A Burner Locomotive, drawn as placeholder boxes in the Rail's rust red: a skirt down both sides of
- * the web, a floor over it and a roof, so the driver shows in the open cab, and a darker engine
- * block at the front so the heading reads. Every
+ * A car, drawn as placeholder boxes in the Rail's rust red: a skirt down both sides of the web and a
+ * floor over it. A Burner Locomotive adds a roof, so the driver shows in the open cab, and a darker
+ * engine block at the front so the heading reads; a Cargo car adds a low crate, a rider sitting on
+ * its lid. Every
  * face is its own triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its
  * tube, so the strips the pipeline joins in one buffer leave no triangles between them.
  */
-public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, LocomotiveRenderer.State> {
+public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, CarRenderer.State> {
 
     public static final class State extends EntityRenderState {
         float yRot;
@@ -34,9 +35,20 @@ public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, L
     /** Rust red, as the Rail's, with the six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
 
-    public LocomotiveRenderer(EntityRendererProvider.Context context) {
+    private final boolean cargo;
+
+    private CarRenderer(EntityRendererProvider.Context context, boolean cargo) {
         super(context);
+        this.cargo = cargo;
         this.shadowRadius = 0.0F;
+    }
+
+    public static <T extends CarEntity> CarRenderer<T> locomotive(EntityRendererProvider.Context context) {
+        return new CarRenderer<>(context, false);
+    }
+
+    public static <T extends CarEntity> CarRenderer<T> cargo(EntityRendererProvider.Context context) {
+        return new CarRenderer<>(context, true);
     }
 
     @Override
@@ -45,7 +57,7 @@ public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, L
     }
 
     @Override
-    public void extractRenderState(LocomotiveEntity car, State state, float partialTicks) {
+    public void extractRenderState(T car, State state, float partialTicks) {
         super.extractRenderState(car, state, partialTicks);
         state.yRot = Mth.rotLerp(partialTicks, car.yRotO, car.getYRot());
         state.xRot = Mth.lerp(partialTicks, car.xRotO, car.getXRot());
@@ -59,16 +71,24 @@ public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, L
         poseStack.mulPose(Axis.YP.rotationDegrees(-state.yRot));
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
         int light = state.lightCoords;
-        // The skirt down both sides of the web, the floor over it, the engine block and the roof.
+        // The skirt down both sides of the web and the floor over it, then the car's own body.
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
             float web = (float) (RailGeometry.WEB_WIDTH / 2.0);
-            float skirt = (float) (LocomotiveEntity.WIDTH / 2.0);
+            float skirt = (float) (CarEntity.WIDTH / 2.0);
             float floor = (float) (RailGeometry.WEB_HEIGHT + 0.05);
             box(pose.pose(), buffer, -skirt, 0.0F, -0.9F, -web - 0.02F, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
             box(pose.pose(), buffer, web + 0.02F, 0.0F, -0.9F, skirt, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
             box(pose.pose(), buffer, -skirt, floor, -0.9F, skirt, floor + 0.15F, 0.9F, 0.62F, 0.27F, 0.18F, light);
-            box(pose.pose(), buffer, -0.45F, floor + 0.15F, 0.2F, 0.45F, 1.6F, 0.9F, 0.40F, 0.17F, 0.12F, light);
-            box(pose.pose(), buffer, -skirt, 2.6F, -0.9F, skirt, 2.75F, 0.9F, 0.62F, 0.27F, 0.18F, light);
+            if (cargo) {
+                // A crate the length of the car, its lid lighter so the top reads.
+                box(pose.pose(), buffer, -skirt + 0.05F, floor + 0.15F, -0.85F, skirt - 0.05F, floor + 0.65F, 0.85F,
+                        0.48F, 0.22F, 0.15F, light);
+                box(pose.pose(), buffer, -skirt + 0.05F, floor + 0.65F, -0.85F, skirt - 0.05F, floor + 0.72F, 0.85F,
+                        0.62F, 0.27F, 0.18F, light);
+            } else {
+                box(pose.pose(), buffer, -0.45F, floor + 0.15F, 0.2F, 0.45F, 1.6F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+                box(pose.pose(), buffer, -skirt, 2.6F, -0.9F, skirt, 2.75F, 0.9F, 0.62F, 0.27F, 0.18F, light);
+            }
         });
         poseStack.popPose();
     }
