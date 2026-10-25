@@ -97,7 +97,7 @@ public final class LevelRails extends SavedData {
         List<Span> moving = network.spansAt(from);
         Arm to = PylonColumn.arm(pos);
         network.rekey(from, to);
-        // A car hanging from one of those Spans stays on it, its Arm now one segment higher.
+        // A car riding one of those Spans stays on it, its Arm now one segment higher.
         AABB around = new AABB(PylonColumn.block(from)).inflate(SpanRules.lengthLimit() + LocomotiveEntity.HEIGHT + 1.0);
         for (LocomotiveEntity car : level.getEntitiesOfClass(LocomotiveEntity.class, around)) {
             car.armMoved(network, from, to);

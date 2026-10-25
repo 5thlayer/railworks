@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.rail.RailGeometry;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -17,8 +18,9 @@ import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 
 /**
- * A Burner Locomotive, drawn as placeholder boxes in the Rail's rust red: an open cab with a floor
- * and a roof so the driver shows, and a darker engine block at the front so the heading reads. Every
+ * A Burner Locomotive, drawn as placeholder boxes in the Rail's rust red: a skirt down both sides of
+ * the web, a floor over it and a roof, so the driver shows in the open cab, and a darker engine
+ * block at the front so the heading reads. Every
  * face is its own triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its
  * tube, so the strips the pipeline joins in one buffer leave no triangles between them.
  */
@@ -59,11 +61,16 @@ public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, L
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
         poseStack.translate(0.0, -LocomotiveEntity.HEIGHT / 2.0, 0.0);
         int light = state.lightCoords;
-        // Floor, roof and engine block.
+        // The skirt down both sides of the web, the floor over it, the engine block and the roof.
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
-            box(pose.pose(), buffer, -0.45F, 0.0F, -0.9F, 0.45F, 0.15F, 0.9F, 0.62F, 0.27F, 0.18F, light);
-            box(pose.pose(), buffer, -0.45F, 1.85F, -0.9F, 0.45F, 2.0F, 0.9F, 0.62F, 0.27F, 0.18F, light);
-            box(pose.pose(), buffer, -0.45F, 0.15F, 0.2F, 0.45F, 1.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+            float web = (float) (RailGeometry.WEB_WIDTH / 2.0);
+            float skirt = (float) (LocomotiveEntity.WIDTH / 2.0);
+            float floor = (float) (RailGeometry.WEB_HEIGHT + 0.05);
+            box(pose.pose(), buffer, -skirt, 0.0F, -0.9F, -web - 0.02F, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+            box(pose.pose(), buffer, web + 0.02F, 0.0F, -0.9F, skirt, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+            box(pose.pose(), buffer, -skirt, floor, -0.9F, skirt, floor + 0.15F, 0.9F, 0.62F, 0.27F, 0.18F, light);
+            box(pose.pose(), buffer, -0.45F, floor + 0.15F, 0.2F, 0.45F, 1.6F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+            box(pose.pose(), buffer, -skirt, 1.85F, -0.9F, skirt, 2.0F, 0.9F, 0.62F, 0.27F, 0.18F, light);
         });
         poseStack.popPose();
     }

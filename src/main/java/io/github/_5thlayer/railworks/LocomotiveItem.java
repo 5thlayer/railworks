@@ -22,7 +22,7 @@ import net.minecraft.world.level.gameevent.GameEvent;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Burner Locomotive in the hand: using it hangs the car from the Span the player's line of sight
+ * A Burner Locomotive in the hand: using it sets the car on the Span the player's line of sight
  * is on, facing the way they look along it. {@link LocomotivePlacement} is the one rule, so the
  * Placement Preview, drawn through Groundworks, and the click cannot disagree.
  *

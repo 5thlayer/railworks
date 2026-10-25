@@ -31,25 +31,25 @@ import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The Rail between Arms, drawn straight: a square tube from the Arm of this Pylon to the
- * other end of each Span it is the first end of, so exactly one end draws a Span. Only the top
- * segment of a column has an Arm. Placeholder art; the curved Rail is a later ticket.
+ * The Rail between Arms, drawn straight as an inverted T: a flange along the bottom, resting on the
+ * Pylon tops, and a web standing on it, from the Arm of this Pylon to the other end of each Span it
+ * is the first end of, so exactly one end draws a Span. Only the top segment of a column has an Arm.
+ * Placeholder art; the curved Rail is a later ticket.
  */
 public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, SpanRenderer.State> {
 
-    /** Where on the top segment the Rail hangs from. */
+    /** Where the flange's underside rests on the top segment. */
     private static final double ATTACH_HEIGHT = RailGeometry.ATTACH_Y;
-    private static final float HALF_WIDTH = 0.12F;
     /** Rust red, with the four sides shaded apart. */
     private static final float[] SHADE = {1.0F, 0.75F, 0.55F, 0.85F};
     static final float R = 0.62F;
     static final float G = 0.27F;
     static final float B = 0.18F;
 
-    /** Where the Rail leaves this block's own Arm, from its origin. */
+    /** Where the Rail rests on this block's own Arm, from its origin. */
     private static final Vec3 START = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
 
-    /** Where on the top segment a Rail hangs from, in world coordinates. */
+    /** Where the flange's underside rests on a Pylon's top segment, in world coordinates. */
     static Vec3 attachPoint(BlockPos arm) {
         return new Vec3(arm.getX() + RailGeometry.ATTACH_X, arm.getY() + ATTACH_HEIGHT, arm.getZ() + RailGeometry.ATTACH_Z);
     }
@@ -134,20 +134,35 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     }
 
     /**
-     * A square tube from this Arm to {@code end}, as one triangle strip around its four sides.
-     *
-     * <p>The pipeline draws every Span of a frame into one buffer, so consecutive Spans join into one
-     * strip, and the triangles between one Span's end and the next one's start would fill the space
-     * between them. The strip therefore repeats its first and last vertex twice, as Wireworks'
-     * {@code WireStrip} does: every triangle that spans two Spans is zero-area, and the even count
-     * keeps the winding.
+     * The Rail from {@code start} to {@code end}, which are where its flange's underside rests: an
+     * inverted T of two prisms, the flange and the web on it, each one triangle strip.
      */
     static void drawSpan(Matrix4f pose, VertexConsumer buffer, Vec3 start, Vec3 end, int light, float fade,
                          float r, float g, float b) {
+        Vec3 flange = new Vec3(0, RailGeometry.FLANGE_HEIGHT / 2.0, 0);
+        Vec3 web = new Vec3(0, RailGeometry.FLANGE_HEIGHT + RailGeometry.WEB_HEIGHT / 2.0, 0);
+        drawPrism(pose, buffer, start.add(flange), end.add(flange), RailGeometry.FLANGE_WIDTH / 2.0,
+                RailGeometry.FLANGE_HEIGHT / 2.0, light, fade, r, g, b);
+        drawPrism(pose, buffer, start.add(web), end.add(web), RailGeometry.WEB_WIDTH / 2.0,
+                RailGeometry.WEB_HEIGHT / 2.0, light, fade, r, g, b);
+    }
+
+    /**
+     * A rectangular prism from {@code start} to {@code end} (the centres of its two ends), as one
+     * triangle strip around its four sides.
+     *
+     * <p>The pipeline draws every prism of a frame into one buffer, so consecutive prisms join into one
+     * strip, and the triangles between one prism's end and the next one's start would fill the space
+     * between them. The strip therefore repeats its first and last vertex twice, as Wireworks'
+     * {@code WireStrip} does: every triangle that spans two prisms is zero-area, and the even count
+     * keeps the winding.
+     */
+    private static void drawPrism(Matrix4f pose, VertexConsumer buffer, Vec3 start, Vec3 end, double halfWidth,
+                                  double halfHeight, int light, float fade, float r, float g, float b) {
         Vec3 along = end.subtract(start).normalize();
         Vec3 up = Math.abs(along.y) > 0.99 ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
-        Vec3 side = along.cross(up).normalize().scale(HALF_WIDTH);
-        Vec3 lift = side.cross(along).normalize().scale(HALF_WIDTH);
+        Vec3 side = along.cross(up).normalize().scale(halfWidth);
+        Vec3 lift = side.cross(along).normalize().scale(halfHeight);
         Vec3[] corners = {
                 side.add(lift), side.subtract(lift), side.reverse().subtract(lift), side.reverse().add(lift)
         };

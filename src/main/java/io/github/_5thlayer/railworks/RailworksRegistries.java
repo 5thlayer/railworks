@@ -42,13 +42,13 @@ public final class RailworksRegistries {
     /** What strings a Span, one item per block of its length. */
     public static final DeferredItem<Item> RAIL = ITEMS.registerSimpleItem("rail");
 
-    /** Iron and a furnace: the Train's first car, hung from a Span. */
+    /** Iron and a furnace: the Train's first car, set on a Span. */
     public static final DeferredItem<LocomotiveItem> LOCOMOTIVE =
             ITEMS.registerItem("burner_locomotive", LocomotiveItem::new);
     public static final DeferredHolder<EntityType<?>, EntityType<LocomotiveEntity>> LOCOMOTIVE_ENTITY =
             ENTITIES.registerEntityType("burner_locomotive", LocomotiveEntity::new, MobCategory.MISC, builder -> builder
                     .sized(LocomotiveEntity.WIDTH, LocomotiveEntity.HEIGHT)
-                    .passengerAttachments(0.3F)
+                    .passengerAttachments(0.7F)
                     .clientTrackingRange(10)
                     .updateInterval(1)
                     .noSummon());

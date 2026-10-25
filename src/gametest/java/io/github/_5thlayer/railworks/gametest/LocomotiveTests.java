@@ -14,6 +14,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.Span;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -32,7 +33,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The Burner Locomotive through the item, the entity and a real player: placing it hanging from a
+ * The Burner Locomotive through the item, the entity and a real player: placing it on a
  * Span the player looks along, the fuel slot, boarding and getting off, and driving. The drive's
  * numbers are {@code LocomotiveTest}'s; what only a server can show is that the keys, the fuel slot
  * and the Rail reach the model and that the entity ends up where the model says. All of these tests
@@ -40,22 +41,22 @@ import net.minecraft.world.phys.Vec3;
  */
 final class LocomotiveTests {
 
-    /** Eight apart, three segments tall so the car clears the floor and the test's roof is still free to stack under, with a Span strung between the tops. */
+    /** Eight apart, one segment tall, with a Span strung between the tops for the car to ride. */
     private static final BlockPos A = new BlockPos(1, 1, 3);
     private static final BlockPos B = new BlockPos(9, 1, 3);
-    private static final int HEIGHT = 3;
-    /** Under the middle of the Span. */
-    private static final BlockPos STAND = new BlockPos(5, 1, 3);
+    private static final int HEIGHT = 1;
+    /** Beside the middle of the Span, looking across it at the web. */
+    private static final BlockPos STAND = new BlockPos(5, 1, 1);
 
     private LocomotiveTests() {
     }
 
     static void register(RailworksGameTests.Registrar tests) {
-        tests.test("locomotive_places_hanging_from_the_span_aimed_at", 20, LocomotiveTests::places);
+        tests.test("locomotive_places_on_the_span_aimed_at", 20, LocomotiveTests::places);
         tests.test("locomotive_faces_the_way_the_player_looks_along_the_span", 20, LocomotiveTests::facesLookDirection);
         tests.test("locomotive_plan_matches_placement", 20, LocomotiveTests::planMatchesPlacement);
         tests.test("locomotive_plan_is_refused_off_a_span", 20, LocomotiveTests::refusedOffSpan);
-        tests.test("locomotive_plan_is_refused_where_the_car_would_hang_in_a_block", 20, LocomotiveTests::refusedBlocked);
+        tests.test("locomotive_plan_is_refused_where_the_car_would_sit_in_a_block", 20, LocomotiveTests::refusedBlocked);
         tests.test("locomotive_plan_is_refused_on_a_span_another_holds", 20, LocomotiveTests::refusedTaken);
         tests.test("locomotive_fuel_goes_in_its_slot", 20, LocomotiveTests::fuelSlot);
         tests.test("locomotive_is_boarded_by_using_it_and_left_by_sneaking", 20, LocomotiveTests::boardsAndLeaves);
@@ -76,16 +77,16 @@ final class LocomotiveTests {
     // ---- placing ----
 
     private static void places(GameTestHelper helper) {
-        ServerPlayer player = player(helper, 90.0F);
+        ServerPlayer player = player(helper, 45.0F);
         use(helper, player);
         LocomotiveEntity car = onlyCar(helper);
         if (car.locomotive() == null || !car.holds(span(helper))) {
-            helper.fail("the placed car does not hang from the Span the player looked at", STAND);
+            helper.fail("the placed car is not on the Span the player looked at", STAND);
         }
-        // Hanging: its roof just under the Rail, so the car is below the Span and not on the floor.
-        double railY = helper.absolutePos(A).getY() + HEIGHT - 1 + 0.8;
-        if (Math.abs(car.getBoundingBox().maxY - (railY - LocomotiveEntity.ROOF_GAP)) > 1e-6) {
-            helper.fail("the car's roof is at " + car.getBoundingBox().maxY + ", not just under the Rail at " + railY, STAND);
+        // Riding: its floor on the flange's top, so the car is above the Span and not on the floor.
+        double railTop = helper.absolutePos(A.above(HEIGHT - 1)).getY() + RailGeometry.RIDE_Y;
+        if (Math.abs(car.getBoundingBox().minY - railTop) > 1e-6) {
+            helper.fail("the car's floor is at " + car.getBoundingBox().minY + ", not on the flange at " + railTop, STAND);
         }
         if (!player.getMainHandItem().isEmpty()) {
             helper.fail("placing the only Locomotive left one in hand", STAND);
@@ -94,11 +95,11 @@ final class LocomotiveTests {
     }
 
     private static void facesLookDirection(GameTestHelper helper) {
-        ServerPlayer player = player(helper, -90.0F);
+        ServerPlayer player = player(helper, -45.0F);
         use(helper, player);
         float east = onlyCar(helper).getYRot();
         onlyCar(helper).discard();
-        ServerPlayer other = player(helper, 90.0F);
+        ServerPlayer other = player(helper, 45.0F);
         use(helper, other);
         float west = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class, searchBox(helper)).stream()
                 .filter(car -> !car.isRemoved()).findFirst().orElseThrow().getYRot();
@@ -109,7 +110,7 @@ final class LocomotiveTests {
     }
 
     private static void planMatchesPlacement(GameTestHelper helper) {
-        ServerPlayer player = player(helper, 90.0F);
+        ServerPlayer player = player(helper, 45.0F);
         PlacementPlan plan = plan(helper, player);
         if (plan == null || plan.isRefused()) {
             helper.fail("a Locomotive aimed along a Span planned " + plan, STAND);
@@ -118,7 +119,7 @@ final class LocomotiveTests {
         use(helper, player);
         BlockPos centre = BlockPos.containing(onlyCar(helper).getBoundingBox().getCenter());
         if (!plan.blocks().getFirst().pos().equals(centre)) {
-            helper.fail("the plan drew the car at " + plan.blocks().getFirst().pos() + " but it hangs at " + centre, STAND);
+            helper.fail("the plan drew the car at " + plan.blocks().getFirst().pos() + " but it sits at " + centre, STAND);
         }
         helper.succeed();
     }
@@ -142,20 +143,20 @@ final class LocomotiveTests {
     }
 
     private static void refusedBlocked(GameTestHelper helper) {
-        ServerPlayer player = player(helper, 90.0F);
-        // Under the middle of the Span, where the car would hang.
-        helper.setBlock(new BlockPos(5, 3, 3), Blocks.STONE);
+        ServerPlayer player = player(helper, 45.0F);
+        // Where the car would sit, above the middle of the Span.
+        helper.setBlock(new BlockPos(3, 3, 3), Blocks.STONE);
         PlacementPlan plan = plan(helper, player);
         if (plan == null || plan.refusal() != RailworksRefusal.BLOCKED_CAR) {
-            helper.fail("a car that would hang in stone planned " + plan, STAND);
+            helper.fail("a car that would sit in stone planned " + plan, STAND);
         }
         helper.succeed();
     }
 
     private static void refusedTaken(GameTestHelper helper) {
-        ServerPlayer first = player(helper, 90.0F);
+        ServerPlayer first = player(helper, 45.0F);
         use(helper, first);
-        ServerPlayer second = player(helper, 90.0F);
+        ServerPlayer second = player(helper, 45.0F);
         PlacementPlan plan = plan(helper, second);
         if (plan == null || plan.refusal() != RailworksRefusal.SPAN_TAKEN) {
             helper.fail("a second Locomotive on a held Span planned " + plan, STAND);
@@ -420,7 +421,7 @@ final class LocomotiveTests {
         builder.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
         builder.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.PYLON_ITEM.get()));
         BlockPos base = helper.absolutePos(B);
-        // The structure's roof is a barrier layer just above the columns; clear it for the new segment.
+        // The structure's edge is a barrier cage; clear it for the new segment.
         helper.setBlock(B.above(HEIGHT), Blocks.AIR);
         builder.gameMode.useItemOn(builder, helper.getLevel(), builder.getMainHandItem(), InteractionHand.MAIN_HAND,
                 new BlockHitResult(Vec3.atCenterOf(base).relative(Direction.NORTH, 0.5), Direction.NORTH, base, false));
@@ -464,20 +465,26 @@ final class LocomotiveTests {
 
     // ---- setup ----
 
-    /** Two columns, a Span between their tops, and a survival player under the middle holding a Locomotive. */
+    /** Two columns, a Span between their tops, and a survival player beside the middle holding a Locomotive. */
     private static ServerPlayer player(GameTestHelper helper, float yaw) {
         if (!helper.getBlockState(A).is(RailworksRegistries.PYLON.get())) {
             for (int i = 0; i < HEIGHT; i++) {
                 helper.setBlock(A.above(i), RailworksRegistries.PYLON.get().defaultBlockState());
                 helper.setBlock(B.above(i), RailworksRegistries.PYLON.get().defaultBlockState());
             }
+            // The structure's roof is a barrier layer; the car rides up into it, so clear it over the Span.
+            for (int x = 0; x <= 10; x++) {
+                for (int z = 2; z <= 4; z++) {
+                    helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
+                }
+            }
             LevelRails.of(helper.getLevel()).network().add(span(helper));
         }
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         BlockPos stand = helper.absolutePos(STAND);
-        // Looking up and along the Span, so the line of sight stays in the Span's vertical plane.
-        player.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, yaw, -70.0F);
+        // Looking across and along the Span, a little down at the web, from two blocks to its side.
+        player.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, yaw, 5.0F);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.LOCOMOTIVE.get()));
         return player;
     }
@@ -504,7 +511,7 @@ final class LocomotiveTests {
 
     /** A car hung mid-Span, facing the second Pylon. */
     private static LocomotiveEntity placed(GameTestHelper helper) {
-        ServerPlayer player = player(helper, -90.0F);
+        ServerPlayer player = player(helper, -45.0F);
         use(helper, player);
         return onlyCar(helper);
     }

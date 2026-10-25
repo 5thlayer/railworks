@@ -42,19 +42,17 @@ import org.jspecify.annotations.Nullable;
 /**
  * A Burner Locomotive in the world: the view of a {@link Locomotive}, which is the Train. The model
  * runs the drive and holds the place, speed, heading and joule fuel; this entity feeds it the
- * driver's keys and the fuel slot, hangs itself where the model says, and mirrors the numbers a
+ * driver's keys and the fuel slot, rides the Rail where the model says, and mirrors the numbers a
  * client shows (Jade, the renderer's heading) into synched data.
  *
  * <p>Using it with fuel in hand fills the fuel slot; using it otherwise boards it, and sneaking
  * gets off (vanilla's dismount). It comes off the Rail, dropping itself and its fuel, when the Span
- * it hangs from is cut.
+ * it rides is cut.
  */
 public final class LocomotiveEntity extends VehicleEntity implements HasCustomInventoryScreen {
 
     public static final float WIDTH = 1.0F;
     public static final float HEIGHT = 2.0F;
-    /** How far the car's roof hangs below the Rail point. */
-    public static final double ROOF_GAP = 0.1;
 
     private static final EntityDataAccessor<BlockPos> DATA_SPAN_A =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -91,7 +89,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         this.setNoGravity(true);
     }
 
-    /** Hangs this car as {@code locomotive}; the entity is its view from then on. */
+    /** Sets this car on the Rail as {@code locomotive}; the entity is its view from then on. */
     public void setLocomotive(Locomotive locomotive) {
         this.model = locomotive;
         moveToModel();
@@ -102,7 +100,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         return model;
     }
 
-    /** Whether some Locomotive in {@code level} hangs from {@code span}: one Train holds a Span at a time. */
+    /** Whether some Locomotive in {@code level} rides {@code span}: one Train holds a Span at a time. */
     public static boolean holding(Level level, Span span) {
         AABB around = new AABB(span.a().x(), span.a().y(), span.a().z(), span.b().x(), span.b().y(), span.b().z())
                 .inflate(HEIGHT + 1.0);
@@ -118,7 +116,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         }
     }
 
-    /** Whether this car hangs from {@code span}, as the client knows it from synched data. */
+    /** Whether this car rides {@code span}, as the client knows it from synched data. */
     public boolean holds(Span span) {
         BlockPos a = entityData.get(DATA_SPAN_A);
         BlockPos b = entityData.get(DATA_SPAN_B);
@@ -224,7 +222,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         setXRot((float) (-Mth.atan2(dy, horizontal) * Mth.RAD_TO_DEG));
         double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
         setDeltaMovement(dx / length * speed, dy / length * speed, dz / length * speed);
-        setPos(rail.x, rail.y - ROOF_GAP - HEIGHT, rail.z);
+        setPos(rail.x, rail.y, rail.z);
     }
 
     private void syncFromModel() {
@@ -324,7 +322,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     // it client-authoritative, so the client would drop the server's positions for it and the rider
     // would not move until they got off.
 
-    /** Off the car onto the first floor below it, since it hangs well above the ground. */
+    /** Off the car onto the first floor below it, since it rides well above the ground. */
     @Override
     public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
         BlockPos.MutableBlockPos probe = BlockPos.containing(getX(), getY(), getZ()).mutable();
