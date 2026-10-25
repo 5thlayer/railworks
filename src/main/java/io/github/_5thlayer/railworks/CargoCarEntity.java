@@ -3,7 +3,9 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
@@ -17,11 +19,16 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
  * which its menu, vanilla's three-row chest, shows. It is not a {@link Container} itself, so a hopper
- * or a pipe cannot reach into it: loading at a Station is #25's. Boarding and the rest are
+ * cannot reach into it wherever it is: only while it is stopped at a Station does it give hoppers,
+ * feeders and pipes its cargo, through {@link #automation()}. Boarding and the rest are
  * {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {
@@ -39,6 +46,9 @@ public final class CargoCarEntity extends CarEntity {
         }
     };
 
+    /** Its cargo as NeoForge's transfer sees it. */
+    private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
+
     public CargoCarEntity(EntityType<? extends CargoCarEntity> type, Level level) {
         super(type, level);
     }
@@ -51,6 +61,21 @@ public final class CargoCarEntity extends CarEntity {
     /** What it carries: the server's, for Jade and the menu. */
     public Container cargo() {
         return cargo;
+    }
+
+    /**
+     * Its cargo to hoppers, feeders and pipes, NeoForge's item capability for automation: while it is
+     * stopped at a Station, and null while it moves, stands away from every Station, or is a client's.
+     */
+    public @Nullable ResourceHandler<ItemResource> automation() {
+        Train train = train();
+        if (train == null || !(level() instanceof ServerLevel server)) {
+            return null;
+        }
+        Car car = train.car(carId());
+        boolean stopped = !LevelStations.of(server).stations()
+                .stoppedAt(LevelRails.of(server).network(), train, car).isEmpty();
+        return stopped ? handler : null;
     }
 
     /** The menu, from the inventory key while riding and from sneaking at the car. */

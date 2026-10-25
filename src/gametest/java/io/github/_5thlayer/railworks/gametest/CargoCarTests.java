@@ -494,7 +494,7 @@ final class CargoCarTests {
         return player;
     }
 
-    private static CargoCarEntity placeCargoBeside(GameTestHelper helper, CarEntity car, int side) {
+    static CargoCarEntity placeCargoBeside(GameTestHelper helper, CarEntity car, int side) {
         ServerPlayer player = cargoPlayer(helper, car, side);
         PlacementPlan plan = LocomotiveTests.plan(helper, player);
         if (plan == null || plan.isRefused()) {

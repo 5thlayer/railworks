@@ -56,6 +56,14 @@ public final class Stations {
         return stations.values().stream().filter(s -> s.serves(network, place)).toList();
     }
 
+    /**
+     * The Stations {@code car} of {@code train} is stopped at: those it is {@link #at} while its Train
+     * is at rest, and none while it moves. A Cargo car is loaded and unloaded only at these.
+     */
+    public List<Station> stoppedAt(RailNetwork network, Train train, Car car) {
+        return train.speed() != 0.0 ? List.of() : at(network, train.placeOf(network, car));
+    }
+
     public Collection<Station> all() {
         return Collections.unmodifiableCollection(new ArrayList<>(stations.values()));
     }
