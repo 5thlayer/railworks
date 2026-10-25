@@ -19,6 +19,7 @@ final class WorksTabContents {
         if (event.getTabKey() != WorksTab.KEY) {
             return;
         }
-        // event.accept(MyItems.FIRST.get()), one line per item, in order.
+        event.accept(RailworksRegistries.PYLON_ITEM.get());
+        event.accept(RailworksRegistries.RAIL.get());
     }
 }

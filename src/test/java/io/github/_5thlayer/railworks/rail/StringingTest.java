@@ -1,0 +1,119 @@
+// SPDX-FileCopyrightText: 2026 5thlayer
+// SPDX-License-Identifier: MIT
+
+package io.github._5thlayer.railworks.rail;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+class StringingTest {
+
+    private static final Arm A = new Arm(0, 5, 0);
+    private static final Arm B = new Arm(10, 5, 0);
+    private static final Arm C = new Arm(20, 5, 0);
+    private static final Arm D = new Arm(30, 5, 0);
+
+    private final RailNetwork network = new RailNetwork();
+
+    @Test
+    void stringsASpanAndSpendsItsCost() {
+        var outcome = Stringing.click(network, A, new Arm(3, 5, 4), 100);
+        assertEquals(Stringing.Result.STRUNG, outcome.result());
+        assertEquals(5, outcome.rail());
+        assertTrue(network.contains(A, new Arm(3, 5, 4)));
+    }
+
+    @Test
+    void theClicksOrderMakesNoDifference() {
+        Stringing.click(network, B, A, 100);
+        assertTrue(network.contains(A, B));
+    }
+
+    @Test
+    void refusesWithoutEnoughRailAndStringsNothing() {
+        var outcome = Stringing.click(network, A, B, 9);
+        assertEquals(Stringing.Result.SHORT_OF_RAIL, outcome.result());
+        assertEquals(0, outcome.rail());
+        assertFalse(network.contains(A, B));
+    }
+
+    @Test
+    void justEnoughRailStrings() {
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, A, B, 10).result());
+    }
+
+    @Test
+    void refusesPastTheLengthLimit() {
+        var far = new Arm(SpanRules.LENGTH_LIMIT + 1, 5, 0);
+        var outcome = Stringing.click(network, A, far, 1000);
+        assertEquals(Stringing.Result.TOO_LONG, outcome.result());
+        assertFalse(network.contains(A, far));
+    }
+
+    @Test
+    void stringsAtTheLengthLimit() {
+        var edge = new Arm(SpanRules.LENGTH_LIMIT, 5, 0);
+        var outcome = Stringing.click(network, A, edge, 1000);
+        assertEquals(Stringing.Result.STRUNG, outcome.result());
+        assertEquals(SpanRules.LENGTH_LIMIT, outcome.rail());
+    }
+
+    @Test
+    void anArmTakesTwoSpans() {
+        Stringing.click(network, B, A, 100);
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, B, C, 100).result());
+        assertEquals(2, network.spansAt(B).size());
+    }
+
+    @Test
+    void aThirdSpanIsRefusedAtEitherEnd() {
+        Stringing.click(network, B, A, 100);
+        Stringing.click(network, B, C, 100);
+        var fromFull = Stringing.click(network, B, D, 100);
+        assertEquals(Stringing.Result.ARM_FULL, fromFull.result());
+        var toFull = Stringing.click(network, D, B, 100);
+        assertEquals(Stringing.Result.ARM_FULL, toFull.result());
+        assertEquals(2, network.spansAt(B).size());
+        assertFalse(network.contains(B, D));
+    }
+
+    @Test
+    void theFullnessCheckComesBeforeTheRailCheck() {
+        Stringing.click(network, B, A, 100);
+        Stringing.click(network, B, C, 100);
+        assertEquals(Stringing.Result.ARM_FULL, Stringing.click(network, B, D, 0).result());
+    }
+
+    @Test
+    void theSameArmCancelsAndChangesNothing() {
+        var outcome = Stringing.click(network, A, A, 100);
+        assertEquals(Stringing.Result.CANCELLED, outcome.result());
+        assertEquals(0, outcome.rail());
+        assertTrue(network.all().isEmpty());
+    }
+
+    @Test
+    void repeatingTheGestureCutsAndRefundsWhatWasPaid() {
+        Stringing.click(network, A, B, 100);
+        var outcome = Stringing.click(network, B, A, 0);
+        assertEquals(Stringing.Result.CUT, outcome.result());
+        assertEquals(10, outcome.rail());
+        assertFalse(network.contains(A, B));
+    }
+
+    @Test
+    void aCutIsAllowedWhileBothArmsAreFull() {
+        Stringing.click(network, B, A, 100);
+        Stringing.click(network, B, C, 100);
+        assertEquals(Stringing.Result.CUT, Stringing.click(network, A, B, 0).result());
+    }
+
+    @Test
+    void aCutRefundsTheRailPaidNotTheLengthNow() {
+        network.add(Span.of(A, B, 7));
+        assertEquals(7, Stringing.click(network, A, B, 0).rail());
+    }
+}

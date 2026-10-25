@@ -1,0 +1,55 @@
+// SPDX-FileCopyrightText: 2026 5thlayer
+// SPDX-License-Identifier: MIT
+
+package io.github._5thlayer.railworks;
+
+import io.github._5thlayer.libworks.WorksTab;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+/** The Module's blocks, items and block entity types, and the held Span end. */
+public final class RailworksRegistries {
+
+    private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Railworks.MOD_ID);
+    private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Railworks.MOD_ID);
+    private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, Railworks.MOD_ID);
+    private static final DeferredRegister<DataComponentType<?>> DATA_COMPONENTS =
+            DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, Railworks.MOD_ID);
+
+    /** One segment of a Pylon column. */
+    public static final DeferredBlock<PylonBlock> PYLON = BLOCKS.registerBlock(PylonBlock.BLOCK_NAME, PylonBlock::new);
+    public static final DeferredItem<PylonItem> PYLON_ITEM =
+            ITEMS.registerItem(PylonBlock.BLOCK_NAME, props -> new PylonItem(PYLON.get(), props));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PylonBlockEntity>> PYLON_ENTITY =
+            BLOCK_ENTITIES.register(PylonBlock.BLOCK_NAME,
+                    () -> new BlockEntityType<>(PylonBlockEntity::new, PYLON.get()));
+
+    /** What strings a Span, one item per block of its length. */
+    public static final DeferredItem<Item> RAIL = ITEMS.registerSimpleItem("rail");
+
+    /** The first Arm of a Span that a Rail is holding, on the stack so it survives a relog and the client can see it. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> PENDING_SPAN =
+            DATA_COMPONENTS.register("pending_span", () -> DataComponentType.<GlobalPos>builder()
+                    .persistent(GlobalPos.CODEC)
+                    .networkSynchronized(GlobalPos.STREAM_CODEC)
+                    .build());
+
+    private RailworksRegistries() {
+    }
+
+    static void register(IEventBus modBus) {
+        BLOCKS.register(modBus);
+        ITEMS.register(modBus);
+        BLOCK_ENTITIES.register(modBus);
+        DATA_COMPONENTS.register(modBus);
+    }
+}

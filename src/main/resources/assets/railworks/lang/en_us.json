@@ -1,0 +1,8 @@
+{
+  "block.railworks.pylon": "Pylon",
+  "item.railworks.pylon": "Pylon",
+  "item.railworks.rail": "Rail",
+  "message.railworks.too_long": "That Span is longer than %s blocks",
+  "message.railworks.arm_full": "An Arm takes at most %s Spans",
+  "message.railworks.short_of_rail": "That Span needs %s Rail"
+}
