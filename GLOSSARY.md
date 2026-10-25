@@ -1,6 +1,6 @@
 # Railworks
 
-Trains: Locomotives and Cargo cars hanging from an overhead Rail, carrying players, mobs and items between Stations, by hand or on a schedule. It is Factorio's train game as a suspended monorail, kept apart from vanilla rails, and it plays alone in vanilla on Groundworks.
+Trains: Locomotives and Cargo cars riding on top of a raised Rail, carrying players, mobs and items between Stations, by hand or on a schedule. It is Factorio's train game as a straddle-beam monorail, kept apart from vanilla rails, and it plays alone in vanilla on Groundworks.
 
 ## Language
 
@@ -23,19 +23,19 @@ _Avoid_: client (collides with the game's client side), dependent, integration
 ### Track
 
 **Rail**:
-The overhead beam a Train hangs from, strung Span by Span between Pylons. Also the item that strings it, spent by a Span's length.
+The beam a Train rides on top of, straddling it, strung Span by Span over Pylons. Also the item that strings it, spent by a Span's length.
 _Avoid_: track, monorail, girder, beam
 
 **Pylon**:
-The column that holds the Rail up, stacked segment by segment to the height the player chooses. Its top segment carries one Arm (a Γ Pylon) or two (a T Pylon).
-_Avoid_: pillar, support, pole (Wireworks'), post
+The column that holds the Rail up, stacked segment by segment to the height the player chooses. Its top segment carries one Arm, or, on a T Pylon, a cross-head with two.
+_Avoid_: pillar, support, pole (Wireworks'), post, Γ Pylon (when the Arm stuck out sideways)
 
 **Arm**:
-The part of a Pylon's head a Rail is strung from. A Pylon with two carries two lines that never join.
+The top of a Pylon, where the Rail rests and its Spans meet. A T Pylon's two carry two lines side by side that never join.
 _Avoid_: bracket, node, attachment point
 
 **Span**:
-The Rail between two Arms. It curves through each Arm, climbs and bends only within its limits, and keeps the space below it clear. One Train holds a Span at a time.
+The Rail between two Arms. It curves through each Arm, climbs and bends only within its limits, and keeps the space above it clear. One Train holds a Span at a time.
 _Avoid_: segment (a Pylon's), section, block (Factorio's rail block), link
 
 **Line**:
@@ -47,7 +47,7 @@ An Arm with three or more Spans. Any two of them that bend gently enough are a w
 _Avoid_: switch, points, fork
 
 **Clearance**:
-The space below a Span that a hanging car passes through, which no block may fill.
+The space above a Span, and down both sides of the Rail, that a car straddling it passes through, which no block may fill.
 _Avoid_: loading gauge, hitbox
 
 ### Trains

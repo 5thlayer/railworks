@@ -4,7 +4,7 @@
 and how it feels to play. It is also the Modrinth and CurseForge description
 (docs/agents/publishing.md). The technical sections go below it. -->
 
-Factorio's trains as a suspended monorail.
+Factorio's trains as a straddle-beam monorail.
 
 ## Status
 
