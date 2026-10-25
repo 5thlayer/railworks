@@ -66,12 +66,6 @@ public final class CargoCarEntity extends CarEntity {
         }
     };
 
-    /**
-     * The name of the Station its Train is stopped at, or empty when it is at none: a client sees it
-     * to draw where hoppers go, and Jade shows it.
-     */
-    private static final EntityDataAccessor<String> DATA_STATION =
-            SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.STRING);
     /** Whether it loads where it stands: at a Station, on a straight leg. The overlay draws by it. */
     private static final EntityDataAccessor<Boolean> DATA_LOADING =
             SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
@@ -127,16 +121,6 @@ public final class CargoCarEntity extends CarEntity {
     /** Whether it loads where it stands, as the server last synced it: what the overlay draws by. */
     public boolean loading() {
         return entityData.get(DATA_LOADING);
-    }
-
-    /** Whether its Train is stopped at a Station, as the server last synced it, loading there or not. */
-    public boolean atStation() {
-        return !stationName().isEmpty();
-    }
-
-    /** The name of the Station its Train is stopped at, the first placed of several; empty at none. */
-    public String stationName() {
-        return entityData.get(DATA_STATION);
     }
 
     /** Where a hopper loads it and where one unloads it, from its box where it stands and its heading. */
@@ -201,15 +185,12 @@ public final class CargoCarEntity extends CarEntity {
 
     @Override
     protected void syncCar(Car car) {
-        List<Station> at = stoppedAt();
-        entityData.set(DATA_STATION, at.isEmpty() ? "" : at.getFirst().name());
-        entityData.set(DATA_LOADING, loads(at));
+        entityData.set(DATA_LOADING, loads(stoppedAt()));
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
         super.defineSynchedData(entityData);
-        entityData.define(DATA_STATION, "");
         entityData.define(DATA_LOADING, false);
     }
 

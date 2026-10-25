@@ -11,7 +11,6 @@ import io.github._5thlayer.railworks.LevelStations;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
-import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.rail.HopperSpots;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Station;
@@ -72,7 +71,7 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_a_car_stopped_at_a_station_has_the_item_capability", 20, CargoLoadingTests::presentAtStation);
         tests.test("cargo_loading_a_car_stopped_away_from_a_station_has_none", 20, CargoLoadingTests::absentAway);
         tests.test("cargo_loading_a_moving_car_at_a_station_has_none", 20, CargoLoadingTests::absentMoving);
-        tests.test("cargo_loading_a_car_flags_it_is_at_a_station_until_it_leaves", 40, CargoLoadingTests::syncsAtStation);
+        tests.test("cargo_loading_a_car_flags_it_loads_at_a_station_until_it_leaves", 40, CargoLoadingTests::syncsAtStation);
         tests.test("cargo_loading_hoppers_at_the_spots_fill_a_car_at_one_station_and_empty_it_at_the_next", 400,
                 CargoLoadingTests::fillsAndEmpties);
         tests.test("cargo_loading_sneak_using_a_hopper_sets_it_beside_the_car_pointing_in", 40, CargoLoadingTests::setsHopperEitherSide);
@@ -212,15 +211,11 @@ final class CargoLoadingTests {
                         helper.fail("expected a Locomotive by the Station and two Cargo cars behind it, neither by it: " + train,
                                 BY_LOCOMOTIVE);
                     }
-                    ServerPlayer namer = helper.makeMockServerPlayerInLevel();
-                    BlockPos stand = helper.absolutePos(LocomotiveTests.STAND);
-                    namer.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
-                    helper.getBlockEntity(BY_LOCOMOTIVE, StationBlockEntity.class).rename(namer, "Mine");
                 })
                 .thenWaitUntil(() -> {
-                    if (!second.stationName().equals("Mine") || !first.stationName().equals("Mine")) {
-                        helper.fail("the Cargo cars show they are at \"" + first.stationName() + "\" and \""
-                                + second.stationName() + "\", not the Mine their Locomotive is by", BY_LOCOMOTIVE);
+                    if (!first.loading() || !second.loading()) {
+                        helper.fail("the Cargo cars flag " + first.loading() + " and " + second.loading()
+                                + " for loading by the Station their Locomotive is by", BY_LOCOMOTIVE);
                     }
                 })
                 .thenExecute(() -> {
@@ -333,7 +328,14 @@ final class CargoLoadingTests {
                 PylonColumn.arm(helper.absolutePos(new BlockPos(13, 1, 7))), 6));
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, LOADING))
-                .thenWaitUntil(() -> synced(helper, cargo, true))
+                .thenExecute(() -> {
+                    var stations = LevelStations.of(helper.getLevel()).stations();
+                    if (stations.stoppedAt(network, cargo.train()).isEmpty()) {
+                        helper.fail("the Train is not stopped at the Station, so the bend proves nothing", LOADING);
+                    }
+                })
+                // A tick for the car to sync what it would flag.
+                .thenIdle(2)
                 .thenExecute(() -> {
                     if (cargo.loading() || cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null) != null) {
                         helper.fail("a Cargo car at a Station on a bend loads", LOADING);
@@ -412,16 +414,13 @@ final class CargoLoadingTests {
         station(helper, LOADING);
         helper.startSequence()
                 .thenExecute(() -> {
-                    if (cargo.atStation()) {
-                        helper.fail("a Cargo car shows it is at a Station before there is one", LOADING);
+                    if (cargo.loading()) {
+                        helper.fail("a Cargo car flags it loads before there is a Station", LOADING);
                     }
                 })
                 .thenWaitUntil(() -> registered(helper, LOADING))
                 .thenWaitUntil(() -> synced(helper, cargo, true))
                 .thenExecute(() -> {
-                    if (!cargo.loading()) {
-                        helper.fail("a Cargo car at a Station on a straight leg does not flag that it loads", LOADING);
-                    }
                     LocomotiveTests.fill(helper, locomotive, new ItemStack(Items.COAL, 4));
                     ServerPlayer driver = LocomotiveTests.board(helper, locomotive);
                     LocomotiveTests.press(driver, true, false);
@@ -432,13 +431,13 @@ final class CargoLoadingTests {
     }
 
     /**
-     * Fails unless the car's synced flag says {@code expected} for being at a Station, for a sequence
-     * to wait on. It reads the server's entity data, which vanilla's entity tracking sends on; no
+     * Fails unless the car's synced flag says {@code expected} for loading where it stands, for a
+     * sequence to wait on. It reads the server's entity data, which vanilla's entity tracking sends on; no
      * client runs here to receive it.
      */
     private static void synced(GameTestHelper helper, CargoCarEntity cargo, boolean expected) {
-        if (cargo.atStation() != expected) {
-            helper.fail("the Cargo car shows " + cargo.atStation() + " for being at a Station, with its capability "
+        if (cargo.loading() != expected) {
+            helper.fail("the Cargo car flags " + cargo.loading() + " for loading, with its capability "
                     + cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null), LOADING);
         }
     }
