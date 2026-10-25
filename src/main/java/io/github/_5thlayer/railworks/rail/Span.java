@@ -27,6 +27,11 @@ public record Span(Arm a, Arm b, int cost) {
         return one.compareTo(other) <= 0 ? new Span(one, other, cost) : new Span(other, one, cost);
     }
 
+    /** The straight distance between the Arms, in blocks: how far a Train runs along the Span. */
+    public double length() {
+        return Math.sqrt(a.distanceSquaredTo(b));
+    }
+
     public boolean touches(Arm arm) {
         return a.equals(arm) || b.equals(arm);
     }
