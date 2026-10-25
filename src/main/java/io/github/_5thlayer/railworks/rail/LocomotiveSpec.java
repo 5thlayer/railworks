@@ -10,12 +10,13 @@ package io.github._5thlayer.railworks.rail;
  *
  * <ul>
  *   <li>600 kW at full power, which is 30,000 J a Minecraft tick (a twentieth of a second);
- *   <li>top speed 1.2 tiles a tick at 60 ticks a second, which is 72 blocks a second;
  *   <li>braking 10 kN on 2,000 kg, which is 5 blocks a second squared;
  *   <li>friction 0.5 kN on 2,000 kg, which is 0.25 blocks a second squared.
  * </ul>
  *
- * <p>Acceleration is the one number nothing gives: Factorio's depends on the Train's mass and a
+ * <p>Top speed is not Factorio's, which is 72 blocks a second (1.2 tiles a tick at 60 ticks a
+ * second): that outruns chunk loading and elytra, so the default is 25 and the config allows 72.
+ * Acceleration is the other number nothing gives: Factorio's depends on the Train's mass and a
  * power curve, so a constant half the braking is this Module's own pick.
  *
  * <p>Speeds are in blocks a second and accelerations in blocks a second squared for the config's
@@ -29,7 +30,7 @@ public final class LocomotiveSpec {
     public static final double POWER_WATTS = 600_000.0;
     public static final long JOULES_PER_TICK_AT_FULL_POWER = Math.round(POWER_WATTS / TICKS_PER_SECOND);
 
-    public static final double DEFAULT_MAX_SPEED = 72.0;
+    public static final double DEFAULT_MAX_SPEED = 25.0;
     public static final double DEFAULT_ACCELERATION = 2.5;
     public static final double DEFAULT_BRAKING = 5.0;
     public static final double DEFAULT_FRICTION = 0.25;

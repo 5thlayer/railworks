@@ -30,7 +30,7 @@ public final class RailworksConfig {
         SPAN_LENGTH_LIMIT = builder.comment("The longest Span, in blocks: the straight distance between its two Arms, which its Rail cost rounds up.")
                 .defineInRange("spanLengthLimit", SpanRules.DEFAULT_LENGTH_LIMIT, 1.0, 256.0);
         builder.push("burner_locomotive");
-        LOCOMOTIVE_MAX_SPEED = builder.comment("Top speed either way, in blocks a second. 72 is Factorio's locomotive.")
+        LOCOMOTIVE_MAX_SPEED = builder.comment("Top speed either way, in blocks a second. Factorio's locomotive does 72, which outruns chunk loading.")
                 .defineInRange("maxSpeed", LocomotiveSpec.DEFAULT_MAX_SPEED, 1.0, 200.0);
         LOCOMOTIVE_ACCELERATION = builder.comment("How fast power adds speed, in blocks a second squared.")
                 .defineInRange("acceleration", LocomotiveSpec.DEFAULT_ACCELERATION, 0.1, 100.0);
