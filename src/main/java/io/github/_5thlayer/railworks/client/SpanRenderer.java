@@ -44,6 +44,14 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     private static final float G = 0.27F;
     private static final float B = 0.18F;
 
+    /** Where the Rail leaves this block's own Arm, from its origin. */
+    private static final Vec3 START = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
+
+    /** Where on the top segment a Rail hangs from, in world coordinates. */
+    static Vec3 attachPoint(BlockPos arm) {
+        return new Vec3(arm.getX() + 0.5, arm.getY() + ATTACH_HEIGHT, arm.getZ() + 0.5);
+    }
+
     public static final class State extends BlockEntityRenderState {
         /** Index-aligned: where each Rail ends, relative to this block's origin, and its light. */
         final List<Vec3> ends = new ArrayList<>();
@@ -89,7 +97,7 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
             Vec3 end = state.ends.get(i);
             int light = state.lights.get(i);
             collector.submitCustomGeometry(poseStack, RenderTypes.leash(),
-                    (pose, buffer) -> drawSpan(pose.pose(), buffer, end, light));
+                    (pose, buffer) -> drawSpan(pose.pose(), buffer, START, end, light, 1.0F));
         }
     }
 
@@ -102,8 +110,7 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
      * {@code WireStrip} does: every triangle that spans two Spans is zero-area, and the even count
      * keeps the winding.
      */
-    private static void drawSpan(Matrix4f pose, VertexConsumer buffer, Vec3 end, int light) {
-        Vec3 start = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
+    static void drawSpan(Matrix4f pose, VertexConsumer buffer, Vec3 start, Vec3 end, int light, float fade) {
         Vec3 along = end.subtract(start).normalize();
         Vec3 up = Math.abs(along.y) > 0.99 ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
         Vec3 side = along.cross(up).normalize().scale(HALF_WIDTH);
@@ -111,21 +118,21 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
         Vec3[] corners = {
                 side.add(lift), side.subtract(lift), side.reverse().subtract(lift), side.reverse().add(lift)
         };
-        vertex(pose, buffer, start.add(corners[0]), SHADE[0], light);
-        vertex(pose, buffer, start.add(corners[0]), SHADE[0], light);
+        vertex(pose, buffer, fade, start.add(corners[0]), SHADE[0], light);
+        vertex(pose, buffer, fade, start.add(corners[0]), SHADE[0], light);
         for (int i = 0; i <= corners.length; i++) {
             Vec3 corner = corners[i % corners.length];
             float shade = SHADE[i % SHADE.length];
-            vertex(pose, buffer, start.add(corner), shade, light);
-            vertex(pose, buffer, end.add(corner), shade, light);
+            vertex(pose, buffer, fade, start.add(corner), shade, light);
+            vertex(pose, buffer, fade, end.add(corner), shade, light);
         }
-        vertex(pose, buffer, end.add(corners[0]), SHADE[0], light);
-        vertex(pose, buffer, end.add(corners[0]), SHADE[0], light);
+        vertex(pose, buffer, fade, end.add(corners[0]), SHADE[0], light);
+        vertex(pose, buffer, fade, end.add(corners[0]), SHADE[0], light);
     }
 
-    private static void vertex(Matrix4f pose, VertexConsumer buffer, Vec3 at, float shade, int light) {
+    private static void vertex(Matrix4f pose, VertexConsumer buffer, float fade, Vec3 at, float shade, int light) {
         buffer.addVertex(pose, (float) at.x, (float) at.y, (float) at.z)
-                .setColor(R * shade, G * shade, B * shade, 1.0F)
+                .setColor(R * shade * fade, G * shade * fade, B * shade * fade, 1.0F)
                 .setLight(light);
     }
 

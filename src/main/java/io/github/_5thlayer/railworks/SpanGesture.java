@@ -69,17 +69,17 @@ public final class SpanGesture {
             return InteractionResult.SUCCESS_SERVER;
         }
         // Creative players pay and are refunded like anyone: a free Span cut for Rail would be a duplicator.
-        Stringing.Outcome outcome = LevelRails.of(server).click(server, pending.pos(), arm, count(player));
+        Stringing.Outcome outcome = LevelRails.of(server).click(server, pending.pos(), arm, RailPurse.count(player));
         switch (outcome.result()) {
             case STRUNG -> {
                 rail.remove(RailworksRegistries.PENDING_SPAN.get());
-                spend(player, outcome.rail());
+                RailPurse.spend(player, outcome.rail());
                 play(server, arm, SoundEvents.CHAIN_PLACE);
                 along(server, pending.pos(), arm, ParticleTypes.ELECTRIC_SPARK);
             }
             case CUT -> {
                 rail.remove(RailworksRegistries.PENDING_SPAN.get());
-                refund(player, outcome.rail());
+                RailPurse.refund(player, outcome.rail());
                 play(server, arm, SoundEvents.CHAIN_BREAK);
                 along(server, pending.pos(), arm, ParticleTypes.SMOKE);
             }
@@ -94,41 +94,6 @@ public final class SpanGesture {
                     SpanRules.cost(PylonColumn.arm(pending.pos()), PylonColumn.arm(arm))));
         }
         return InteractionResult.SUCCESS_SERVER;
-    }
-
-    private static int count(Player player) {
-        Inventory inventory = player.getInventory();
-        int total = 0;
-        for (int i = 0; i < inventory.getContainerSize(); i++) {
-            ItemStack stack = inventory.getItem(i);
-            if (stack.is(RailworksRegistries.RAIL)) {
-                total += stack.getCount();
-            }
-        }
-        return total;
-    }
-
-    private static void spend(Player player, int amount) {
-        Inventory inventory = player.getInventory();
-        int left = amount;
-        for (int i = 0; i < inventory.getContainerSize() && left > 0; i++) {
-            ItemStack stack = inventory.getItem(i);
-            if (stack.is(RailworksRegistries.RAIL)) {
-                int taken = Math.min(left, stack.getCount());
-                stack.shrink(taken);
-                left -= taken;
-            }
-        }
-    }
-
-    /** Into the inventory, and at the player's feet for what does not fit. */
-    private static void refund(Player player, int amount) {
-        int left = amount;
-        while (left > 0) {
-            int part = Math.min(left, RailworksRegistries.RAIL.get().getDefaultMaxStackSize());
-            player.getInventory().placeItemBackInInventory(new ItemStack(RailworksRegistries.RAIL.get(), part));
-            left -= part;
-        }
     }
 
     private static void refused(ServerLevel server, Player player, Component reason) {
@@ -170,11 +135,11 @@ public final class SpanGesture {
         }
     }
 
-    private static void play(ServerLevel level, BlockPos at, SoundEvent sound) {
+    static void play(ServerLevel level, BlockPos at, SoundEvent sound) {
         level.playSound(null, at, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
     }
 
-    private static void along(ServerLevel level, BlockPos from, BlockPos to, ParticleOptions particle) {
+    static void along(ServerLevel level, BlockPos from, BlockPos to, ParticleOptions particle) {
         Vec3 start = Vec3.atCenterOf(from);
         Vec3 end = Vec3.atCenterOf(to);
         int count = Math.max(2, (int) Math.ceil(start.distanceTo(end) * PARTICLES_PER_BLOCK));

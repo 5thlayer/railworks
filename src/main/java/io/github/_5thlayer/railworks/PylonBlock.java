@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -25,6 +26,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One segment of a Pylon column, as tall as the player stacks it with no cap below the build limit.
@@ -89,6 +91,15 @@ public final class PylonBlock extends Block implements EntityBlock {
         super.onPlace(state, level, pos, oldState, movedByPiston);
         if (level instanceof ServerLevel server && !(oldState.getBlock() instanceof PylonBlock)) {
             LevelRails.of(server).placed(server, pos);
+        }
+    }
+
+    /** A Pylon placed by a player starts a column that strings itself ({@link LevelRails#autoString}). */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (level instanceof ServerLevel server && placer instanceof Player player) {
+            LevelRails.of(server).autoString(server, pos, player);
         }
     }
 

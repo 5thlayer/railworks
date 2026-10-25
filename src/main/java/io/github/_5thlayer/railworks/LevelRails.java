@@ -11,14 +11,19 @@ import java.util.stream.Stream;
 import com.mojang.serialization.Codec;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.AutoStringing;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -94,6 +99,28 @@ public final class LevelRails extends SavedData {
         if (!moving.isEmpty()) {
             changed(level, moving.stream().flatMap(s -> Stream.of(s.a(), s.b())).toArray(Arm[]::new));
         }
+    }
+
+    /**
+     * A new column was placed at {@code pos} by {@code placer}: it strings itself as
+     * {@link AutoStringing} says, for Rail from the placer's inventory. A sneaking placer, a
+     * column that grew, or too little Rail strings nothing.
+     */
+    public void autoString(ServerLevel level, BlockPos pos, Player placer) {
+        if (placer.isSecondaryUseActive() || !PylonColumn.startsColumn(level, pos)) {
+            return;
+        }
+        Arm placed = PylonColumn.arm(pos);
+        int reach = (int) Math.ceil(SpanRules.lengthLimit());
+        var choice = AutoStringing.choose(network, placed, PylonColumn.armsNear(level, pos, reach), RailPurse.count(placer));
+        if (choice.isEmpty()) {
+            return;
+        }
+        network.add(Span.of(placed, choice.get().target(), choice.get().cost()));
+        RailPurse.spend(placer, choice.get().cost());
+        changed(level, placed, choice.get().target());
+        SpanGesture.play(level, pos, SoundEvents.CHAIN_PLACE);
+        SpanGesture.along(level, pos, PylonColumn.block(choice.get().target()), ParticleTypes.ELECTRIC_SPARK);
     }
 
     /** The Arm at {@code top} is gone: its Spans are cut and the Rail they cost is dropped there. */

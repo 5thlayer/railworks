@@ -17,6 +17,7 @@ public final class RailworksClient {
     public static void register(IEventBus modBus) {
         modBus.addListener(RailworksClient::registerRenderers);
         NeoForge.EVENT_BUS.addListener(ClientRails::onLevelUnload);
+        NeoForge.EVENT_BUS.addListener(PreviewSpan::onOverlay);
     }
 
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
