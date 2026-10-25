@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -11,18 +12,35 @@ import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * {@code railworks-server.toml}: the longest Span. A server config, so the client measures the same
- * limit the server strings by.
+ * {@code railworks-server.toml}: the longest Span and the Burner Locomotive's drive and fuel. A server
+ * config, so the client measures the same limit the server strings by.
  */
 public final class RailworksConfig {
 
     private static final ModConfigSpec SPEC;
     private static final ModConfigSpec.DoubleValue SPAN_LENGTH_LIMIT;
+    private static final ModConfigSpec.DoubleValue LOCOMOTIVE_MAX_SPEED;
+    private static final ModConfigSpec.DoubleValue LOCOMOTIVE_ACCELERATION;
+    private static final ModConfigSpec.DoubleValue LOCOMOTIVE_BRAKING;
+    private static final ModConfigSpec.DoubleValue LOCOMOTIVE_FRICTION;
+    private static final ModConfigSpec.LongValue LOCOMOTIVE_JOULES_PER_BURN_TICK;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         SPAN_LENGTH_LIMIT = builder.comment("The longest Span, in blocks: the straight distance between its two Arms, which its Rail cost rounds up.")
                 .defineInRange("spanLengthLimit", SpanRules.DEFAULT_LENGTH_LIMIT, 1.0, 256.0);
+        builder.push("burner_locomotive");
+        LOCOMOTIVE_MAX_SPEED = builder.comment("Top speed either way, in blocks a second. 72 is Factorio's locomotive.")
+                .defineInRange("maxSpeed", LocomotiveSpec.DEFAULT_MAX_SPEED, 1.0, 200.0);
+        LOCOMOTIVE_ACCELERATION = builder.comment("How fast power adds speed, in blocks a second squared.")
+                .defineInRange("acceleration", LocomotiveSpec.DEFAULT_ACCELERATION, 0.1, 100.0);
+        LOCOMOTIVE_BRAKING = builder.comment("How fast back brakes a moving Locomotive, in blocks a second squared. 5 is Factorio's locomotive.")
+                .defineInRange("braking", LocomotiveSpec.DEFAULT_BRAKING, 0.1, 100.0);
+        LOCOMOTIVE_FRICTION = builder.comment("How fast an unpowered Locomotive slows, in blocks a second squared. 0.25 is Factorio's locomotive.")
+                .defineInRange("friction", LocomotiveSpec.DEFAULT_FRICTION, 0.0, 10.0);
+        LOCOMOTIVE_JOULES_PER_BURN_TICK = builder.comment("What one tick of a fuel's vanilla burn time is worth to the Locomotive, in joules. 2500 makes coal's 1600 ticks Factorio's 4 MJ, as in Wireworks' Boiler.")
+                .defineInRange("joules_per_burn_tick", LocomotiveSpec.DEFAULT_JOULES_PER_BURN_TICK, 1L, 1_000_000L);
+        builder.pop();
         SPEC = builder.build();
     }
 
@@ -36,6 +54,9 @@ public final class RailworksConfig {
         modBus.addListener(ModConfigEvent.Unloading.class, event -> {
             if (event.getConfig().getSpec() == SPEC) {
                 SpanRules.configure(SpanRules.DEFAULT_LENGTH_LIMIT);
+                LocomotiveSpec.configure(LocomotiveSpec.DEFAULT_MAX_SPEED, LocomotiveSpec.DEFAULT_ACCELERATION,
+                        LocomotiveSpec.DEFAULT_BRAKING, LocomotiveSpec.DEFAULT_FRICTION);
+                LocomotiveSpec.configureFuel(LocomotiveSpec.DEFAULT_JOULES_PER_BURN_TICK);
             }
         });
     }
@@ -43,6 +64,9 @@ public final class RailworksConfig {
     private static void apply(ModConfig config) {
         if (config.getSpec() == SPEC) {
             SpanRules.configure(SPAN_LENGTH_LIMIT.get());
+            LocomotiveSpec.configure(LOCOMOTIVE_MAX_SPEED.get(), LOCOMOTIVE_ACCELERATION.get(),
+                    LOCOMOTIVE_BRAKING.get(), LOCOMOTIVE_FRICTION.get());
+            LocomotiveSpec.configureFuel(LOCOMOTIVE_JOULES_PER_BURN_TICK.get());
         }
     }
 }

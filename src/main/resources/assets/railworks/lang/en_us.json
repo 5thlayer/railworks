@@ -4,5 +4,13 @@
   "item.railworks.rail": "Rail",
   "message.railworks.too_long": "That Span is longer than %s blocks",
   "message.railworks.arm_full": "An Arm takes at most %s Spans",
-  "message.railworks.short_of_rail": "That Span needs %s Rail"
+  "message.railworks.short_of_rail": "That Span needs %s Rail",
+  "item.railworks.burner_locomotive": "Burner Locomotive",
+  "entity.railworks.burner_locomotive": "Burner Locomotive",
+  "tooltip.railworks.locomotive.jade.speed": "Speed: %s blocks/s (%s)",
+  "tooltip.railworks.locomotive.jade.forward": "forward",
+  "tooltip.railworks.locomotive.jade.reversing": "reversing",
+  "tooltip.railworks.locomotive.jade.fuel": "Fuel: %s MJ (%s s at full power)",
+  "tooltip.railworks.locomotive.jade.slot": "Slot: %s x %s",
+  "tooltip.railworks.locomotive.jade.slot_empty": "Slot: empty"
 }

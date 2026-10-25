@@ -7,6 +7,8 @@ import io.github._5thlayer.libworks.WorksTab;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -15,11 +17,12 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** The Module's blocks, items and block entity types, and the held Span end. */
+/** The Module's blocks, items, entity and block entity types, and the held Span end. */
 public final class RailworksRegistries {
 
     private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Railworks.MOD_ID);
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Railworks.MOD_ID);
+    private static final DeferredRegister.Entities ENTITIES = DeferredRegister.createEntities(Railworks.MOD_ID);
     private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, Railworks.MOD_ID);
     private static final DeferredRegister<DataComponentType<?>> DATA_COMPONENTS =
@@ -36,6 +39,17 @@ public final class RailworksRegistries {
     /** What strings a Span, one item per block of its length. */
     public static final DeferredItem<Item> RAIL = ITEMS.registerSimpleItem("rail");
 
+    /** Iron and a furnace: the Train's first car, hung from a Span. */
+    public static final DeferredItem<LocomotiveItem> LOCOMOTIVE =
+            ITEMS.registerItem("burner_locomotive", LocomotiveItem::new);
+    public static final DeferredHolder<EntityType<?>, EntityType<LocomotiveEntity>> LOCOMOTIVE_ENTITY =
+            ENTITIES.registerEntityType("burner_locomotive", LocomotiveEntity::new, MobCategory.MISC, builder -> builder
+                    .sized(LocomotiveEntity.WIDTH, LocomotiveEntity.HEIGHT)
+                    .passengerAttachments(0.3F)
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .noSummon());
+
     /** The first Arm of a Span that a Rail is holding, on the stack so it survives a relog and the client can see it. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> PENDING_SPAN =
             DATA_COMPONENTS.register("pending_span", () -> DataComponentType.<GlobalPos>builder()
@@ -49,6 +63,7 @@ public final class RailworksRegistries {
     static void register(IEventBus modBus) {
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
+        ENTITIES.register(modBus);
         BLOCK_ENTITIES.register(modBus);
         DATA_COMPONENTS.register(modBus);
     }

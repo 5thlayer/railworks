@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Stringing;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.Nullable;
 public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, SpanRenderer.State> {
 
     /** Where on the top segment the Rail hangs from. */
-    private static final double ATTACH_HEIGHT = 0.8;
+    private static final double ATTACH_HEIGHT = RailGeometry.ATTACH_Y;
     private static final float HALF_WIDTH = 0.12F;
     /** Rust red, with the four sides shaded apart. */
     private static final float[] SHADE = {1.0F, 0.75F, 0.55F, 0.85F};
@@ -50,7 +51,7 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
 
     /** Where on the top segment a Rail hangs from, in world coordinates. */
     static Vec3 attachPoint(BlockPos arm) {
-        return new Vec3(arm.getX() + 0.5, arm.getY() + ATTACH_HEIGHT, arm.getZ() + 0.5);
+        return new Vec3(arm.getX() + RailGeometry.ATTACH_X, arm.getY() + ATTACH_HEIGHT, arm.getZ() + RailGeometry.ATTACH_Z);
     }
 
     public static final class State extends BlockEntityRenderState {

@@ -5,8 +5,14 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.groundworks.Refusal;
 
-/** Why a Pylon would not place. */
+/** Why a Pylon or a Locomotive would not place. */
 public enum RailworksRefusal implements Refusal {
     /** A Pylon aimed at a column whose next segment's position is occupied or past the build limit. */
     BLOCKED_TOP,
+    /** A Locomotive aimed at no Span. */
+    OFF_SPAN,
+    /** A Locomotive aimed at a Span another Locomotive already holds: one Train holds a Span at a time. */
+    SPAN_TAKEN,
+    /** A Locomotive whose car would hang in a block, so the Span's Clearance is not clear. */
+    BLOCKED_CAR,
 }

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "III",
+    "IFI",
+    "III"
+  ],
+  "key": {
+    "I": "#c:ingots/iron",
+    "F": "minecraft:furnace"
+  },
+  "result": {
+    "id": "railworks:burner_locomotive",
+    "count": 1
+  }
+}
