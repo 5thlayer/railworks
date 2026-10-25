@@ -12,4 +12,4 @@ In design: the first release is specified in [5thlayer/factoryworks#705](https:/
 
 ## Dependencies
 
-Minecraft 26.1.2 and NeoForge. The libworks runtime is nested in the jar.
+Minecraft 26.1.2, NeoForge and Groundworks, which Railworks requires for its placement preview and does not bundle. The libworks runtime is nested in the jar.
