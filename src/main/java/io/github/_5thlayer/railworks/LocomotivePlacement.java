@@ -63,7 +63,8 @@ public final class LocomotivePlacement {
             return new Result(null, PlacementPlan.refused(aimedBlock, Blocks.FURNACE.defaultBlockState(), RailworksRefusal.OFF_SPAN));
         }
         Span span = aim.get().span();
-        boolean facesB = (span.b().x() - span.a().x()) * look.x
+        // The whole look vector, not its horizontal part: a steep Span has almost no horizontal run.
+        boolean facesB = (span.b().x() - span.a().x()) * look.x + (span.b().y() - span.a().y()) * look.y
                 + (span.b().z() - span.a().z()) * look.z >= 0.0;
         Arm front = facesB ? span.b() : span.a();
         double toFront = facesB ? span.length() - aim.get().fromA() : aim.get().fromA();

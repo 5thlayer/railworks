@@ -222,7 +222,8 @@ public final class LocomotiveEntity extends VehicleEntity {
             return inherited;
         }
         ItemStack held = player.getItemInHand(hand);
-        if (fuelValue(level(), held) > 0L) {
+        // Fuel in hand fills the slot; fuel the slot cannot take (full, or another fuel) boards instead.
+        if (fuelValue(level(), held) > 0L && takesFuel(held)) {
             if (!level().isClientSide()) {
                 fill(held);
             }
@@ -234,11 +235,13 @@ public final class LocomotiveEntity extends VehicleEntity {
         return InteractionResult.SUCCESS;
     }
 
+    private boolean takesFuel(ItemStack held) {
+        return fuelItem.isEmpty()
+                || ItemStack.isSameItemSameComponents(fuelItem, held) && fuelItem.getCount() < held.getMaxStackSize();
+    }
+
     /** Moves as much of {@code held} into the fuel slot as fits, if it is the fuel already there or the slot is empty. */
     private void fill(ItemStack held) {
-        if (!fuelItem.isEmpty() && !ItemStack.isSameItemSameComponents(fuelItem, held)) {
-            return;
-        }
         int room = held.getMaxStackSize() - fuelItem.getCount();
         int moved = Math.min(room, held.getCount());
         if (moved <= 0) {

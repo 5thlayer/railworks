@@ -166,13 +166,11 @@ final class LocomotiveTests {
         if (car.fuelItem().getCount() != 5 || !player.getMainHandItem().isEmpty()) {
             helper.fail("coal in hand should fill the slot with 5, slot holds " + car.fuelItem(), STAND);
         }
+        // Fuel the slot cannot take, another fuel or more than fits, boards the player instead.
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.OAK_PLANKS, 2));
         car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (car.fuelItem().getCount() != 5 || player.getMainHandItem().getCount() != 2) {
-            helper.fail("a different fuel should stay in hand while the slot holds coal", STAND);
-        }
-        if (player.getVehicle() != null) {
-            helper.fail("using the car with fuel in hand boarded it", STAND);
+        if (car.fuelItem().getCount() != 5 || player.getMainHandItem().getCount() != 2 || player.getVehicle() != car) {
+            helper.fail("a different fuel should stay in hand and board, with the slot still holding 5 coal", STAND);
         }
         helper.succeed();
     }

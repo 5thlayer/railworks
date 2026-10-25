@@ -100,14 +100,14 @@ class LocomotiveTest {
     }
 
     @Test
-    void whenTheFuelRunsOutItCoastsToAStop() {
+    void whenTheFuelRunsOutItBrakesToAStop() {
         Locomotive loco = Locomotive.on(network.get(A, B), B, 20.0);
         loco.fuel().light(5 * FULL_BURN);
         tick(loco, Throttle.FORWARD, 5);
         assertEquals(0.5, loco.speed(), EPS);
         tick(loco, Throttle.FORWARD, 1);
-        assertTrue(loco.speed() < 0.5, "no fuel, no thrust: it only slows");
-        tick(loco, Throttle.FORWARD, 100);
+        assertEquals(0.5 - 0.25, loco.speed(), EPS, "the dead engine's brakes take it down");
+        tick(loco, Throttle.FORWARD, 3);
         assertEquals(0.0, loco.speed(), EPS);
         assertFalse(loco.fuel().drawTick(FULL_BURN));
     }

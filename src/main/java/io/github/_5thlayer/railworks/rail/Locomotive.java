@@ -101,7 +101,7 @@ public final class Locomotive {
     /**
      * One tick under {@code throttle}. A powered tick draws full power from the fuel buffer, lighting
      * an item through {@code ignite} when the buffer cannot cover it (the item's joules, or 0 for
-     * none), and with no fuel it only coasts. Pushing against the motion brakes, for free.
+     * none), and with no fuel it brakes to a stop. Pushing against the motion brakes, for free.
      */
     public void tick(RailNetwork network, Throttle throttle, LongSupplier ignite) {
         int push = throttle.sign();
@@ -109,8 +109,12 @@ public final class Locomotive {
             coast();
         } else if (speed * push < 0) {
             speed = towardZero(speed, LocomotiveSpec.braking());
-        } else if (blockedAhead(network, push) || !pay(ignite)) {
+        } else if (blockedAhead(network, push)) {
             coast();
+        } else if (!pay(ignite)) {
+            // Out of fuel the brakes take it down: coasting on friction alone would run a fast car
+            // on for minutes.
+            speed = towardZero(speed, LocomotiveSpec.braking());
         } else {
             double cap = LocomotiveSpec.maxSpeed();
             speed = Math.max(-cap, Math.min(cap, speed + push * LocomotiveSpec.acceleration()));
