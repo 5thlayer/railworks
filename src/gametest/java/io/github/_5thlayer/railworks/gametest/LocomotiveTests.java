@@ -51,10 +51,6 @@ final class LocomotiveTests {
     }
 
     static void register(RailworksGameTests.Registrar tests) {
-        // The tests' players have no client connection to carry the open-screen packet, so the menu
-        // is put straight in the player's hands, as the server side of opening it ends up.
-        LocomotiveEntity.setMenuOpening((player, menu, carId) ->
-                player.containerMenu = menu.createMenu(1, player.getInventory(), player));
         tests.test("locomotive_places_hanging_from_the_span_aimed_at", 20, LocomotiveTests::places);
         tests.test("locomotive_faces_the_way_the_player_looks_along_the_span", 20, LocomotiveTests::facesLookDirection);
         tests.test("locomotive_plan_matches_placement", 20, LocomotiveTests::planMatchesPlacement);

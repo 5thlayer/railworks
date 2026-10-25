@@ -3,7 +3,6 @@
 
 package io.github._5thlayer.railworks;
 
-import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -42,11 +41,14 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
         addSlots(inventory);
     }
 
-    /** The client's menu, over an empty cab the server fills, for the car whose id the server sent. */
-    public LocomotiveMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf data) {
+    /**
+     * The client's menu, over an empty cab the server fills. It knows no car: the server decides when
+     * the menu closes, so it opens with vanilla's plain screen packet and no data of its own.
+     */
+    public LocomotiveMenu(int containerId, Inventory inventory) {
         super(RailworksRegistries.LOCOMOTIVE_MENU.get(), containerId);
         this.cab = new SimpleContainer(CAB_SLOTS);
-        this.car = inventory.player.level().getEntity(data.readVarInt()) instanceof LocomotiveEntity found ? found : null;
+        this.car = null;
         addSlots(inventory);
     }
 
@@ -64,7 +66,10 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return car != null && car.isAlive() && (car.hasPassenger(player) || player.distanceToSqr(car) < REACH * REACH);
+        if (car == null) {
+            return true;
+        }
+        return car.isAlive() && (car.hasPassenger(player) || player.distanceToSqr(car) < REACH * REACH);
     }
 
     /** Shift-click: the cab's slots to the inventory, and the inventory's fuel to the fuel slot. */

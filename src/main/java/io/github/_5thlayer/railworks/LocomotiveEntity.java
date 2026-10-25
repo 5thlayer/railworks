@@ -21,9 +21,9 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.MenuProvider;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InterpolationHandler;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.LivingEntity;
@@ -71,19 +71,8 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
 
-    /** How a car's menu is opened for a player, given the car's id; the default sends the screen to the player's client. */
-    @FunctionalInterface
-    public interface MenuOpening {
-        void open(ServerPlayer player, MenuProvider menu, int carId);
-    }
-
-    private static volatile MenuOpening menuOpening =
-            (player, menu, carId) -> player.openMenu(menu, buffer -> buffer.writeVarInt(carId));
-
-    public static void setMenuOpening(MenuOpening opening) {
-        menuOpening = opening;
-    }
-
+    /** Steps the client's car toward each position the server sends, as a boat's does, rather than snapping to it. */
+    private final InterpolationHandler interpolation = new InterpolationHandler(this, 3);
     private @Nullable Locomotive model;
     /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
@@ -167,6 +156,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
             setDamage(getDamage() - 1.0F);
         }
         super.tick();
+        interpolation.interpolate();
         if (level() instanceof ServerLevel server) {
             tickServer(server);
         }
@@ -305,9 +295,14 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     @Override
     public void openCustomInventoryScreen(Player player) {
         if (player instanceof ServerPlayer server) {
-            menuOpening.open(server, new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
-                    Component.translatable("entity.railworks.burner_locomotive")), getId());
+            server.openMenu(new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
+                    Component.translatable("entity.railworks.burner_locomotive")));
         }
+    }
+
+    @Override
+    public InterpolationHandler getInterpolation() {
+        return interpolation;
     }
 
     @Override

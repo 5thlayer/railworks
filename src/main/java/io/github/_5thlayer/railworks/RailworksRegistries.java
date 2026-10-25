@@ -9,8 +9,8 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
-import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -55,7 +55,7 @@ public final class RailworksRegistries {
 
     /** The Locomotive's menu, opened with the car's entity id. */
     public static final DeferredHolder<MenuType<?>, MenuType<LocomotiveMenu>> LOCOMOTIVE_MENU =
-            MENUS.register("burner_locomotive", () -> IMenuTypeExtension.create(LocomotiveMenu::new));
+            MENUS.register("burner_locomotive", () -> new MenuType<>(LocomotiveMenu::new, FeatureFlags.VANILLA_SET));
 
     /** The first Arm of a Span that a Rail is holding, on the stack so it survives a relog and the client can see it. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> PENDING_SPAN =
