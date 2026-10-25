@@ -44,11 +44,11 @@ import net.minecraft.world.phys.Vec3;
 final class LocomotiveTests {
 
     /** Eight apart, one segment tall, with a Span strung between the tops for the car to ride. */
-    private static final BlockPos A = new BlockPos(1, 1, 3);
-    private static final BlockPos B = new BlockPos(9, 1, 3);
-    private static final int HEIGHT = 1;
+    static final BlockPos A = new BlockPos(1, 1, 3);
+    static final BlockPos B = new BlockPos(9, 1, 3);
+    static final int HEIGHT = 1;
     /** Beside the middle of the Span, looking across it at the web. */
-    private static final BlockPos STAND = new BlockPos(5, 1, 1);
+    static final BlockPos STAND = new BlockPos(5, 1, 1);
 
     private LocomotiveTests() {
     }
@@ -474,10 +474,10 @@ final class LocomotiveTests {
         var output = net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(
                 net.minecraft.util.ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
-        // The entity as a world saved before Trains had cars holds it: the Locomotive was the Train.
+        // The entity as a world saved before Trains had cars holds it: the Locomotive was the Train,
+        // saved with the entity and not with the level.
         var tag = output.buildResult();
-        tag.remove("train");
-        tag.remove("car");
+        tag.remove("car_id");
         Place head = car.train().head();
         var span = new net.minecraft.nbt.CompoundTag();
         span.put("a", arm(head.span().a()));
@@ -513,7 +513,7 @@ final class LocomotiveTests {
     // ---- setup ----
 
     /** Two columns, a Span between their tops, and a survival player beside the middle holding a Locomotive. */
-    private static ServerPlayer player(GameTestHelper helper, float yaw) {
+    static ServerPlayer player(GameTestHelper helper, float yaw) {
         if (!helper.getBlockState(A).is(RailworksRegistries.PYLON.get())) {
             for (int i = 0; i < HEIGHT; i++) {
                 helper.setBlock(A.above(i), RailworksRegistries.PYLON.get().defaultBlockState());
@@ -536,15 +536,15 @@ final class LocomotiveTests {
         return player;
     }
 
-    private static Span span(GameTestHelper helper) {
+    static Span span(GameTestHelper helper) {
         return Span.of(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))), PylonColumn.arm(helper.absolutePos(B.above(HEIGHT - 1))), 8);
     }
 
-    private static AABB searchBox(GameTestHelper helper) {
+    static AABB searchBox(GameTestHelper helper) {
         return new AABB(helper.absolutePos(new BlockPos(-2, 0, 0)).getCenter(), helper.absolutePos(new BlockPos(14, 8, 8)).getCenter());
     }
 
-    private static void use(GameTestHelper helper, ServerPlayer player) {
+    static void use(GameTestHelper helper, ServerPlayer player) {
         player.getMainHandItem().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
     }
 
@@ -557,27 +557,27 @@ final class LocomotiveTests {
     }
 
     /** A car set on the Span, facing the second Pylon. */
-    private static LocomotiveEntity placed(GameTestHelper helper) {
+    static LocomotiveEntity placed(GameTestHelper helper) {
         ServerPlayer player = player(helper, -45.0F);
         use(helper, player);
         return onlyCar(helper);
     }
 
     /** A placed car with a stack of coal in its slot. */
-    private static LocomotiveEntity fuelled(GameTestHelper helper) {
+    static LocomotiveEntity fuelled(GameTestHelper helper) {
         LocomotiveEntity car = placed(helper);
         fill(helper, car, new ItemStack(Items.COAL, 4));
         return car;
     }
 
-    private static void fill(GameTestHelper helper, LocomotiveEntity car, ItemStack fuel) {
+    static void fill(GameTestHelper helper, LocomotiveEntity car, ItemStack fuel) {
         ServerPlayer filler = helper.makeMockServerPlayerInLevel();
         filler.setGameMode(GameType.SURVIVAL);
         filler.setItemInHand(InteractionHand.MAIN_HAND, fuel);
         car.interact(filler, InteractionHand.MAIN_HAND, Vec3.ZERO);
     }
 
-    private static ServerPlayer board(GameTestHelper helper, LocomotiveEntity car) {
+    static ServerPlayer board(GameTestHelper helper, LocomotiveEntity car) {
         ServerPlayer driver = helper.makeMockServerPlayerInLevel();
         driver.setGameMode(GameType.SURVIVAL);
         car.interact(driver, InteractionHand.MAIN_HAND, Vec3.ZERO);
@@ -587,18 +587,18 @@ final class LocomotiveTests {
         return driver;
     }
 
-    private static void press(ServerPlayer driver, boolean forward, boolean back) {
+    static void press(ServerPlayer driver, boolean forward, boolean back) {
         driver.setLastClientInput(new Input(forward, back, false, false, false, false, false));
     }
 
-    private static void run(LocomotiveEntity car, int ticks) {
+    static void run(LocomotiveEntity car, int ticks) {
         for (int i = 0; i < ticks; i++) {
             car.tick();
         }
     }
 
     /** The plan a Locomotive in hand gets for a click at the floor under the player, through Groundworks. */
-    private static PlacementPlan plan(GameTestHelper helper, ServerPlayer player) {
+    static PlacementPlan plan(GameTestHelper helper, ServerPlayer player) {
         BlockPos floor = helper.absolutePos(STAND.below());
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(floor).relative(Direction.UP, 0.5), Direction.UP, floor, false);
         return Placements.planFor(helper.getLevel(), player, InteractionHand.MAIN_HAND, player.getMainHandItem(), hit);

@@ -3,7 +3,12 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 
 import com.mojang.serialization.Codec;
@@ -17,19 +22,29 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * code.
  *
  * <p>The head faces one end of its Span and the Train runs that way. Speed is signed against that
- * heading: positive runs toward the front, negative is a reverse that does not turn it round. It
- * runs on through an Arm into the Span beyond and stops when its first car meets a line's end ahead
- * or its last car one behind.
+ * heading: positive runs toward the front, negative is a reverse that does not turn it round. Each
+ * car faces the Train's way or, {@link #reversed}, the other, so a Train can carry a Locomotive
+ * facing out at each end. It runs on through an Arm into the Span beyond and stops when its first
+ * car meets a line's end ahead or its last car one behind, or at the Arm of a Span another Train
+ * holds.
+ *
+ * <p>Its cars are fixed: coupling and uncoupling make new Trains, at rest.
  *
  * <p>Pure: no Minecraft types.
  */
 public final class Train {
 
+    /** Which end of a Train a car couples to: ahead of its first car or behind its last. */
+    public enum End {
+        FRONT, BACK
+    }
+
     public static final Codec<Train> CODEC = RecordCodecBuilder.create(i -> i.group(
             Place.MAP_CODEC.forGetter(Train::head),
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
-            Car.CODEC.listOf(1, Integer.MAX_VALUE).fieldOf("cars").forGetter(Train::cars)
-    ).apply(i, Train::restore));
+            Car.CODEC.listOf(1, Integer.MAX_VALUE).fieldOf("cars").forGetter(Train::cars),
+            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed))
+    ).apply(i, (head, speed, cars, reversed) -> restore(head, speed, cars, Set.copyOf(reversed))));
 
     /**
      * What a Locomotive saved before Trains had cars looks like: the Locomotive was the whole Train,
@@ -40,32 +55,42 @@ public final class Train {
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
             Codec.LONG.fieldOf("fuel").forGetter(t -> t.legacyLocomotive().fuel().storedJoules()),
             Codec.LONG.fieldOf("last_lit").forGetter(t -> t.legacyLocomotive().fuel().lastLitJoules())
-    ).apply(i, (head, speed, fuel, lastLit) -> restore(head, speed, List.of(Locomotive.restore(fuel, lastLit)))));
+    ).apply(i, (head, speed, fuel, lastLit) -> restore(head, speed,
+            List.of(Locomotive.restore(UUID.randomUUID(), fuel, lastLit)), Set.of())));
 
     private final List<Car> cars;
+    /** The ids of the cars that face against the Train's heading. */
+    private final Set<UUID> reversed;
     private Place head;
     private double speed;
 
-    private Train(Place head, List<Car> cars) {
+    private Train(Place head, List<? extends Car> cars, Set<UUID> reversed) {
         if (cars.isEmpty()) {
             throw new IllegalArgumentException("a Train has at least one car");
         }
         this.head = head;
         this.cars = List.copyOf(cars);
+        Set<UUID> ids = new HashSet<>();
+        for (Car car : this.cars) {
+            if (!ids.add(car.id())) {
+                throw new IllegalArgumentException("a car is coupled twice into " + this.cars);
+            }
+        }
+        this.reversed = Set.copyOf(reversed.stream().filter(ids::contains).toList());
     }
 
-    /** At rest with its first car at {@code head} and the rest behind it. */
+    /** At rest with its first car at {@code head} and the rest behind it, all facing its way. */
     public static Train of(Place head, List<? extends Car> cars) {
-        return new Train(head, List.copyOf(cars));
+        return new Train(head, cars, Set.of());
     }
 
-    /** A Train of one car, at rest at {@code head}. */
+    /** A Train of one car, at rest at {@code head}, facing its way. */
     public static Train of(Place head, Car car) {
-        return new Train(head, List.of(car));
+        return new Train(head, List.of(car), Set.of());
     }
 
-    private static Train restore(Place head, double speed, List<Car> cars) {
-        Train train = new Train(head, cars);
+    private static Train restore(Place head, double speed, List<Car> cars, Set<UUID> reversed) {
+        Train train = new Train(head, cars, reversed);
         train.speed = speed;
         return train;
     }
@@ -73,6 +98,21 @@ public final class Train {
     /** Its cars, first to last. */
     public List<Car> cars() {
         return cars;
+    }
+
+    /** Its car with this id, or null when it has none. */
+    public Car car(UUID id) {
+        for (Car car : cars) {
+            if (car.id().equals(id)) {
+                return car;
+            }
+        }
+        return null;
+    }
+
+    /** Whether {@code car} faces against the Train's heading. */
+    public boolean reversed(Car car) {
+        return reversed.contains(car.id());
     }
 
     /** Where its first car is, and the way the Train faces. */
@@ -133,9 +173,25 @@ public final class Train {
         return offset == 0.0 ? head : head.move(network, -offset).place();
     }
 
-    /** The Spans its cars stand on, the head's first: one Train holds a Span at a time. */
+    /** Where {@code car} is, facing its own way: {@link #placeOf}, turned round for a reversed car. */
+    public Place facing(RailNetwork network, Car car) {
+        Place place = placeOf(network, car);
+        return reversed(car) ? place.turned() : place;
+    }
+
+    /**
+     * The Spans its cars stand on, from its first car's front to its last car's back, the head's
+     * first: one Train holds a Span at a time.
+     */
     public List<Span> spans(RailNetwork network) {
-        return head.spansBack(network, length());
+        double frontHalf = cars.getFirst().length() / 2.0;
+        double backHalf = cars.getLast().length() / 2.0;
+        Place front = head.move(network, frontHalf).place();
+        Place back = tail(network).move(network, -backHalf).place();
+        List<Span> spans = front.spansBack(network, frontHalf + length() + backHalf);
+        // A front stopped at a line's end ran short, so the count back overshoots the last car.
+        int last = spans.indexOf(back.span());
+        return last < 0 ? spans : List.copyOf(spans.subList(0, last + 1));
     }
 
     /** Whether every Span it stands on is still strung: a cut behind its head leaves its last car off the line. */
@@ -159,26 +215,129 @@ public final class Train {
         head = head.movedArm(network, from, to);
     }
 
+    // ---- coupling ----
+
     /**
-     * One tick under {@code throttle}. A powered tick has each Locomotive draw full power from its
-     * fuel buffer, lighting an item through {@code ignite} when the buffer cannot cover it (the
-     * item's joules, or 0 for none); those that paid pull the Train, and with none it brakes to a
-     * stop. Pushing against the motion brakes, for free.
+     * Where a car {@code length} blocks long would stand coupled at {@code end}: its middle, with
+     * the Train's heading. Null where the line ends before the car would fit on it.
      */
+    public Place slot(RailNetwork network, End end, double length) {
+        Place.Moved moved = end == End.FRONT
+                ? head.move(network, (cars.getFirst().length() + length) / 2.0)
+                : tail(network).move(network, -(cars.getLast().length() + length) / 2.0);
+        return moved.stopped() ? null : moved.place();
+    }
+
+    /**
+     * This Train with {@code car} coupled at {@code end}, facing against its heading when
+     * {@code reversed}; null while it moves or where the car would not fit on the line.
+     */
+    public Train coupled(RailNetwork network, End end, Car car, boolean reversed) {
+        Place slot = slot(network, end, car.length());
+        if (speed != 0.0 || slot == null || car(car.id()) != null) {
+            return null;
+        }
+        List<Car> joined = new ArrayList<>(cars);
+        if (end == End.FRONT) {
+            joined.addFirst(car);
+        } else {
+            joined.addLast(car);
+        }
+        Set<UUID> facing = new HashSet<>(this.reversed);
+        if (reversed) {
+            facing.add(car.id());
+        }
+        return new Train(end == End.FRONT ? slot : head, joined, facing);
+    }
+
+    /**
+     * The coupler on {@code car}'s {@code side}, +1 ahead of it the way it faces and -1 behind: the
+     * index of the first car behind that coupler in the Train, or, when that side of the car has no
+     * car coupled, the other side's. -1 for a Train of one car.
+     */
+    public int coupler(Car car, int side) {
+        int index = cars.indexOf(car);
+        if (index < 0) {
+            throw new IllegalArgumentException(car + " is not in this Train");
+        }
+        // Ahead in the Train's own heading is toward its first car.
+        boolean ahead = (reversed(car) ? -side : side) > 0;
+        int asked = ahead ? index : index + 1;
+        int other = ahead ? index + 1 : index;
+        if (asked >= 1 && asked < cars.size()) {
+            return asked;
+        }
+        return other >= 1 && other < cars.size() ? other : -1;
+    }
+
+    /**
+     * The two Trains it parts into at {@code at}: the cars before it and those from it on, each
+     * where it stood and facing as it did. Null while it moves or for a coupler it has not.
+     */
+    public List<Train> uncoupled(RailNetwork network, int at) {
+        if (speed != 0.0 || at < 1 || at >= cars.size()) {
+            return null;
+        }
+        return List.of(part(network, 0, at), part(network, at, cars.size()));
+    }
+
+    /**
+     * What is left of it without {@code car}: nothing for a Train of that car alone, one Train for
+     * a car at an end and two for one in the middle, each where it stood and at its speed.
+     */
+    public List<Train> without(RailNetwork network, Car car) {
+        int index = cars.indexOf(car);
+        if (index < 0) {
+            throw new IllegalArgumentException(car + " is not in this Train");
+        }
+        List<Train> left = new ArrayList<>();
+        if (index > 0) {
+            left.add(part(network, 0, index));
+        }
+        if (index + 1 < cars.size()) {
+            left.add(part(network, index + 1, cars.size()));
+        }
+        return left;
+    }
+
+    /** Its cars from {@code from} up to {@code to} as a Train of their own, where they stand. */
+    private Train part(RailNetwork network, int from, int to) {
+        Train part = new Train(placeOf(network, cars.get(from)), cars.subList(from, to), reversed);
+        part.speed = speed;
+        return part;
+    }
+
+    // ---- the drive ----
+
+    /** One tick under {@code throttle} from its first car, with no other Train on the Rail. */
     public void tick(RailNetwork network, Throttle throttle, ToLongFunction<Locomotive> ignite) {
-        int push = throttle.sign();
+        tick(network, throttle, cars.getFirst(), ignite, span -> false);
+    }
+
+    /**
+     * One tick under {@code throttle} from the cab of {@code driven}, whose forward is the way that
+     * car faces. A powered tick has the Locomotives facing the way it pushes draw full power from
+     * their fuel buffers, or every Locomotive when none faces that way, lighting an item through
+     * {@code ignite} when a buffer cannot cover it (the item's joules, or 0 for none); those that
+     * paid pull the Train, and with none it brakes to a stop. Pushing against the motion brakes, for
+     * free. Its Locomotives brake and its other cars do not, so a heavier Train starts and stops
+     * more slowly. It does not run onto a Span {@code taken} says another Train holds.
+     */
+    public void tick(RailNetwork network, Throttle throttle, Car driven, ToLongFunction<Locomotive> ignite,
+                     Predicate<Span> taken) {
+        int push = throttle.sign() * (reversed(driven) ? -1 : 1);
         if (push == 0) {
             coast();
         } else if (speed * push < 0) {
-            speed = towardZero(speed, LocomotiveSpec.braking());
-        } else if (blocked(network, push)) {
+            brake();
+        } else if (blocked(network, push, taken)) {
             coast();
         } else {
-            double pulling = pay(ignite);
+            double pulling = pay(push, ignite);
             if (pulling <= 0.0) {
                 // Out of fuel the brakes take it down: coasting on friction alone would run a fast
                 // Train on for minutes.
-                speed = towardZero(speed, LocomotiveSpec.braking());
+                brake();
             } else {
                 double cap = LocomotiveSpec.maxSpeed();
                 // Pull over mass, as the configured acceleration times the share of the mass that
@@ -187,31 +346,68 @@ public final class Train {
                 speed = Math.max(-cap, Math.min(cap, speed + push * acceleration));
             }
         }
-        advance(network);
+        advance(network, taken);
     }
 
     private void coast() {
         speed = towardZero(speed, LocomotiveSpec.friction());
     }
 
+    /** Its Locomotives' brakes over its whole mass: a lone Locomotive brakes at the configured rate. */
+    private void brake() {
+        double braking = 0.0;
+        for (Car car : cars) {
+            if (car instanceof Locomotive) {
+                braking += car.mass();
+            }
+        }
+        speed = towardZero(speed, LocomotiveSpec.braking() * (braking / mass()));
+    }
+
     private static double towardZero(double value, double by) {
         return value > 0 ? Math.max(0.0, value - by) : Math.min(0.0, value + by);
     }
 
-    /** Has every Locomotive pay a tick of full power, and says what those that paid weigh: the mass that pulls. */
-    private double pay(ToLongFunction<Locomotive> ignite) {
+    /**
+     * Has the Locomotives facing the way it pushes pay a tick of full power, or all of them when
+     * none faces that way, and says what those that paid weigh: the mass that pulls.
+     */
+    private double pay(int push, ToLongFunction<Locomotive> ignite) {
+        boolean anyFacing = false;
+        for (Car car : cars) {
+            if (car instanceof Locomotive && facingSign(car) == push) {
+                anyFacing = true;
+            }
+        }
         double pulling = 0.0;
         for (Car car : cars) {
-            if (car instanceof Locomotive locomotive && locomotive.pay(() -> ignite.applyAsLong(locomotive))) {
+            if (car instanceof Locomotive locomotive && (!anyFacing || facingSign(car) == push)
+                    && locomotive.pay(() -> ignite.applyAsLong(locomotive))) {
                 pulling += locomotive.mass();
             }
         }
         return pulling;
     }
 
-    /** Whether it sits at a line's end with the throttle pushing it off: its head ahead, its tail behind. */
-    private boolean blocked(RailNetwork network, int push) {
-        return push > 0 ? head.atEnd(network, push) : tail(network).atEnd(network, push);
+    private int facingSign(Car car) {
+        return reversed(car) ? -1 : 1;
+    }
+
+    /**
+     * Whether it cannot move the way it is pushed: its head at a line's end ahead or its tail
+     * behind, or its front or back face at the Arm of a Span another Train holds.
+     */
+    private boolean blocked(RailNetwork network, int push, Predicate<Span> taken) {
+        boolean atEnd = push > 0 ? head.atEnd(network, push) : tail(network).atEnd(network, push);
+        return atEnd || room(network, push, 1.0, taken) <= 0.0;
+    }
+
+    /** How far it can run {@code way}, up to {@code want} blocks, before its front or back face meets a taken Span. */
+    private double room(RailNetwork network, int way, double want, Predicate<Span> taken) {
+        Place face = way > 0
+                ? head.move(network, cars.getFirst().length() / 2.0).place()
+                : tail(network).move(network, -cars.getLast().length() / 2.0).place().turned();
+        return face.room(network, want, taken);
     }
 
     /** The one Locomotive a legacy record holds: only a Train of one Locomotive has one. */
@@ -226,21 +422,28 @@ public final class Train {
         return placeOf(network, cars.getLast());
     }
 
-    private void advance(RailNetwork network) {
+    private void advance(RailNetwork network, Predicate<Span> taken) {
         if (speed > 0.0) {
-            Place.Moved moved = head.move(network, speed);
+            double by = Math.min(speed, room(network, 1, speed, taken));
+            Place.Moved moved = head.move(network, by);
             head = moved.place();
-            if (moved.stopped()) {
+            if (moved.stopped() || by < speed) {
                 speed = 0.0;
             }
         } else if (speed < 0.0) {
             // Backing, the last car meets a line's end first.
-            Place.Moved moved = tail(network).move(network, speed);
+            double by = -Math.min(-speed, room(network, -1, -speed, taken));
+            Place.Moved moved = tail(network).move(network, by);
             double length = length();
             head = length == 0.0 ? moved.place() : moved.place().move(network, length).place();
-            if (moved.stopped()) {
+            if (moved.stopped() || by > speed) {
                 speed = 0.0;
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        return "Train[" + cars + " at " + head + ", speed " + speed + "]";
     }
 }

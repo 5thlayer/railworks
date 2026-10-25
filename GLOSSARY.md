@@ -56,6 +56,10 @@ _Avoid_: loading gauge, hitbox
 Cars coupled on the Rail that move as one.
 _Avoid_: monorail, consist
 
+**Car**:
+One vehicle of a Train, a Locomotive or a Cargo car, coupled to the car ahead and the car behind. It faces the Train's way or the other, so a Train can have a Locomotive facing out at each end. Placing one beside an end of a Train at rest couples it there; shears uncouple it.
+_Avoid_: wagon, carriage, vehicle, rolling stock
+
 **Locomotive**:
 A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electric Locomotive runs on FE.
 _Avoid_: engine (Wireworks' steam engine), loco

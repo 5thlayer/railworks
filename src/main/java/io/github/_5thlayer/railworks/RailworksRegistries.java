@@ -42,13 +42,24 @@ public final class RailworksRegistries {
     /** What strings a Span, one item per block of its length. */
     public static final DeferredItem<Item> RAIL = ITEMS.registerSimpleItem("rail");
 
-    /** Iron and a furnace: the Train's first car, set on a Span. */
-    public static final DeferredItem<LocomotiveItem> LOCOMOTIVE =
-            ITEMS.registerItem("burner_locomotive", LocomotiveItem::new);
+    /** Iron and a furnace: the car that pulls a Train, set on a Span. */
+    public static final DeferredItem<CarItem> LOCOMOTIVE =
+            ITEMS.registerItem("burner_locomotive", props -> new CarItem(CarKind.LOCOMOTIVE, props));
     public static final DeferredHolder<EntityType<?>, EntityType<LocomotiveEntity>> LOCOMOTIVE_ENTITY =
             ENTITIES.registerEntityType("burner_locomotive", LocomotiveEntity::new, MobCategory.MISC, builder -> builder
-                    .sized(LocomotiveEntity.WIDTH, LocomotiveEntity.HEIGHT)
+                    .sized(CarEntity.WIDTH, CarEntity.HEIGHT)
                     .passengerAttachments(1.2F)
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .noSummon());
+
+    /** Iron and a chest: a car that carries items, coupled into a Train. */
+    public static final DeferredItem<CarItem> CARGO_CAR =
+            ITEMS.registerItem("cargo_car", props -> new CarItem(CarKind.CARGO, props));
+    public static final DeferredHolder<EntityType<?>, EntityType<CargoCarEntity>> CARGO_CAR_ENTITY =
+            ENTITIES.registerEntityType("cargo_car", CargoCarEntity::new, MobCategory.MISC, builder -> builder
+                    .sized(CarEntity.WIDTH, CarEntity.HEIGHT)
+                    .passengerAttachments(1.3F)
                     .clientTrackingRange(10)
                     .updateInterval(1)
                     .noSummon());

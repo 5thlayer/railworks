@@ -27,7 +27,8 @@ public final class RailworksClient {
     }
 
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        event.registerEntityRenderer(RailworksRegistries.LOCOMOTIVE_ENTITY.get(), LocomotiveRenderer::new);
+        event.registerEntityRenderer(RailworksRegistries.LOCOMOTIVE_ENTITY.get(), CarRenderer::locomotive);
+        event.registerEntityRenderer(RailworksRegistries.CARGO_CAR_ENTITY.get(), CarRenderer::cargo);
         event.registerBlockEntityRenderer(RailworksRegistries.PYLON_ENTITY.get(), context -> new SpanRenderer());
     }
 }

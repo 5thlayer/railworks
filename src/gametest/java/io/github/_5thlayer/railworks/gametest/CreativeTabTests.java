@@ -19,7 +19,7 @@ import net.minecraft.resources.Identifier;
 final class CreativeTabTests {
 
     /** The paths of the Module's items, as the Works tab shows them. */
-    private static final List<String> WORKS_TAB_ORDER = List.of("pylon", "rail", "burner_locomotive", "station");
+    private static final List<String> WORKS_TAB_ORDER = List.of("pylon", "rail", "burner_locomotive", "cargo_car", "station");
 
     private CreativeTabTests() {
     }

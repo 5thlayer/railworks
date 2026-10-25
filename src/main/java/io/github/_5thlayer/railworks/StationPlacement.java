@@ -37,7 +37,7 @@ public final class StationPlacement {
         Place at = foot.get().place();
         for (double by = -Station.STRETCH; by <= Station.STRETCH + 1e-9; by += SWEEP_STEP) {
             Place car = at.move(network, by).place();
-            if (block.intersects(LocomotivePlacement.carBox(LocomotivePlacement.railPoint(car)))) {
+            if (block.intersects(CarPlacement.carBox(CarPlacement.railPoint(car)))) {
                 return Optional.of(RailworksRefusal.STATION_IN_CLEARANCE);
             }
         }

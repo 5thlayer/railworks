@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks.rail;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -53,6 +54,35 @@ public record Place(Span span, Arm front, double toFront) {
         return new Point(front.x() + (back.x() - front.x()) * t,
                 front.y() + (back.y() - front.y()) * t,
                 front.z() + (back.z() - front.z()) * t);
+    }
+
+    /** The same spot facing the other way. */
+    public Place turned() {
+        return new Place(span, back(), span.length() - toFront);
+    }
+
+    /**
+     * How far it can run on toward its front, up to {@code want} blocks, before it would enter a
+     * Span that {@code taken} says another Train holds: it stops at that Span's Arm. A line's end
+     * is {@link #move}'s to stop at, not this.
+     */
+    public double room(RailNetwork network, double want, Predicate<Span> taken) {
+        double room = toFront;
+        Span span = this.span;
+        Arm arm = front;
+        while (room < want) {
+            Span next = beyond(network, span, arm);
+            if (next == null) {
+                return want;
+            }
+            if (taken.test(next)) {
+                return room;
+            }
+            room += next.length();
+            arm = next.otherEnd(arm);
+            span = next;
+        }
+        return want;
     }
 
     /** Whether it sits at a line's end, ahead for a positive {@code way} and behind for a negative one. */
