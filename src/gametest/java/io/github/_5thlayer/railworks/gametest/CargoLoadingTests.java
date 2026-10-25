@@ -51,11 +51,11 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_a_car_stopped_away_from_a_station_has_none", 20, CargoLoadingTests::absentAway);
         tests.test("cargo_loading_a_moving_car_at_a_station_has_none", 20, CargoLoadingTests::absentMoving);
         tests.test("cargo_loading_a_hopper_fills_a_car_at_one_station_and_another_empties_it_at_the_next", 400,
-                CargoLoadingTests::run);
+                CargoLoadingTests::fillsAndEmpties);
     }
 
     private static void presentAtStation(GameTestHelper helper) {
-        CargoCarEntity cargo = train(helper);
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
         station(helper, LOADING);
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, LOADING))
@@ -72,7 +72,7 @@ final class CargoLoadingTests {
     }
 
     private static void absentAway(GameTestHelper helper) {
-        CargoCarEntity cargo = train(helper);
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
         station(helper, FAR);
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, FAR))
@@ -85,7 +85,7 @@ final class CargoLoadingTests {
     }
 
     private static void absentMoving(GameTestHelper helper) {
-        CargoCarEntity cargo = train(helper);
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
         LocomotiveEntity locomotive = locomotive(helper, cargo);
         station(helper, LOADING);
         helper.startSequence()
@@ -109,8 +109,8 @@ final class CargoLoadingTests {
                 .thenSucceed();
     }
 
-    private static void run(GameTestHelper helper) {
-        CargoCarEntity cargo = train(helper);
+    private static void fillsAndEmpties(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
         LocomotiveEntity locomotive = locomotive(helper, cargo);
         station(helper, LOADING);
         station(helper, UNLOADING);
@@ -157,8 +157,8 @@ final class CargoLoadingTests {
 
     // ---- setup ----
 
-    /** A Locomotive on the Span with a Cargo car coupled behind it; the Cargo car. */
-    private static CargoCarEntity train(GameTestHelper helper) {
+    /** The Cargo car of a Locomotive on the Span with it coupled behind. */
+    private static CargoCarEntity cargoBehindLocomotive(GameTestHelper helper) {
         return CargoCarTests.placeCargoBeside(helper, LocomotiveTests.placed(helper), -1);
     }
 

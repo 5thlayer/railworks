@@ -61,7 +61,7 @@ public final class Stations {
      * is at rest, and none while it moves. A Cargo car is loaded and unloaded only at these.
      */
     public List<Station> stoppedAt(RailNetwork network, Train train, Car car) {
-        return train.speed() != 0.0 ? List.of() : at(network, train.placeOf(network, car));
+        return !train.atRest() ? List.of() : at(network, train.placeOf(network, car));
     }
 
     public Collection<Station> all() {

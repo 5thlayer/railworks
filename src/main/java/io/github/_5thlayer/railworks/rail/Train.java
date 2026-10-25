@@ -125,6 +125,11 @@ public final class Train {
         return speed;
     }
 
+    /** Whether it stands still: a car couples to it, and a Cargo car loads at a Station, only then. */
+    public boolean atRest() {
+        return speed == 0.0;
+    }
+
     /** Kilograms: its cars'. */
     public double mass() {
         double mass = 0.0;
