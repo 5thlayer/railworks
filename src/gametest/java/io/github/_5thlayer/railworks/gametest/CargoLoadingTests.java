@@ -56,7 +56,7 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_a_car_stopped_at_a_station_has_the_item_capability", 20, CargoLoadingTests::presentAtStation);
         tests.test("cargo_loading_a_car_stopped_away_from_a_station_has_none", 20, CargoLoadingTests::absentAway);
         tests.test("cargo_loading_a_moving_car_at_a_station_has_none", 20, CargoLoadingTests::absentMoving);
-        tests.test("cargo_loading_a_car_shows_clients_it_is_at_a_station_until_it_leaves", 40, CargoLoadingTests::syncsAtStation);
+        tests.test("cargo_loading_a_car_flags_it_is_at_a_station_until_it_leaves", 40, CargoLoadingTests::syncsAtStation);
         tests.test("cargo_loading_hoppers_at_the_spots_fill_a_car_at_one_station_and_empty_it_at_the_next", 400,
                 CargoLoadingTests::fillsAndEmpties);
     }
@@ -122,26 +122,30 @@ final class CargoLoadingTests {
         station(helper, LOADING);
         station(helper, UNLOADING);
         // Where the filling hopper goes, and the chest over it that feeds it.
-        BlockPos[] filling = new BlockPos[2];
-        BlockState[] was = new BlockState[2];
+        var filling = new Object() {
+            BlockPos hopper;
+            BlockPos chest;
+            BlockState wasAtHopper;
+            BlockState wasAtChest;
+        };
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, LOADING, UNLOADING))
                 .thenWaitUntil(() -> synced(helper, cargo, true))
                 .thenExecute(() -> {
                     // A chest of ore over the car's filling spot, and a hopper placed under it as a player
                     // places one, clicking the chest's underside.
-                    filling[0] = spot(cargo.hopperSpots().fill());
-                    filling[1] = filling[0].above();
+                    filling.hopper = spot(cargo.hopperSpots().fill());
+                    filling.chest = filling.hopper.above();
                     // Over the structure, where the test's barrier walls it in.
-                    was[0] = helper.getLevel().getBlockState(filling[0]);
-                    was[1] = helper.getLevel().getBlockState(filling[1]);
-                    helper.getLevel().setBlockAndUpdate(filling[0], Blocks.AIR.defaultBlockState());
-                    helper.getLevel().setBlockAndUpdate(filling[1], Blocks.CHEST.defaultBlockState());
-                    chest(helper, filling[1]).setItem(0, new ItemStack(Items.IRON_ORE, 4));
-                    placeHopper(helper, filling[1], Direction.DOWN, filling[0]);
+                    filling.wasAtHopper = helper.getLevel().getBlockState(filling.hopper);
+                    filling.wasAtChest = helper.getLevel().getBlockState(filling.chest);
+                    helper.getLevel().setBlockAndUpdate(filling.hopper, Blocks.AIR.defaultBlockState());
+                    helper.getLevel().setBlockAndUpdate(filling.chest, Blocks.CHEST.defaultBlockState());
+                    chest(helper, filling.chest).setItem(0, new ItemStack(Items.IRON_ORE, 4));
+                    placeHopper(helper, filling.chest, Direction.DOWN, filling.hopper);
                 })
                 .thenWaitUntil(() -> {
-                    if (count(cargo) != 4 || !chest(helper, filling[1]).isEmpty() || !hopper(helper, filling[0]).isEmpty()) {
+                    if (count(cargo) != 4 || !chest(helper, filling.chest).isEmpty() || !hopper(helper, filling.hopper).isEmpty()) {
                         helper.fail("the filling hopper has moved " + count(cargo) + " of 4 iron ore into the car", LOADING);
                     }
                 })
@@ -177,8 +181,8 @@ final class CargoLoadingTests {
                 })
                 .thenExecute(() -> {
                     // The chest and hopper over the car stand above the structure, which its clean-up misses.
-                    helper.getLevel().setBlockAndUpdate(filling[1], was[1]);
-                    helper.getLevel().setBlockAndUpdate(filling[0], was[0]);
+                    helper.getLevel().setBlockAndUpdate(filling.chest, filling.wasAtChest);
+                    helper.getLevel().setBlockAndUpdate(filling.hopper, filling.wasAtHopper);
                 })
                 .thenSucceed();
     }
@@ -200,12 +204,16 @@ final class CargoLoadingTests {
                     ServerPlayer driver = LocomotiveTests.board(helper, locomotive);
                     LocomotiveTests.press(driver, true, false);
                     LocomotiveTests.run(locomotive, 2);
-                    synced(helper, cargo, false);
                 })
+                .thenWaitUntil(() -> synced(helper, cargo, false))
                 .thenSucceed();
     }
 
-    /** Fails unless the car shows {@code expected} for being at a Station, for a sequence to wait on. */
+    /**
+     * Fails unless the car's synced flag says {@code expected} for being at a Station, for a sequence
+     * to wait on. It reads the server's entity data, which vanilla's entity tracking sends on; no
+     * client runs here to receive it.
+     */
     private static void synced(GameTestHelper helper, CargoCarEntity cargo, boolean expected) {
         if (cargo.atStation() != expected) {
             helper.fail("the Cargo car shows " + cargo.atStation() + " for being at a Station, with its capability "

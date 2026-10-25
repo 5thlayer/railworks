@@ -65,7 +65,7 @@ A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electr
 _Avoid_: engine (Wireworks' steam engine), loco
 
 **Cargo car**:
-A car that carries items, loaded and unloaded only while stopped at a Station.
+A car that carries items, loaded and unloaded only while stopped at a Station: by a hopper over its roof pointing down, and by one under the Rail beneath it, the two spots drawn while it is stopped there.
 _Avoid_: wagon, freight car
 
 **Station**:

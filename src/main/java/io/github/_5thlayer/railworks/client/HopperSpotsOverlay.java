@@ -12,9 +12,13 @@ import io.github._5thlayer.railworks.CargoCarEntity;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.rail.HopperSpots;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.context.ContextKey;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -27,7 +31,8 @@ import org.joml.Vector3f;
  * inserter reaches: a yellow box over the car's roof where a hopper pointing down fills it, and an
  * amber one under the Rail where a hopper empties it. Every player sees them, whatever they hold, so
  * the boxes tell a player who has not met loading yet that hoppers are the way, and they go when the
- * Train leaves. The spots are {@link HopperSpots}', at the car's synced box.
+ * Train leaves. The spots are {@link HopperSpots}', at the car's synced box; one a block already fills,
+ * a Pylon or a Station under the Rail, is not drawn, since no hopper can go there.
  */
 final class HopperSpotsOverlay {
 
@@ -35,9 +40,9 @@ final class HopperSpotsOverlay {
             new ContextKey<>(Identifier.fromNamespaceAndPath(Railworks.MOD_ID, "hopper_spots"));
 
     /** Where a hopper fills the car: yellow. */
-    static final int FILL = 0xFFE000;
+    private static final int FILL = 0xFFE000;
     /** Where a hopper empties it: amber. */
-    static final int EMPTY = 0xFF9000;
+    private static final int EMPTY = 0xFF9000;
     private static final int FACE_ALPHA = 0x50;
     private static final int EDGE_ALPHA = 0xFF;
     /** Out past a placed hopper's faces, so the box does not fight them. */
@@ -56,13 +61,21 @@ final class HopperSpotsOverlay {
         for (Entity entity : event.getLevel().entitiesForRendering()) {
             if (entity instanceof CargoCarEntity car && car.atStation()) {
                 HopperSpots spots = car.hopperSpots();
-                boxes.add(new Box(block(spots.fill()), FILL));
-                boxes.add(new Box(block(spots.empty()), EMPTY));
+                add(boxes, event.getLevel(), spots.fill(), FILL);
+                add(boxes, event.getLevel(), spots.empty(), EMPTY);
             }
         }
         event.getRenderState().setRenderData(BOXES, boxes.isEmpty() ? null : List.copyOf(boxes));
     }
 
+    private static void add(List<Box> boxes, Level level, HopperSpots.Spot spot, int colour) {
+        BlockState state = level.getBlockState(new BlockPos(spot.x(), spot.y(), spot.z()));
+        if (state.canBeReplaced() || state.is(Blocks.HOPPER)) {
+            boxes.add(new Box(block(spot), colour));
+        }
+    }
+
+    /** Draws the boxes taken: translucent faces, and their edges over them. */
     static void onSubmit(SubmitCustomGeometryEvent event) {
         List<Box> boxes = event.getLevelRenderState().getRenderData(BOXES);
         if (boxes == null) {

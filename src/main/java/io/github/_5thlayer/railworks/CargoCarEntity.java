@@ -81,10 +81,11 @@ public final class CargoCarEntity extends CarEntity {
         if (train == null || !(level() instanceof ServerLevel server)) {
             return null;
         }
-        Car car = train.car(carId());
-        boolean stopped = !LevelStations.of(server).stations()
-                .stoppedAt(LevelRails.of(server).network(), train, car).isEmpty();
-        return stopped ? handler : null;
+        return stoppedAtStation(server, train, train.car(carId())) ? handler : null;
+    }
+
+    private static boolean stoppedAtStation(ServerLevel level, Train train, Car car) {
+        return !LevelStations.of(level).stations().stoppedAt(LevelRails.of(level).network(), train, car).isEmpty();
     }
 
     /** Whether it is stopped at a Station, as the server last synced it: what the overlay draws by. */
@@ -99,7 +100,9 @@ public final class CargoCarEntity extends CarEntity {
 
     @Override
     protected void syncCar(Car car) {
-        entityData.set(DATA_AT_STATION, automation() != null);
+        Train train = train();
+        entityData.set(DATA_AT_STATION, train != null && level() instanceof ServerLevel server
+                && stoppedAtStation(server, train, car));
     }
 
     @Override

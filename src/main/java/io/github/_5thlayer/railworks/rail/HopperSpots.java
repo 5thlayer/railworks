@@ -13,6 +13,8 @@ package io.github._5thlayer.railworks.rail;
  *
  * <p>Pure: no Minecraft types. It is asked with the car's floor, the centre of its box's underside
  * in world coordinates, and its box's height, so the overlay and the game tests ask the same thing.
+ * The box is the entity's, which neither pitches nor turns with the car, so on a grade or a bend
+ * the spots are still the column over and under its centre; the Span need not be asked.
  */
 public record HopperSpots(Spot fill, Spot empty) {
 
