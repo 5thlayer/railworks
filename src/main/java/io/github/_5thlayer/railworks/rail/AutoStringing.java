@@ -8,9 +8,9 @@ import java.util.Comparator;
 import java.util.Optional;
 
 /**
- * Which Span a newly placed column strings by itself: the one to the nearest Pylon within the length
- * limit whose Arm has a Span to spare. The server places by it and the Placement Preview draws it,
- * both asking this.
+ * Which Span a newly placed column strings by itself: the one to the nearest Pylon the click's own rule
+ * would string to, within the length, grade and bend limits and with a Span to spare at its Arm. The
+ * server places by it and the Placement Preview draws it, both asking this.
  *
  * <p>Pure: no Minecraft types.
  */
@@ -35,7 +35,30 @@ public final class AutoStringing {
                 .filter(arm -> !arm.equals(placed))
                 // The click's own rule decides each candidate, so a refusal added there applies here too.
                 .filter(arm -> Stringing.decide(network, placed, arm, railHeld).result() == Stringing.Result.STRUNG)
-                .min(Comparator.comparingLong((Arm arm) -> placed.distanceSquaredTo(arm)).thenComparing(Comparator.naturalOrder()))
+                .min(nearestTo(placed))
                 .map(arm -> new Choice(arm, SpanRules.cost(placed, arm)));
+    }
+
+    /**
+     * The Arm a placed column would have strung to but for the grade or bend limit, which the Placement
+     * Preview draws red: where {@link #choose} finds nothing, the nearest Arm the click's rule refuses
+     * as {@link Stringing.Result#TOO_STEEP} or {@link Stringing.Result#TOO_SHARP}.
+     */
+    public static Optional<Arm> refused(RailNetwork network, Arm placed, Collection<Arm> arms, int railHeld) {
+        if (choose(network, placed, arms, railHeld).isPresent()) {
+            return Optional.empty();
+        }
+        return arms.stream()
+                .filter(arm -> !arm.equals(placed))
+                .filter(arm -> {
+                    Stringing.Result result = Stringing.decide(network, placed, arm, railHeld).result();
+                    return result == Stringing.Result.TOO_STEEP || result == Stringing.Result.TOO_SHARP;
+                })
+                .min(nearestTo(placed));
+    }
+
+    /** Nearest first, ties broken by position so the server and the preview pick the same Arm. */
+    private static Comparator<Arm> nearestTo(Arm placed) {
+        return Comparator.comparingLong((Arm arm) -> placed.distanceSquaredTo(arm)).thenComparing(Comparator.naturalOrder());
     }
 }

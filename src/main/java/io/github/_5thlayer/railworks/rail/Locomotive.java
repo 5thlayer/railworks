@@ -6,151 +6,80 @@ package io.github._5thlayer.railworks.rail;
 import java.util.function.LongSupplier;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
- * A Burner Locomotive as a Train: its place on a Span, its speed, the way it faces and its joule
- * fuel buffer. The entity in the world is only its view, so a Train in an unloaded chunk (#6) can
- * run the same code.
- *
- * <p>It faces one end of its Span, {@link #front()}, and {@link #toFront()} is how far it is from
- * that end. Speed is signed against its heading: positive runs toward the front, negative is a
- * reverse that does not turn it round. It runs on through an Arm into the Span beyond and stops at a
- * line's end, an Arm with one Span.
+ * A Burner Locomotive: the car of a {@link Train} that pulls it, for as long as its joule fuel
+ * buffer pays a tick of full power. Where it is and how fast it goes are its Train's.
  *
  * <p>Pure: no Minecraft types.
  */
-public final class Locomotive {
+public final class Locomotive implements Car {
 
-    /** Where a Locomotive is, in Arm coordinates; the world adds where the Rail rests on an Arm. */
-    public record Point(double x, double y, double z) {
-    }
+    public static final String KIND = "locomotive";
 
-    public static final Codec<Locomotive> CODEC = RecordCodecBuilder.create(i -> i.group(
-            Span.CODEC.fieldOf("span").forGetter(Locomotive::span),
-            Arm.CODEC.fieldOf("front").forGetter(Locomotive::front),
-            Codec.DOUBLE.fieldOf("to_front").forGetter(Locomotive::toFront),
-            Codec.DOUBLE.fieldOf("speed").forGetter(Locomotive::speed),
+    /** Blocks along the Line: the 1.8-block body {@code LocomotiveRenderer} draws. */
+    public static final double LENGTH = 1.8;
+
+    static final MapCodec<Locomotive> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             Codec.LONG.fieldOf("fuel").forGetter(l -> l.fuel.storedJoules()),
             Codec.LONG.fieldOf("last_lit").forGetter(l -> l.fuel.lastLitJoules())
     ).apply(i, Locomotive::restore));
 
-    private Span span;
-    private Arm front;
-    private double toFront;
-    private double speed;
     private final FuelBuffer fuel = new FuelBuffer();
 
-    private Locomotive(Span span, Arm front, double toFront) {
-        if (!span.touches(front)) {
-            throw new IllegalArgumentException(front + " is not an end of " + span);
-        }
-        this.span = span;
-        this.front = front;
-        this.toFront = Math.max(0.0, Math.min(span.length(), toFront));
+    private Locomotive() {
     }
 
-    /** At rest on {@code span}, facing {@code front}, {@code toFront} blocks from it. */
-    public static Locomotive on(Span span, Arm front, double toFront) {
-        return new Locomotive(span, front, toFront);
+    /** A Burner Locomotive with an empty buffer. */
+    public static Locomotive burner() {
+        return new Locomotive();
     }
 
-    private static Locomotive restore(Span span, Arm front, double toFront, double speed, long fuel, long lastLit) {
-        Locomotive loco = new Locomotive(span, front, toFront);
-        loco.speed = speed;
-        loco.fuel.load(fuel, lastLit);
-        return loco;
+    static Locomotive restore(long fuel, long lastLit) {
+        Locomotive locomotive = new Locomotive();
+        locomotive.fuel.load(fuel, lastLit);
+        return locomotive;
     }
 
-    public Span span() {
-        return span;
+    @Override
+    public String kind() {
+        return KIND;
     }
 
-    /** The end of its Span it faces. */
-    public Arm front() {
-        return front;
+    @Override
+    public double mass() {
+        return LocomotiveSpec.MASS_KG;
     }
 
-    public double toFront() {
-        return toFront;
-    }
-
-    /** Blocks a tick, positive the way it faces. */
-    public double speed() {
-        return speed;
+    @Override
+    public double length() {
+        return LENGTH;
     }
 
     public FuelBuffer fuel() {
         return fuel;
     }
 
-    /** Whether the Span it stands on is still strung. */
-    public boolean onRail(RailNetwork network) {
-        return network.contains(span.a(), span.b());
+    /**
+     * What it pulls with at full power, in kilogram blocks a tick squared: its own mass at the
+     * configured acceleration, so a Train's acceleration is its pulling share of that.
+     */
+    public double pull() {
+        return LocomotiveSpec.MASS_KG * LocomotiveSpec.acceleration();
+    }
+
+    /** Whether its buffer covers a tick of full power without lighting anything. */
+    public boolean fuelled() {
+        return fuel.storedJoules() >= LocomotiveSpec.JOULES_PER_TICK_AT_FULL_POWER;
     }
 
     /**
-     * The Arm at {@code from} has moved to {@code to}, {@code network} already holding its Spans
-     * there: a car on one of them stays on it, the same fraction of the way along, rather than
-     * losing the Rail it was on.
+     * Pays one tick of full power: the buffer first, lighting an item through {@code ignite} (the
+     * item's joules, or 0 for none) only when the buffer cannot cover the tick.
      */
-    public void moveArm(RailNetwork network, Arm from, Arm to) {
-        if (!span.touches(from)) {
-            return;
-        }
-        Span moved = network.get(to, span.otherEnd(from));
-        if (moved == null) {
-            return;
-        }
-        double fraction = toFront / span.length();
-        front = front.equals(from) ? to : front;
-        span = moved;
-        toFront = fraction * moved.length();
-    }
-
-    /** Where it is, in Arm coordinates: along the Span, {@code toFront} short of its front. */
-    public Point point() {
-        Arm back = span.otherEnd(front);
-        double t = toFront / span.length();
-        return new Point(front.x() + (back.x() - front.x()) * t,
-                front.y() + (back.y() - front.y()) * t,
-                front.z() + (back.z() - front.z()) * t);
-    }
-
-    /**
-     * One tick under {@code throttle}. A powered tick draws full power from the fuel buffer, lighting
-     * an item through {@code ignite} when the buffer cannot cover it (the item's joules, or 0 for
-     * none), and with no fuel it brakes to a stop. Pushing against the motion brakes, for free.
-     */
-    public void tick(RailNetwork network, Throttle throttle, LongSupplier ignite) {
-        int push = throttle.sign();
-        if (push == 0) {
-            coast();
-        } else if (speed * push < 0) {
-            speed = towardZero(speed, LocomotiveSpec.braking());
-        } else if (blockedAhead(network, push)) {
-            coast();
-        } else if (!pay(ignite)) {
-            // Out of fuel the brakes take it down: coasting on friction alone would run a fast car
-            // on for minutes.
-            speed = towardZero(speed, LocomotiveSpec.braking());
-        } else {
-            double cap = LocomotiveSpec.maxSpeed();
-            speed = Math.max(-cap, Math.min(cap, speed + push * LocomotiveSpec.acceleration()));
-        }
-        advance(network);
-    }
-
-    private void coast() {
-        speed = towardZero(speed, LocomotiveSpec.friction());
-    }
-
-    private static double towardZero(double value, double by) {
-        return value > 0 ? Math.max(0.0, value - by) : Math.min(0.0, value + by);
-    }
-
-    /** Pays one tick of full power; the buffer first, an item only when it cannot cover the tick. */
-    private boolean pay(LongSupplier ignite) {
+    boolean pay(LongSupplier ignite) {
         long perTick = LocomotiveSpec.JOULES_PER_TICK_AT_FULL_POWER;
         if (fuel.drawTick(perTick)) {
             return true;
@@ -161,52 +90,5 @@ public final class Locomotive {
         }
         fuel.light(lit);
         return fuel.drawTick(perTick);
-    }
-
-    /** Whether it sits at a line's end with the throttle pushing it off. */
-    private boolean blockedAhead(RailNetwork network, int push) {
-        return push > 0
-                ? toFront <= 0.0 && beyond(network, front) == null
-                : toFront >= span.length() && beyond(network, span.otherEnd(front)) == null;
-    }
-
-    /** The Span past {@code arm} from the current one, or null at a line's end. */
-    private Span beyond(RailNetwork network, Arm arm) {
-        for (Span other : network.spansAt(arm)) {
-            if (!other.a().equals(span.a()) || !other.b().equals(span.b())) {
-                return other;
-            }
-        }
-        return null;
-    }
-
-    private void advance(RailNetwork network) {
-        toFront -= speed;
-        while (toFront < 0.0 || toFront > span.length()) {
-            if (toFront < 0.0) {
-                Span next = beyond(network, front);
-                if (next == null) {
-                    toFront = 0.0;
-                    speed = 0.0;
-                    return;
-                }
-                double over = -toFront;
-                front = next.otherEnd(front);
-                span = next;
-                toFront = next.length() - over;
-            } else {
-                Arm back = span.otherEnd(front);
-                Span next = beyond(network, back);
-                if (next == null) {
-                    toFront = span.length();
-                    speed = 0.0;
-                    return;
-                }
-                double over = toFront - span.length();
-                front = back;
-                span = next;
-                toFront = over;
-            }
-        }
     }
 }

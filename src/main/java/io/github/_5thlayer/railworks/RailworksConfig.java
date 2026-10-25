@@ -12,13 +12,16 @@ import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * {@code railworks-server.toml}: the longest Span and the Burner Locomotive's drive and fuel. A server
- * config, so the client measures the same limit the server strings by.
+ * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, and the Burner
+ * Locomotive's drive and fuel. A server config, so the client measures the same limits the server
+ * strings by.
  */
 public final class RailworksConfig {
 
     private static final ModConfigSpec SPEC;
     private static final ModConfigSpec.DoubleValue SPAN_LENGTH_LIMIT;
+    private static final ModConfigSpec.DoubleValue SPAN_GRADE_LIMIT;
+    private static final ModConfigSpec.DoubleValue SPAN_BEND_LIMIT;
     private static final ModConfigSpec.DoubleValue LOCOMOTIVE_MAX_SPEED;
     private static final ModConfigSpec.DoubleValue LOCOMOTIVE_ACCELERATION;
     private static final ModConfigSpec.DoubleValue LOCOMOTIVE_BRAKING;
@@ -29,6 +32,10 @@ public final class RailworksConfig {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         SPAN_LENGTH_LIMIT = builder.comment("The longest Span, in blocks: the straight distance between its two Arms, which its Rail cost rounds up.")
                 .defineInRange("spanLengthLimit", SpanRules.DEFAULT_LENGTH_LIMIT, 1.0, 256.0);
+        SPAN_GRADE_LIMIT = builder.comment("The steepest Span, in percent: blocks up for every 100 across. 25 is a block up for every four across.")
+                .defineInRange("spanGradeLimitPercent", SpanRules.DEFAULT_GRADE_LIMIT * 100.0, 1.0, 1000.0);
+        SPAN_BEND_LIMIT = builder.comment("The sharpest bend a Span may make through an Arm against the Span already there, in degrees off straight on. 45 is Factorio's curved rail pair.")
+                .defineInRange("spanBendLimit", SpanRules.DEFAULT_BEND_LIMIT, 1.0, 180.0);
         builder.push("burner_locomotive");
         LOCOMOTIVE_MAX_SPEED = builder.comment("Top speed either way, in blocks a second. Factorio's locomotive does 72, which outruns chunk loading.")
                 .defineInRange("maxSpeed", LocomotiveSpec.DEFAULT_MAX_SPEED, 1.0, 200.0);
@@ -54,6 +61,8 @@ public final class RailworksConfig {
         modBus.addListener(ModConfigEvent.Unloading.class, event -> {
             if (event.getConfig().getSpec() == SPEC) {
                 SpanRules.configure(SpanRules.DEFAULT_LENGTH_LIMIT);
+                SpanRules.configureGrade(SpanRules.DEFAULT_GRADE_LIMIT);
+                SpanRules.configureBend(SpanRules.DEFAULT_BEND_LIMIT);
                 LocomotiveSpec.configure(LocomotiveSpec.DEFAULT_MAX_SPEED, LocomotiveSpec.DEFAULT_ACCELERATION,
                         LocomotiveSpec.DEFAULT_BRAKING, LocomotiveSpec.DEFAULT_FRICTION);
                 LocomotiveSpec.configureFuel(LocomotiveSpec.DEFAULT_JOULES_PER_BURN_TICK);
@@ -64,6 +73,8 @@ public final class RailworksConfig {
     private static void apply(ModConfig config) {
         if (config.getSpec() == SPEC) {
             SpanRules.configure(SPAN_LENGTH_LIMIT.get());
+            SpanRules.configureGrade(SPAN_GRADE_LIMIT.get() / 100.0);
+            SpanRules.configureBend(SPAN_BEND_LIMIT.get());
             LocomotiveSpec.configure(LOCOMOTIVE_MAX_SPEED.get(), LOCOMOTIVE_ACCELERATION.get(),
                     LOCOMOTIVE_BRAKING.get(), LOCOMOTIVE_FRICTION.get());
             LocomotiveSpec.configureFuel(LOCOMOTIVE_JOULES_PER_BURN_TICK.get());

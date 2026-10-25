@@ -124,7 +124,7 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     }
 
     /** The slack's colour: leash brown while held, green, orange or red over a Pylon: string, cut or refused. */
-    private static float[] colourOf(Stringing.Tint tint) {
+    static float[] colourOf(Stringing.Tint tint) {
         return switch (tint) {
             case HELD -> new float[] {0.5F, 0.4F, 0.3F};
             case STRING -> new float[] {0.2F, 0.8F, 0.2F};

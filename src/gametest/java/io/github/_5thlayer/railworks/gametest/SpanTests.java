@@ -46,6 +46,8 @@ final class SpanTests {
         tests.test("span_the_rail_gesture_strings_and_spends_the_cost", 20, SpanTests::stringsAndSpends);
         tests.test("span_a_short_purse_strings_nothing", 20, SpanTests::shortPurse);
         tests.test("span_a_span_past_the_length_limit_is_refused", 20, SpanTests::tooLong);
+        tests.test("span_a_span_past_the_grade_limit_is_refused", 20, SpanTests::tooSteep);
+        tests.test("span_a_span_bending_past_the_bend_limit_is_refused", 20, SpanTests::tooSharp);
         tests.test("span_a_third_span_on_one_arm_is_refused", 20, SpanTests::thirdRefused);
         tests.test("span_using_the_same_arm_again_cancels", 20, SpanTests::sameArmCancels);
         tests.test("span_switching_items_cancels", 20, SpanTests::switchingCancels);
@@ -128,6 +130,31 @@ final class SpanTests {
         use(helper, player, far);
         expectStrung(helper, A, far, false, "a 70 block Span");
         expectRail(helper, player, 64, "a refused Span");
+        helper.succeed();
+    }
+
+    private static void tooSteep(GameTestHelper helper) {
+        // B's Arm four segments up: 3 blocks of rise over 8 across, past the 1 in 4 limit.
+        column(helper, B, 4);
+        ServerPlayer player = railPlayer(helper, 20);
+        use(helper, player, A);
+        use(helper, player, B);
+        expectStrung(helper, A, B.above(3), false, "a Span climbing 3 over 8");
+        expectRail(helper, player, 20, "a refused Span");
+        helper.succeed();
+    }
+
+    private static void tooSharp(GameTestHelper helper) {
+        // A to B runs east; turning north at B is a right angle, past the 45 degree limit.
+        BlockPos corner = B.offset(0, 0, 8);
+        helper.setBlock(corner, RailworksRegistries.PYLON.get().defaultBlockState());
+        ServerPlayer player = railPlayer(helper, 20);
+        use(helper, player, A);
+        use(helper, player, B);
+        use(helper, player, B);
+        use(helper, player, corner);
+        expectStrung(helper, B, corner, false, "a right angle through B");
+        expectRail(helper, player, 12, "a refused bend");
         helper.succeed();
     }
 

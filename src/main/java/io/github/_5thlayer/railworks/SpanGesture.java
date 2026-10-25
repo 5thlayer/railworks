@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks;
 
 import java.math.BigDecimal;
 
+import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.PendingEnd;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Stringing;
@@ -85,15 +86,29 @@ public final class SpanGesture {
             }
             case CANCELLED -> rail.remove(RailworksRegistries.PENDING_SPAN.get());
             // A refusal changes nothing, the held end included.
-            case TOO_LONG -> refused(server, player,
-                    Component.translatable("message.railworks.too_long",
-                            BigDecimal.valueOf(SpanRules.lengthLimit()).stripTrailingZeros().toPlainString()));
-            case ARM_FULL -> refused(server, player,
-                    Component.translatable("message.railworks.arm_full", SpanRules.SPANS_PER_ARM));
-            case SHORT_OF_RAIL -> refused(server, player, Component.translatable("message.railworks.short_of_rail",
-                    SpanRules.cost(PylonColumn.arm(pending.pos()), PylonColumn.arm(arm))));
+            default -> refused(server, player, reason(outcome.result(), PylonColumn.arm(pending.pos()), PylonColumn.arm(arm)));
         }
         return InteractionResult.SUCCESS_SERVER;
+    }
+
+    /**
+     * Why a Span from {@code anchor} to {@code target} is refused, for a {@code result} that
+     * {@link Stringing#refused} says is a refusal: the action-bar line, and Jade's.
+     */
+    public static Component reason(Stringing.Result result, Arm anchor, Arm target) {
+        return switch (result) {
+            case TOO_LONG -> Component.translatable("message.railworks.too_long", number(SpanRules.lengthLimit()));
+            case TOO_STEEP -> Component.translatable("message.railworks.too_steep", number(SpanRules.gradeLimit() * 100.0));
+            case TOO_SHARP -> Component.translatable("message.railworks.too_sharp", number(SpanRules.bendLimit()));
+            case ARM_FULL -> Component.translatable("message.railworks.arm_full", SpanRules.SPANS_PER_ARM);
+            case SHORT_OF_RAIL -> Component.translatable("message.railworks.short_of_rail", SpanRules.cost(anchor, target));
+            case STRUNG, CUT, CANCELLED -> throw new IllegalArgumentException("not a refusal: " + result);
+        };
+    }
+
+    /** A limit as the config writes it: 32, 0.5, never 32.0. */
+    private static String number(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
     private static void refused(ServerLevel server, Player player, Component reason) {

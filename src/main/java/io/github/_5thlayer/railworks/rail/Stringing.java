@@ -22,6 +22,10 @@ public final class Stringing {
         /** The same Arm again: the pending Span is dropped, nothing changed. */
         CANCELLED,
         TOO_LONG,
+        /** The Span would climb more steeply than {@link SpanRules#gradeLimit()}. */
+        TOO_STEEP,
+        /** The Span would bend more sharply than {@link SpanRules#bendLimit()} against a Span already at either Arm. */
+        TOO_SHARP,
         /** One of the Arms already takes {@link SpanRules#SPANS_PER_ARM} Spans. */
         ARM_FULL,
         SHORT_OF_RAIL
@@ -68,6 +72,12 @@ public final class Stringing {
         if (SpanRules.tooLong(anchor, target)) {
             return new Outcome(Result.TOO_LONG, 0);
         }
+        if (SpanRules.tooSteep(anchor, target)) {
+            return new Outcome(Result.TOO_STEEP, 0);
+        }
+        if (bendsTooSharply(network, anchor, target) || bendsTooSharply(network, target, anchor)) {
+            return new Outcome(Result.TOO_SHARP, 0);
+        }
         int cost = SpanRules.cost(anchor, target);
         if (railHeld < cost) {
             return new Outcome(Result.SHORT_OF_RAIL, 0);
@@ -75,16 +85,41 @@ public final class Stringing {
         return new Outcome(Result.STRUNG, cost);
     }
 
+    /**
+     * Whether a new Span from {@code at} to {@code to} bends too sharply against any Span already at
+     * {@code at}. Any, since an Arm takes two Spans and so one line; a Junction's branch leaving beside
+     * its sibling would only need to run on from one of them, judged by the same {@link SpanRules#tooSharp}.
+     */
+    private static boolean bendsTooSharply(RailNetwork network, Arm at, Arm to) {
+        for (Span span : network.spansAt(at)) {
+            if (SpanRules.tooSharp(span.otherEnd(at), at, to)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether {@code result} is a refusal: the click changes nothing and spends nothing. */
+    public static boolean refused(Result result) {
+        return switch (result) {
+            case STRUNG, CUT, CANCELLED -> false;
+            case TOO_LONG, TOO_STEEP, TOO_SHARP, ARM_FULL, SHORT_OF_RAIL -> true;
+        };
+    }
+
     /** The slack's tint for an aim at {@code target}, or at nothing when it is null. */
     public static Tint tintFor(RailNetwork network, Arm anchor, @Nullable Arm target, int railHeld) {
         if (target == null) {
             return Tint.HELD;
         }
-        return switch (decide(network, anchor, target, railHeld).result()) {
-            case CANCELLED -> Tint.HELD;
+        Result result = decide(network, anchor, target, railHeld).result();
+        if (refused(result)) {
+            return Tint.REFUSED;
+        }
+        return switch (result) {
             case STRUNG -> Tint.STRING;
             case CUT -> Tint.CUT;
-            case TOO_LONG, ARM_FULL, SHORT_OF_RAIL -> Tint.REFUSED;
+            default -> Tint.HELD;
         };
     }
 

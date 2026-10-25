@@ -10,6 +10,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailPurse;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -40,6 +41,8 @@ final class AutoStringTests {
         tests.test("autostring_picks_the_nearest_of_two", 20, within(14.0, AutoStringTests::nearest));
         tests.test("autostring_charges_a_creative_player_too", 20, within(9.0, AutoStringTests::creativePays));
         tests.test("autostring_with_too_little_rail_places_the_pylon_alone", 20, within(9.0, AutoStringTests::shortOfRail));
+        tests.test("autostring_never_strings_past_the_grade_limit", 20, within(9.0, AutoStringTests::tooSteep));
+        tests.test("autostring_never_strings_past_the_bend_limit", 20, within(9.0, AutoStringTests::tooSharp));
         tests.test("autostring_strings_nothing_when_sneaking", 20, within(9.0, AutoStringTests::sneaking));
         tests.test("autostring_strings_nothing_with_no_arm_in_reach", 20, within(9.0, AutoStringTests::nothingInReach));
         tests.test("autostring_never_strings_when_stacking_onto_a_column", 20, within(9.0, AutoStringTests::stackingNever));
@@ -98,6 +101,39 @@ final class AutoStringTests {
         expectPylon(helper, PLACED);
         expectStrung(helper, PLACED, NEIGHBOUR, false, "placing with 7 Rail for an 8 Rail Span");
         expectRail(helper, player, 7, "a Span that was not strung");
+        helper.succeed();
+    }
+
+    private static void tooSteep(GameTestHelper helper) {
+        // The neighbour's Arm four segments up: 3 of rise over 8, past the 1 in 4 limit.
+        for (int i = 0; i < 4; i++) {
+            helper.setBlock(NEIGHBOUR.above(i), RailworksRegistries.PYLON.get().defaultBlockState());
+        }
+        ServerPlayer player = player(helper, 20, GameType.SURVIVAL);
+        place(helper, player, PLACED);
+        expectPylon(helper, PLACED);
+        expectStrung(helper, PLACED, NEIGHBOUR.above(3), false, "placing a column 3 below and 8 from an Arm");
+        expectRail(helper, player, 20, "a Span past the grade limit");
+        helper.succeed();
+    }
+
+    private static void tooSharp(GameTestHelper helper) {
+        // The neighbour's Span runs north, out of reach; on to the placed column would turn a right angle.
+        helper.setBlock(NEIGHBOUR, RailworksRegistries.PYLON.get().defaultBlockState());
+        BlockPos north = NEIGHBOUR.offset(0, 0, 8);
+        helper.setBlock(north, RailworksRegistries.PYLON.get().defaultBlockState());
+        LevelRails rails = LevelRails.of(helper.getLevel());
+        rails.network().add(Span.of(PylonColumn.arm(helper.absolutePos(NEIGHBOUR)),
+                PylonColumn.arm(helper.absolutePos(north)), 8));
+        try {
+            ServerPlayer player = player(helper, 20, GameType.SURVIVAL);
+            place(helper, player, PLACED);
+            expectPylon(helper, PLACED);
+            expectStrung(helper, PLACED, NEIGHBOUR, false, "placing a column a right angle off a line");
+            expectRail(helper, player, 20, "a Span past the bend limit");
+        } finally {
+            rails.network().removeAllAt(PylonColumn.arm(helper.absolutePos(NEIGHBOUR)));
+        }
         helper.succeed();
     }
 

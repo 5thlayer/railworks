@@ -22,6 +22,8 @@ class StringingTest {
     @AfterEach
     void resetLimit() {
         SpanRules.configure(SpanRules.DEFAULT_LENGTH_LIMIT);
+        SpanRules.configureGrade(SpanRules.DEFAULT_GRADE_LIMIT);
+        SpanRules.configureBend(SpanRules.DEFAULT_BEND_LIMIT);
     }
 
     private static int limit() {
@@ -88,6 +90,79 @@ class StringingTest {
         // sqrt(109) = 10.44, inside 10.5, costing 11
         assertEquals(Stringing.Result.STRUNG, outcome.result());
         assertEquals(11, outcome.rail());
+    }
+
+    @Test
+    void refusesPastTheGradeLimitAndStringsNothing() {
+        var steep = new Arm(8, 8, 0);
+        var outcome = Stringing.click(network, A, steep, 1000);
+        assertEquals(Stringing.Result.TOO_STEEP, outcome.result());
+        assertEquals(0, outcome.rail());
+        assertFalse(network.contains(A, steep));
+    }
+
+    @Test
+    void stringsAtTheGradeLimit() {
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, A, new Arm(8, 7, 0), 1000).result());
+    }
+
+    @Test
+    void aConfiguredGradeLimitMovesTheRefusal() {
+        var steep = new Arm(8, 8, 0);
+        SpanRules.configureGrade(0.5);
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, A, steep, 1000).result());
+    }
+
+    @Test
+    void refusesABendPastTheLimitAtTheHeldArm() {
+        network.add(Span.of(A, B, 10));
+        var corner = new Arm(10, 5, 10);
+        var outcome = Stringing.click(network, B, corner, 1000);
+        assertEquals(Stringing.Result.TOO_SHARP, outcome.result());
+        assertEquals(0, outcome.rail());
+        assertFalse(network.contains(B, corner));
+    }
+
+    @Test
+    void refusesABendPastTheLimitAtTheClickedArm() {
+        network.add(Span.of(A, B, 10));
+        assertEquals(Stringing.Result.TOO_SHARP, Stringing.click(network, new Arm(10, 5, 10), B, 1000).result());
+    }
+
+    @Test
+    void aBendWithinTheLimitStringsAtEitherArm() {
+        network.add(Span.of(A, B, 10));
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, B, new Arm(17, 5, 7), 1000).result());
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, new Arm(-7, 5, 7), A, 1000).result());
+    }
+
+    @Test
+    void aBendIsJudgedAgainstTheSpanAtTheArmNotTheOneAcross() {
+        // Through A the line runs on from B; through B it doubles back, which is refused
+        network.add(Span.of(A, B, 10));
+        assertEquals(Stringing.Result.TOO_SHARP, Stringing.click(network, B, new Arm(-5, 5, 0), 1000).result());
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, A, new Arm(-5, 5, 0), 1000).result());
+    }
+
+    @Test
+    void aConfiguredBendLimitMovesTheRefusal() {
+        network.add(Span.of(A, B, 10));
+        SpanRules.configureBend(90.0);
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, B, new Arm(10, 5, 10), 1000).result());
+    }
+
+    @Test
+    void theGradeAndBendChecksComeBeforeTheRailCheck() {
+        assertEquals(Stringing.Result.TOO_STEEP, Stringing.click(network, A, new Arm(0, 9, 1), 0).result());
+        network.add(Span.of(A, B, 10));
+        assertEquals(Stringing.Result.TOO_SHARP, Stringing.click(network, B, new Arm(10, 5, 10), 0).result());
+    }
+
+    @Test
+    void aCutIsAllowedWhateverTheLimitsSayNow() {
+        var steep = new Arm(2, 9, 0);
+        network.add(Span.of(A, steep, 5));
+        assertEquals(Stringing.Result.CUT, Stringing.click(network, A, steep, 0).result());
     }
 
     @Test
@@ -179,11 +254,25 @@ class StringingTest {
         Stringing.click(network, B, A, 100);
         Stringing.click(network, B, C, 100);
         assertEquals(Stringing.Tint.REFUSED, Stringing.tintFor(network, B, D, 100));
+        assertEquals(Stringing.Tint.REFUSED, Stringing.tintFor(network, D, new Arm(30, 25, 0), 1000));
+        assertEquals(Stringing.Tint.REFUSED, Stringing.tintFor(network, C, new Arm(20, 5, 10), 1000));
+    }
+
+    @Test
+    void everyRefusalIsARefusalAndNothingElseIs() {
+        for (Stringing.Result result : Stringing.Result.values()) {
+            boolean refused = switch (result) {
+                case STRUNG, CUT, CANCELLED -> false;
+                default -> true;
+            };
+            assertEquals(refused, Stringing.refused(result));
+        }
     }
 
     @Test
     void thePreviewAndTheClickAgreeOnEveryAim() {
-        Arm[] aims = {A, B, C, D, new Arm(limit() + 1, 5, 0), new Arm(3, 5, 4)};
+        network.add(Span.of(A, new Arm(-10, 5, 0), 10));
+        Arm[] aims = {A, B, C, D, new Arm(limit() + 1, 5, 0), new Arm(3, 5, 4), new Arm(3, 12, 0), new Arm(-5, 5, 2)};
         for (int rail : new int[] {0, 5, 100}) {
             for (Arm aim : aims) {
                 var copy = new RailNetwork();

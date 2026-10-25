@@ -9,6 +9,7 @@ package io.github._5thlayer.railworks.rail;
  * Where it has none, Factorio's prototype is the source:
  *
  * <ul>
+ *   <li>2,000 kg, the car's mass, so a Train with more cars than Locomotives pulls slower;
  *   <li>600 kW at full power, which is 30,000 J a Minecraft tick (a twentieth of a second);
  *   <li>braking 10 kN on 2,000 kg, which is 5 blocks a second squared;
  *   <li>friction 0.5 kN on 2,000 kg, which is 0.25 blocks a second squared.
@@ -17,7 +18,9 @@ package io.github._5thlayer.railworks.rail;
  * <p>Top speed is not Factorio's, which is 72 blocks a second (1.2 tiles a tick at 60 ticks a
  * second): that outruns chunk loading and elytra, so the default is 25 and the config allows 72.
  * Acceleration is the other number nothing gives: Factorio's depends on the Train's mass and a
- * power curve, so a constant half the braking is this Module's own pick.
+ * power curve, so a constant half the braking is this Module's own pick, for a Locomotive pulling
+ * only itself: a Train's acceleration is its fuelled Locomotives' pull over its whole mass. Braking
+ * and friction are each car's own, so they slow a Train the same whatever its length.
  *
  * <p>Speeds are in blocks a second and accelerations in blocks a second squared for the config's
  * sake; the model works in ticks. Pure: no Minecraft types.
@@ -25,6 +28,9 @@ package io.github._5thlayer.railworks.rail;
 public final class LocomotiveSpec {
 
     public static final int TICKS_PER_SECOND = 20;
+
+    /** Factorio's locomotive weighs 2,000 kg. */
+    public static final double MASS_KG = 2_000.0;
 
     /** Factorio's locomotive draws 600 kW at full power. */
     public static final double POWER_WATTS = 600_000.0;
