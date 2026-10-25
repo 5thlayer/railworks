@@ -16,5 +16,12 @@
   "tooltip.railworks.locomotive.jade.reversing": "reversing",
   "tooltip.railworks.locomotive.jade.fuel": "Fuel: %s MJ (%s s at full power)",
   "tooltip.railworks.locomotive.jade.slot": "Slot: %s x %s",
-  "tooltip.railworks.locomotive.jade.slot_empty": "Slot: empty"
+  "tooltip.railworks.locomotive.jade.slot_empty": "Slot: empty",
+  "block.railworks.station": "Station",
+  "item.railworks.station": "Station",
+  "menu.railworks.station.name": "Name",
+  "message.railworks.station_off_rail": "A Station goes beside the Rail or under it",
+  "message.railworks.station_in_clearance": "A Station there would be in the way of a passing car",
+  "tooltip.railworks.station.jade.name": "Name: %s",
+  "tooltip.railworks.station.jade.off_rail": "By no Rail"
 }

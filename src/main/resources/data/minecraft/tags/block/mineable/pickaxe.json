@@ -1,5 +1,6 @@
 {
   "values": [
-    "railworks:pylon"
+    "railworks:pylon",
+    "railworks:station"
   ]
 }

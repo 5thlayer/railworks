@@ -4,7 +4,9 @@
 package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.client.RailworksClient;
+import io.github._5thlayer.railworks.network.NameStationPacket;
 import io.github._5thlayer.railworks.network.SpansPacket;
+import io.github._5thlayer.railworks.network.StationMenuPacket;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -40,6 +42,8 @@ public final class Railworks {
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
         event.registrar(NETWORK_VERSION)
-                .playToClient(SpansPacket.TYPE, SpansPacket.STREAM_CODEC, SpansPacket::handle);
+                .playToClient(SpansPacket.TYPE, SpansPacket.STREAM_CODEC, SpansPacket::handle)
+                .playToClient(StationMenuPacket.TYPE, StationMenuPacket.STREAM_CODEC, StationMenuPacket::handle)
+                .playToServer(NameStationPacket.TYPE, NameStationPacket.STREAM_CODEC, NameStationPacket::handle);
     }
 }

@@ -22,5 +22,6 @@ final class WorksTabContents {
         event.accept(RailworksRegistries.PYLON_ITEM.get());
         event.accept(RailworksRegistries.RAIL.get());
         event.accept(RailworksRegistries.LOCOMOTIVE.get());
+        event.accept(RailworksRegistries.STATION_ITEM.get());
     }
 }
