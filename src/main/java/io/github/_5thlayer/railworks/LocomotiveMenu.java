@@ -25,6 +25,8 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     public static final int FUEL = 0;
     public static final int CAB_SLOTS = 1;
 
+    /** How far from the car the player may stand with its menu open, in blocks. */
+    private static final double REACH = 8.0;
     private static final int FUEL_X = 80;
     private static final int FUEL_Y = 18;
     private static final int INVENTORY_Y = 49;
@@ -62,7 +64,7 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return car != null && car.isAlive() && (car.hasPassenger(player) || player.distanceToSqr(car) < 64.0);
+        return car != null && car.isAlive() && (car.hasPassenger(player) || player.distanceToSqr(car) < REACH * REACH);
     }
 
     /** Shift-click: the cab's slots to the inventory, and the inventory's fuel to the fuel slot. */
