@@ -68,7 +68,7 @@ public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, L
             box(pose.pose(), buffer, web + 0.02F, 0.0F, -0.9F, skirt, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
             box(pose.pose(), buffer, -skirt, floor, -0.9F, skirt, floor + 0.15F, 0.9F, 0.62F, 0.27F, 0.18F, light);
             box(pose.pose(), buffer, -0.45F, floor + 0.15F, 0.2F, 0.45F, 1.6F, 0.9F, 0.40F, 0.17F, 0.12F, light);
-            box(pose.pose(), buffer, -skirt, 1.85F, -0.9F, skirt, 2.0F, 0.9F, 0.62F, 0.27F, 0.18F, light);
+            box(pose.pose(), buffer, -skirt, 2.6F, -0.9F, skirt, 2.75F, 0.9F, 0.62F, 0.27F, 0.18F, light);
         });
         poseStack.popPose();
     }

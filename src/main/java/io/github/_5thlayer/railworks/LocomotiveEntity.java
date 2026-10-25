@@ -52,7 +52,7 @@ import org.jspecify.annotations.Nullable;
 public final class LocomotiveEntity extends VehicleEntity implements HasCustomInventoryScreen {
 
     public static final float WIDTH = 1.0F;
-    public static final float HEIGHT = 2.0F;
+    public static final float HEIGHT = 2.75F;
 
     private static final EntityDataAccessor<BlockPos> DATA_SPAN_A =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BLOCK_POS);
