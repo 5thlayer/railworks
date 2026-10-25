@@ -5,6 +5,14 @@ plugins {
     id 'io.github.5thlayer.libworks.module' version '0.4.2'
 }
 
+repositories {
+    maven { url = 'https://cursemaven.com' }
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+}
+
 // What the Module requires of other Modules, each as a range (libworks ADR 0003):
 libworks {
     // Required at load and not bundled, for the placement preview.
@@ -21,3 +29,41 @@ libworks {
 // libworks-runtime and libworks-gametest come from ~/.m2, the one repository the plugin gives every
 // io.github.5thlayer module (libworks#18). CI builds the runtime's tag there first.
 
+
+neoForge {
+    runs {
+        client {
+            // EMI still uses @OnlyIn, and the warning screen it raises would stop the quick play.
+            systemProperty 'neoforge.warnings.onlyin.hide', 'true'
+        }
+    }
+}
+
+// 26.1 has no per-run classpath, so the dev client's mods go into its mods folder, which holds only
+// what is listed here; the game test server loads Groundworks and nothing else (FactoryWorks ADR-0127).
+configurations {
+    clientMods { transitive = false }
+}
+
+def syncClientMods = tasks.register('syncClientMods', Sync) {
+    from configurations.clientMods
+    into layout.projectDirectory.dir('run/mods')
+}
+
+tasks.named('runClient') { dependsOn syncClientMods }
+
+dependencies {
+    // Jade and EMI find their plugins by annotation, so the Module runs without either, and the game
+    // test server loads neither. EMI lists the Module's recipes with no plugin of ours.
+    compileOnly 'maven.modrinth:jade:26.1.11+neoforge'
+    clientMods 'maven.modrinth:jade:26.1.11+neoforge'
+    compileOnly 'curse.maven:emi-unofficial-port-1544558:8630349'
+    clientMods 'curse.maven:emi-unofficial-port-1544558:8630349'
+
+    // The JUnit tests run on a plain JVM, with no Minecraft on their classpath: they test the rules that
+    // read no game state, and the game tests test the rest. DataFixerUpper, and only that: Codec is
+    // Mojang's serialisation library, not a Minecraft type, so the rail network's codec round-trips on a
+    // plain JVM. The version is the one Minecraft 26.1.2 ships.
+    testImplementation 'com.mojang:datafixerupper:9.0.19'
+    testImplementation 'com.google.code.gson:gson:2.13.2'
+}
