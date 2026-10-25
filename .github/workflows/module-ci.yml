@@ -1,0 +1,98 @@
+# The CI every Module calls (ADR 0003), at the tag of the plugin it applies:
+#   jobs:
+#     ci:
+#       uses: 5thlayer/libworks/.github/workflows/module-ci.yml@plugin-v<version>
+# The plugin version is that ref's, and the run fails when build.gradle applies another.
+# It never publishes outside the runner: a jar reaches a Consumer only through a maintainer's ~/.m2.
+name: Module CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # The plugin version is the ref the Module calls this workflow at, which build.gradle must
+      # apply. libworks itself calls it locally and builds plugin/ in, so it has none.
+      - id: plugin
+        run: |
+          ref=$(sed -n 's|^ *uses: *5thlayer/libworks/\.github/workflows/module-ci\.yml@plugin-v\([^[:space:]]*\).*|\1|p' .github/workflows/*.yml | head -n 1)
+          applied=$(sed -n "s/^ *id 'io\.github\.5thlayer\.libworks\.module' version '\([^']*\)'.*/\1/p" build.gradle)
+          if [ "$ref" != "$applied" ]; then
+            echo "::error::module-ci.yml is called at plugin-v${ref:-<none>}, but build.gradle applies the libworks plugin ${applied:-<none>}: move them together"
+            exit 1
+          fi
+          echo "version=$ref" >> "$GITHUB_OUTPUT"
+
+      # The plugin is taken from ~/.m2, which a runner starts without, so it is built from its tag.
+      - if: steps.plugin.outputs.version != ''
+        uses: actions/checkout@v7
+        with:
+          repository: 5thlayer/libworks
+          ref: plugin-v${{ steps.plugin.outputs.version }}
+          path: .libworks
+
+      - if: steps.plugin.outputs.version != ''
+        run: ./gradlew -p plugin publishToMavenLocal
+        working-directory: .libworks
+
+      # Each upstream Module the Module declares, from its tag, the same way.
+      # libworks itself runs its own copy, having no .libworks checkout.
+      - run: |
+          script=.libworks/.github/scripts/build-upstreams.sh
+          [ -f "$script" ] || script=.github/scripts/build-upstreams.sh
+          ./gradlew -q libworksUpstreams | sh "$script"
+
+      # The build, with the JUnit tests.
+      - run: ./gradlew build
+
+      # A headless server that runs the game tests and names each one; it fails if it ran none.
+      - run: ./gradlew runGameTestServer
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gametest-report
+          path: |
+            build/reports/gametest.xml
+            build/reports/tests/
+            run/gametest/logs/
+          if-no-files-found: ignore
+
+  reuse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: fsfe/reuse-action@v6
+
+  # A Module whose textures scripts/build-textures.py builds, such as those made from third-party
+  # art (NOTICE), commits what the script writes; --check fails when one differs. Without the
+  # script there is nothing to check.
+  textures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: script
+        run: |
+          if [ -f scripts/build-textures.py ]; then echo "found=true" >> "$GITHUB_OUTPUT"; fi
+
+      - if: steps.script.outputs.found == 'true'
+        run: pip install pillow
+
+      - if: steps.script.outputs.found == 'true'
+        run: python3 scripts/build-textures.py --check

@@ -1,0 +1,61 @@
+version = 1
+
+# Java files carry their own SPDX headers. This file marks everything that
+# can't hold one.
+
+[[annotations]]
+path = [
+    "**/*.gradle",
+    "**/gradle.properties",
+    ".gitignore",
+    ".gitattributes",
+    ".claude/settings.json",
+    ".gitmodules",
+    "**/*.mods.toml",
+    "scripts/*.py",
+    "scripts/*.sh",
+    "plugin/src/main/resources/**/scripts/*",
+    "**/*.md",
+    "**/src/main/resources/**/*.json",
+    "**/src/gametest/resources/**/*.json",
+    "**/src/main/resources/**/*.mcmeta",
+    "**/src/main/resources/**/*.mcfunction",
+    "**/src/gametest/resources/**/*.mcmeta",
+    "**/src/gametest/resources/**/*.mcfunction",
+    "**/src/gametest/resources/**/*.nbt",
+    "**/src/main/resources/**/*.nbt",
+    "LICENSE",
+    "NOTICE",
+    ".github/**",
+]
+SPDX-FileCopyrightText = "2026 5thlayer"
+SPDX-License-Identifier = "MIT"
+
+# Third-party art, such as Malcolm Riley's unused textures
+# (https://github.com/malcolmriley/unused-textures), takes an override stanza of its own and an
+# entry in NOTICE that credits it. Unmodified copies, those a texture is built from under data/art/
+# included, are the author's; a texture scripts/build-textures.py builds from them is both. Module
+# CI runs that script's --check when it exists. Uncommenting a stanza needs the licence's text in
+# LICENSES/ (reuse download CC-BY-4.0), which reuse lint refuses while no file uses it.
+#
+# [[annotations]]
+# path = [
+#     "data/art/*.png",
+#     "src/main/resources/assets/examplelib/textures/block/plating/*.png",
+# ]
+# precedence = "override"
+# SPDX-FileCopyrightText = "Malcolm Riley"
+# SPDX-License-Identifier = "CC-BY-4.0"
+#
+# [[annotations]]
+# path = ["src/main/resources/assets/examplelib/textures/block/machine/front.png"]
+# precedence = "override"
+# SPDX-FileCopyrightText = ["Malcolm Riley", "2026 5thlayer"]
+# SPDX-License-Identifier = "CC-BY-4.0"
+
+# The Gradle wrapper is Gradle's.
+[[annotations]]
+path = ["gradlew", "gradlew.bat", "gradle/wrapper/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "Gradle"
+SPDX-License-Identifier = "Apache-2.0"
