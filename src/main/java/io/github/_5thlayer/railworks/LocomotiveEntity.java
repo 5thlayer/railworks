@@ -186,7 +186,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         }
         // The first car's view runs its Train's tick: a Train moves once a tick, whatever its length.
         if (train.cars().getFirst() == locomotive) {
-            train.tick(network, throttle(), loco -> loco == locomotive ? ignite() : 0L);
+            train.tick(network, throttle(), each -> each == locomotive ? ignite() : 0L);
         }
         moveToModel();
         syncFromModel();
@@ -415,8 +415,8 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
                 .or(() -> input.read("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC))
                 .ifPresent(loaded -> {
                     int car = input.getIntOr("car", 0);
-                    if (car >= 0 && car < loaded.cars().size() && loaded.cars().get(car) instanceof Locomotive loco) {
-                        setTrain(loaded, loco);
+                    if (car >= 0 && car < loaded.cars().size() && loaded.cars().get(car) instanceof Locomotive view) {
+                        setTrain(loaded, view);
                     }
                 });
         cab.fromItemList(input.listOrEmpty("cab", ItemStack.OPTIONAL_CODEC));

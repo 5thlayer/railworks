@@ -6,6 +6,10 @@ package io.github._5thlayer.railworks.rail;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+
 /**
  * A spot on the Line, with a heading: it faces one end of its Span, {@link #front()}, and
  * {@link #toFront()} is how far it is from that end. Moving it runs on through an Arm into the Span
@@ -22,6 +26,13 @@ public record Place(Span span, Arm front, double toFront) {
     /** Where a move ended, and whether a line's end cut it short. */
     public record Moved(Place place, boolean stopped) {
     }
+
+    /** Its fields as a Train saves them, beside the Train's own. */
+    public static final MapCodec<Place> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+            Span.CODEC.fieldOf("span").forGetter(Place::span),
+            Arm.CODEC.fieldOf("front").forGetter(Place::front),
+            Codec.DOUBLE.fieldOf("to_front").forGetter(Place::toFront)
+    ).apply(i, Place::new));
 
     public Place {
         if (!span.touches(front)) {

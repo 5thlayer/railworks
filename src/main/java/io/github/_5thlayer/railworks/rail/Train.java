@@ -26,26 +26,21 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 public final class Train {
 
     public static final Codec<Train> CODEC = RecordCodecBuilder.create(i -> i.group(
-            Span.CODEC.fieldOf("span").forGetter(t -> t.head.span()),
-            Arm.CODEC.fieldOf("front").forGetter(t -> t.head.front()),
-            Codec.DOUBLE.fieldOf("to_front").forGetter(t -> t.head.toFront()),
+            Place.MAP_CODEC.forGetter(Train::head),
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
             Car.CODEC.listOf(1, Integer.MAX_VALUE).fieldOf("cars").forGetter(Train::cars)
-    ).apply(i, (span, front, toFront, speed, cars) -> restore(new Place(span, front, toFront), speed, cars)));
+    ).apply(i, Train::restore));
 
     /**
      * What a Locomotive saved before Trains had cars looks like: the Locomotive was the whole Train,
      * its place, speed and fuel in one record. It loads as a Train of that one Locomotive.
      */
     public static final Codec<Train> LEGACY_LOCOMOTIVE_CODEC = RecordCodecBuilder.create(i -> i.group(
-            Span.CODEC.fieldOf("span").forGetter(t -> t.head.span()),
-            Arm.CODEC.fieldOf("front").forGetter(t -> t.head.front()),
-            Codec.DOUBLE.fieldOf("to_front").forGetter(t -> t.head.toFront()),
+            Place.MAP_CODEC.forGetter(Train::head),
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
-            Codec.LONG.fieldOf("fuel").forGetter(t -> t.lead().fuel().storedJoules()),
-            Codec.LONG.fieldOf("last_lit").forGetter(t -> t.lead().fuel().lastLitJoules())
-    ).apply(i, (span, front, toFront, speed, fuel, lastLit) ->
-            restore(new Place(span, front, toFront), speed, List.of(Locomotive.restore(fuel, lastLit)))));
+            Codec.LONG.fieldOf("fuel").forGetter(t -> t.legacyLocomotive().fuel().storedJoules()),
+            Codec.LONG.fieldOf("last_lit").forGetter(t -> t.legacyLocomotive().fuel().lastLitJoules())
+    ).apply(i, (head, speed, fuel, lastLit) -> restore(head, speed, List.of(Locomotive.restore(fuel, lastLit)))));
 
     private final List<Car> cars;
     private Place head;
@@ -99,12 +94,15 @@ public final class Train {
         return mass;
     }
 
-    /** What its fuelled Locomotives pull with, in kilogram blocks a tick squared. */
+    /**
+     * What its fuelled Locomotives pull with, in kilogram blocks a tick squared: those whose buffer
+     * covers a tick. A tick also counts one that lights an item to pay for it.
+     */
     public double pull() {
         double pull = 0.0;
         for (Car car : cars) {
-            if (car instanceof Locomotive loco && loco.fuelled()) {
-                pull += loco.pull();
+            if (car instanceof Locomotive locomotive && locomotive.fuelled()) {
+                pull += locomotive.pull();
             }
         }
         return pull;
@@ -176,14 +174,17 @@ public final class Train {
         } else if (blocked(network, push)) {
             coast();
         } else {
-            double pull = pay(ignite);
-            if (pull <= 0.0) {
+            double pulling = pay(ignite);
+            if (pulling <= 0.0) {
                 // Out of fuel the brakes take it down: coasting on friction alone would run a fast
                 // Train on for minutes.
                 speed = towardZero(speed, LocomotiveSpec.braking());
             } else {
                 double cap = LocomotiveSpec.maxSpeed();
-                speed = Math.max(-cap, Math.min(cap, speed + push * pull / mass()));
+                // Pull over mass, as the configured acceleration times the share of the mass that
+                // pulls: a lone Locomotive gets that acceleration exactly.
+                double acceleration = LocomotiveSpec.acceleration() * (pulling / mass());
+                speed = Math.max(-cap, Math.min(cap, speed + push * acceleration));
             }
         }
         advance(network);
@@ -197,15 +198,15 @@ public final class Train {
         return value > 0 ? Math.max(0.0, value - by) : Math.min(0.0, value + by);
     }
 
-    /** Has every Locomotive pay a tick of full power, and says what those that paid pull with. */
+    /** Has every Locomotive pay a tick of full power, and says what those that paid weigh: the mass that pulls. */
     private double pay(ToLongFunction<Locomotive> ignite) {
-        double pull = 0.0;
+        double pulling = 0.0;
         for (Car car : cars) {
-            if (car instanceof Locomotive loco && loco.pay(() -> ignite.applyAsLong(loco))) {
-                pull += loco.pull();
+            if (car instanceof Locomotive locomotive && locomotive.pay(() -> ignite.applyAsLong(locomotive))) {
+                pulling += locomotive.mass();
             }
         }
-        return pull;
+        return pulling;
     }
 
     /** Whether it sits at a line's end with the throttle pushing it off: its head ahead, its tail behind. */
@@ -213,12 +214,12 @@ public final class Train {
         return push > 0 ? head.atEnd(network, push) : tail(network).atEnd(network, push);
     }
 
-    /** The first car as the Locomotive a legacy record held; every Train saved that way led with one. */
-    private Locomotive lead() {
-        if (!(cars.getFirst() instanceof Locomotive loco)) {
-            throw new IllegalStateException("a Train led by " + cars.getFirst() + " has no legacy record");
+    /** The one Locomotive a legacy record holds: only a Train of one Locomotive has one. */
+    private Locomotive legacyLocomotive() {
+        if (cars.size() != 1 || !(cars.getFirst() instanceof Locomotive locomotive)) {
+            throw new IllegalStateException("only a Train of one Locomotive has a legacy record, not " + cars);
         }
-        return loco;
+        return locomotive;
     }
 
     private Place tail(RailNetwork network) {

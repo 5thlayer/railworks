@@ -19,7 +19,7 @@ public final class Locomotive implements Car {
 
     public static final String KIND = "locomotive";
 
-    /** Blocks along the Line: the body the renderer draws. */
+    /** Blocks along the Line: the 1.8-block body {@code LocomotiveRenderer} draws. */
     public static final double LENGTH = 1.8;
 
     static final MapCodec<Locomotive> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
@@ -38,9 +38,9 @@ public final class Locomotive implements Car {
     }
 
     static Locomotive restore(long fuel, long lastLit) {
-        Locomotive loco = new Locomotive();
-        loco.fuel.load(fuel, lastLit);
-        return loco;
+        Locomotive locomotive = new Locomotive();
+        locomotive.fuel.load(fuel, lastLit);
+        return locomotive;
     }
 
     @Override
@@ -62,7 +62,10 @@ public final class Locomotive implements Car {
         return fuel;
     }
 
-    /** What it pulls with at full power, in kilogram blocks a tick squared: its own mass at the configured acceleration. */
+    /**
+     * What it pulls with at full power, in kilogram blocks a tick squared: its own mass at the
+     * configured acceleration, so a Train's acceleration is its pulling share of that.
+     */
     public double pull() {
         return LocomotiveSpec.MASS_KG * LocomotiveSpec.acceleration();
     }

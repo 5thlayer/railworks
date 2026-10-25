@@ -13,10 +13,11 @@ import io.github._5thlayer.railworks.LocomotiveMenu;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
+import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.Span;
-import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -477,7 +478,19 @@ final class LocomotiveTests {
         var tag = output.buildResult();
         tag.remove("train");
         tag.remove("car");
-        tag.put("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, car.train()).getOrThrow());
+        Place head = car.train().head();
+        var span = new net.minecraft.nbt.CompoundTag();
+        span.put("a", arm(head.span().a()));
+        span.put("b", arm(head.span().b()));
+        span.putInt("cost", head.span().cost());
+        var locomotive = new net.minecraft.nbt.CompoundTag();
+        locomotive.put("span", span);
+        locomotive.put("front", arm(head.front()));
+        locomotive.putDouble("to_front", head.toFront());
+        locomotive.putDouble("speed", car.train().speed());
+        locomotive.putLong("fuel", car.locomotive().fuel().storedJoules());
+        locomotive.putLong("last_lit", car.locomotive().fuel().lastLitJoules());
+        tag.put("locomotive", locomotive);
         var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
                 net.minecraft.world.entity.EntitySpawnReason.LOAD);
         reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
@@ -490,6 +503,11 @@ final class LocomotiveTests {
             helper.fail("a Locomotive saved before Trains had cars came back different: " + now + " at " + reloaded.position(), STAND);
         }
         helper.succeed();
+    }
+
+    /** An Arm as the old record wrote it: its three coordinates. */
+    private static net.minecraft.nbt.IntArrayTag arm(Arm arm) {
+        return new net.minecraft.nbt.IntArrayTag(new int[] {arm.x(), arm.y(), arm.z()});
     }
 
     // ---- setup ----
