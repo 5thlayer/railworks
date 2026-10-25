@@ -267,10 +267,9 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         }
         ItemStack held = player.getItemInHand(hand);
         // Fuel in hand fills the slot as a shortcut; fuel the slot cannot take boards instead.
-        if (fuelValue(level(), held) > 0L && cab.canAddItem(held)) {
+        if (fuelValue(level(), held) > 0L && fuelRoomFor(held) > 0) {
             if (!level().isClientSide()) {
-                ItemStack left = cab.addItem(held.copy());
-                held.setCount(left.getCount());
+                fillFuel(held);
             }
             return InteractionResult.SUCCESS;
         }
@@ -278,6 +277,28 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
             return InteractionResult.PASS;
         }
         return InteractionResult.SUCCESS;
+    }
+
+    /** How many of {@code held} the fuel slot takes: it holds the same fuel or nothing. */
+    private int fuelRoomFor(ItemStack held) {
+        ItemStack slot = cab.getItem(LocomotiveMenu.FUEL);
+        if (slot.isEmpty()) {
+            return held.getMaxStackSize();
+        }
+        return ItemStack.isSameItemSameComponents(slot, held) ? slot.getMaxStackSize() - slot.getCount() : 0;
+    }
+
+    /** Moves what fits of {@code held} into the fuel slot, and nowhere else in the cab. */
+    private void fillFuel(ItemStack held) {
+        int moved = Math.min(fuelRoomFor(held), held.getCount());
+        ItemStack slot = cab.getItem(LocomotiveMenu.FUEL);
+        if (slot.isEmpty()) {
+            cab.setItem(LocomotiveMenu.FUEL, held.copyWithCount(moved));
+        } else {
+            slot.grow(moved);
+            cab.setChanged();
+        }
+        held.shrink(moved);
     }
 
     /** The menu, from the inventory key while riding and from sneaking at the car. */
