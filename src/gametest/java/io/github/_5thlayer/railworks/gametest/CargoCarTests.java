@@ -30,7 +30,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.animal.pig.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.inventory.ChestMenu;
@@ -45,7 +44,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The Cargo car, and Trains of several cars, through the items, the entities and a real player:
  * the recipe, coupling a car by placing it beside an end of a Train, uncoupling it with shears,
- * the menu, boarding and leading a mob in and out, and a Train of cars moving, saving and breaking
+ * the menu, leading a mob in and out of a Locomotive, and a Train of cars moving, saving and breaking
  * as one. Weight's numbers are {@code TrainTest}'s. All of these tests share the {@code cargo_}
  * prefix, and stand on {@link LocomotiveTests}' Span.
  */
@@ -65,11 +64,9 @@ final class CargoCarTests {
         tests.test("cargo_shears_uncouple_a_train_in_two", 20, CargoCarTests::shearsUncouple);
         tests.test("cargo_a_moving_train_does_not_uncouple", 20, CargoCarTests::movingDoesNotUncouple);
         tests.test("cargo_car_sneaking_at_it_opens_its_menu", 20, CargoCarTests::sneakOpensMenu);
-        tests.test("cargo_car_the_inventory_key_opens_its_menu_while_riding", 20, CargoCarTests::inventoryKeyOpensMenu);
         tests.test("cargo_car_holds_items_put_in_through_its_menu", 20, CargoCarTests::holdsItems);
-        tests.test("cargo_car_is_boarded_by_using_it", 20, CargoCarTests::boards);
-        tests.test("cargo_a_led_mob_is_pulled_into_a_car", 20, CargoCarTests::pullsMobIn);
-        tests.test("cargo_a_lead_leads_a_mob_out_of_a_car", 20, CargoCarTests::leadsMobOut);
+        tests.test("cargo_a_led_mob_is_pulled_into_a_locomotive", 20, CargoCarTests::pullsMobIn);
+        tests.test("cargo_a_lead_leads_a_mob_out_of_a_locomotive", 20, CargoCarTests::leadsMobOut);
         tests.test("cargo_a_train_of_cars_moves_as_one", 20, CargoCarTests::movesAsOne);
         tests.test("cargo_a_train_of_cars_is_saved_with_the_level", 20, CargoCarTests::savedWithLevel);
         tests.test("cargo_car_saves_what_it_holds", 20, CargoCarTests::savesCargo);
@@ -252,7 +249,7 @@ final class CargoCarTests {
         helper.succeed();
     }
 
-    // ---- the menu, boarding ----
+    // ---- the menu, leading mobs ----
 
     private static void sneakOpensMenu(GameTestHelper helper) {
         CargoCarEntity cargo = lone(helper);
@@ -266,22 +263,6 @@ final class CargoCarTests {
         }
         if (player.getVehicle() != null) {
             helper.fail("sneaking at the Cargo car boarded it", STAND);
-        }
-        helper.succeed();
-    }
-
-    private static void inventoryKeyOpensMenu(GameTestHelper helper) {
-        CargoCarEntity cargo = lone(helper);
-        ServerPlayer rider = helper.makeMockServerPlayerInLevel();
-        rider.setGameMode(GameType.SURVIVAL);
-        cargo.interact(rider, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (!(rider.getVehicle() instanceof HasCustomInventoryScreen vehicle)) {
-            helper.fail("the rider is not in a car that answers the inventory key", STAND);
-            return;
-        }
-        vehicle.openCustomInventoryScreen(rider);
-        if (!(rider.containerMenu instanceof ChestMenu menu) || menu.getContainer() != cargo.cargo() || !menu.stillValid(rider)) {
-            helper.fail("the inventory key did not open the cargo for its rider", STAND);
         }
         helper.succeed();
     }
@@ -308,36 +289,15 @@ final class CargoCarTests {
         helper.succeed();
     }
 
-    private static void boards(GameTestHelper helper) {
-        CargoCarEntity cargo = lone(helper);
-        ServerPlayer player = helper.makeMockServerPlayerInLevel();
-        player.setGameMode(GameType.SURVIVAL);
-        cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (player.getVehicle() != cargo) {
-            helper.fail("using the Cargo car did not board it", STAND);
-        }
-        ServerPlayer second = helper.makeMockServerPlayerInLevel();
-        second.setGameMode(GameType.SURVIVAL);
-        cargo.interact(second, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (second.getVehicle() != null) {
-            helper.fail("a second player boarded a car that seats one", STAND);
-        }
-        player.setShiftKeyDown(true);
-        player.rideTick();
-        if (player.getVehicle() != null) {
-            helper.fail("sneaking did not get the rider off", STAND);
-        }
-        helper.succeed();
-    }
-
     private static void pullsMobIn(GameTestHelper helper) {
-        CargoCarEntity cargo = lone(helper);
+        // A Locomotive: nobody rides a Cargo car.
+        LocomotiveEntity car = LocomotiveTests.placed(helper);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         Pig pig = helper.spawn(EntityType.PIG, STAND.east(2));
         pig.setLeashedTo(player, true);
-        cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (pig.getVehicle() != cargo) {
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        if (pig.getVehicle() != car) {
             helper.fail("the led pig was not pulled into the car", STAND);
         }
         if (player.getVehicle() != null) {
@@ -350,13 +310,13 @@ final class CargoCarTests {
     }
 
     private static void leadsMobOut(GameTestHelper helper) {
-        CargoCarEntity cargo = lone(helper);
+        LocomotiveEntity car = LocomotiveTests.placed(helper);
         Pig pig = helper.spawn(EntityType.PIG, STAND.east(2));
-        pig.startRiding(cargo);
+        pig.startRiding(car);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
-        cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
         if (pig.getVehicle() != null || pig.getLeashHolder() != player || !player.getMainHandItem().isEmpty()) {
             helper.fail("the lead did not lead the pig out, riding " + pig.getVehicle() + ", held by " + pig.getLeashHolder(), STAND);
         }

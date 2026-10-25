@@ -20,6 +20,8 @@
   "item.railworks.cargo_car": "Cargo Car",
   "entity.railworks.cargo_car": "Cargo Car",
   "message.railworks.uncouple_moving": "Stop the Train to uncouple it",
+  "message.railworks.hopper_not_at_station": "Stop the Train at a Station to set a hopper by it",
+  "message.railworks.hopper_spot_taken": "Something is already beside the car there",
   "block.railworks.station": "Station",
   "item.railworks.station": "Station",
   "menu.railworks.station.name": "Name",

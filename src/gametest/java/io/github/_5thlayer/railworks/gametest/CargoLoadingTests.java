@@ -20,6 +20,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.pig.Pig;
+import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
@@ -54,6 +57,9 @@ final class CargoLoadingTests {
     private static final BlockPos UNLOADING = new BlockPos(9, 1, 2);
     /** Beside the Rail a block down, by the Locomotive and not by the Cargo cars behind it. */
     private static final BlockPos BY_LOCOMOTIVE = new BlockPos(7, 1, 2);
+    /** The row beside the Span a player stands in, on the near side and the far side of the Rail. */
+    private static final int SIDE_Z = 1;
+    private static final int FAR_SIDE_Z = 5;
     /** Beside the Rail far from the Cargo car. */
     private static final BlockPos FAR = new BlockPos(2, 1, 2);
 
@@ -67,6 +73,11 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_a_car_flags_it_is_at_a_station_until_it_leaves", 40, CargoLoadingTests::syncsAtStation);
         tests.test("cargo_loading_hoppers_at_the_spots_fill_a_car_at_one_station_and_empty_it_at_the_next", 400,
                 CargoLoadingTests::fillsAndEmpties);
+        tests.test("cargo_loading_sneak_using_a_hopper_sets_it_beside_the_car_pointing_in", 40, CargoLoadingTests::setsHopperEitherSide);
+        tests.test("cargo_loading_a_hopper_is_refused_where_its_spot_is_taken", 40, CargoLoadingTests::hopperRefusedWhereTaken);
+        tests.test("cargo_loading_a_hopper_is_refused_by_a_car_at_no_station", 20, CargoLoadingTests::hopperRefusedAwayFromStation);
+        tests.test("cargo_loading_using_a_car_opens_its_cargo_sneaking_or_not", 20, CargoLoadingTests::useOpensCargo);
+        tests.test("cargo_loading_a_car_is_not_boarded_by_a_player_or_a_led_mob", 20, CargoLoadingTests::notBoarded);
         tests.test("cargo_loading_a_car_two_back_is_filled_when_the_locomotive_is_by_the_station", 200,
                 CargoLoadingTests::fillsTwoBack);
     }
@@ -131,31 +142,17 @@ final class CargoLoadingTests {
         LocomotiveEntity locomotive = locomotive(helper, cargo);
         station(helper, LOADING);
         station(helper, UNLOADING);
-        // Where the filling hopper goes, and the chest over it that feeds it.
-        var filling = new Object() {
-            BlockPos hopper;
-            BlockPos chest;
-            BlockState wasAtHopper;
-            BlockState wasAtChest;
-        };
+        BlockPos[] filling = new BlockPos[1];
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, LOADING, UNLOADING))
                 .thenWaitUntil(() -> synced(helper, cargo, true))
                 .thenExecute(() -> {
-                    // A chest of ore over the car's filling spot, and a hopper placed under it as a player
-                    // places one, clicking the chest's underside.
-                    filling.hopper = spot(cargo.hopperSpots().fill());
-                    filling.chest = filling.hopper.above();
-                    // Over the structure, where the test's barrier walls it in.
-                    filling.wasAtHopper = helper.getLevel().getBlockState(filling.hopper);
-                    filling.wasAtChest = helper.getLevel().getBlockState(filling.chest);
-                    helper.getLevel().setBlockAndUpdate(filling.hopper, Blocks.AIR.defaultBlockState());
-                    helper.getLevel().setBlockAndUpdate(filling.chest, Blocks.CHEST.defaultBlockState());
-                    chest(helper, filling.chest).setItem(0, new ItemStack(Items.IRON_ORE, 4));
-                    placeHopper(helper, filling.chest, Direction.DOWN, filling.hopper);
+                    // A hopper sneak-used at the car from the player's side, and ore dropped in it.
+                    filling[0] = sneakHopper(helper, cargo, sneaker(helper, SIDE_Z), Direction.SOUTH);
+                    hopper(helper, filling[0]).setItem(0, new ItemStack(Items.IRON_ORE, 4));
                 })
                 .thenWaitUntil(() -> {
-                    if (count(cargo) != 4 || !chest(helper, filling.chest).isEmpty() || !hopper(helper, filling.hopper).isEmpty()) {
+                    if (count(cargo) != 4 || !hopper(helper, filling[0]).isEmpty()) {
                         helper.fail("the filling hopper has moved " + count(cargo) + " of 4 iron ore into the car", LOADING);
                     }
                 })
@@ -178,21 +175,16 @@ final class CargoLoadingTests {
                     }
                     // A chest under the car's emptying spot, and a hopper placed on it as a player
                     // places one, clicking the chest's top.
-                    BlockPos emptying = spot(cargo.hopperSpots().empty());
+                    BlockPos emptying = spot(cargo.hopperSpots().emptying());
                     helper.getLevel().setBlockAndUpdate(emptying.below(), Blocks.CHEST.defaultBlockState());
                     placeHopper(helper, emptying.below(), Direction.UP, emptying);
                 })
                 .thenWaitUntil(() -> {
-                    BlockPos below = spot(cargo.hopperSpots().empty()).below();
+                    BlockPos below = spot(cargo.hopperSpots().emptying()).below();
                     if (count(cargo) != 0 || count(chest(helper, below)) != 4) {
                         helper.fail("the chest under the emptying hopper holds " + count(chest(helper, below))
                                 + " and the car " + count(cargo), UNLOADING);
                     }
-                })
-                .thenExecute(() -> {
-                    // The chest and hopper over the car stand above the structure, which its clean-up misses.
-                    helper.getLevel().setBlockAndUpdate(filling.chest, filling.wasAtChest);
-                    helper.getLevel().setBlockAndUpdate(filling.hopper, filling.wasAtHopper);
                 })
                 .thenSucceed();
     }
@@ -203,12 +195,7 @@ final class CargoLoadingTests {
         CargoCarEntity second = coupledBehind(helper, first);
         // By the Locomotive, two cars ahead of the second Cargo car and too far from it to reach it alone.
         station(helper, BY_LOCOMOTIVE);
-        var filling = new Object() {
-            BlockPos hopper;
-            BlockPos chest;
-            BlockState wasAtHopper;
-            BlockState wasAtChest;
-        };
+        BlockPos[] filling = new BlockPos[1];
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, BY_LOCOMOTIVE))
                 .thenExecute(() -> {
@@ -234,25 +221,14 @@ final class CargoLoadingTests {
                     }
                 })
                 .thenExecute(() -> {
-                    filling.hopper = spot(second.hopperSpots().fill());
-                    filling.chest = filling.hopper.above();
-                    // Over the structure, where the test's barrier walls it in.
-                    filling.wasAtHopper = helper.getLevel().getBlockState(filling.hopper);
-                    filling.wasAtChest = helper.getLevel().getBlockState(filling.chest);
-                    helper.getLevel().setBlockAndUpdate(filling.hopper, Blocks.AIR.defaultBlockState());
-                    helper.getLevel().setBlockAndUpdate(filling.chest, Blocks.CHEST.defaultBlockState());
-                    chest(helper, filling.chest).setItem(0, new ItemStack(Items.IRON_ORE, 4));
-                    placeHopper(helper, filling.chest, Direction.DOWN, filling.hopper);
+                    filling[0] = sneakHopper(helper, second, sneaker(helper, SIDE_Z), Direction.SOUTH);
+                    hopper(helper, filling[0]).setItem(0, new ItemStack(Items.IRON_ORE, 4));
                 })
                 .thenWaitUntil(() -> {
                     if (count(second) != 4 || count(first) != 0) {
-                        helper.fail("the hopper over the second Cargo car moved " + count(second) + " of 4 iron ore into it, and "
+                        helper.fail("the hopper beside the second Cargo car moved " + count(second) + " of 4 iron ore into it, and "
                                 + count(first) + " into the first", BY_LOCOMOTIVE);
                     }
-                })
-                .thenExecute(() -> {
-                    helper.getLevel().setBlockAndUpdate(filling.chest, filling.wasAtChest);
-                    helper.getLevel().setBlockAndUpdate(filling.hopper, filling.wasAtHopper);
                 })
                 .thenSucceed();
     }
@@ -270,6 +246,128 @@ final class CargoLoadingTests {
                     "the car coupled behind is not a Cargo car"));
         }
         return coupled;
+    }
+
+    // ---- setting a hopper, using the car ----
+
+    private static void setsHopperEitherSide(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        station(helper, LOADING);
+        helper.startSequence()
+                .thenWaitUntil(() -> registered(helper, LOADING))
+                .thenWaitUntil(() -> synced(helper, cargo, true))
+                .thenExecute(() -> {
+                    ServerPlayer near = sneaker(helper, SIDE_Z);
+                    BlockPos south = sneakHopper(helper, cargo, near, Direction.SOUTH);
+                    if (near.getMainHandItem().getCount() != 3) {
+                        helper.fail("setting a hopper left " + near.getMainHandItem().getCount() + " of 4 in hand", LOADING);
+                    }
+                    ServerPlayer far = sneaker(helper, FAR_SIDE_Z);
+                    BlockPos north = sneakHopper(helper, cargo, far, Direction.NORTH);
+                    BlockPos car = helper.absolutePos(new BlockPos(5, 2, 3));
+                    if (!south.equals(car.north()) || !north.equals(car.south())) {
+                        helper.fail("the hoppers stand at " + south + " and " + north + ", not either side of the car's block " + car,
+                                LOADING);
+                    }
+                    ServerPlayer creative = sneaker(helper, SIDE_Z);
+                    creative.setGameMode(GameType.CREATIVE);
+                    helper.getLevel().removeBlock(south, false);
+                    sneakHopper(helper, cargo, creative, Direction.SOUTH);
+                    if (creative.getMainHandItem().getCount() != 4) {
+                        helper.fail("a creative player's hopper was used up", LOADING);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    private static void hopperRefusedWhereTaken(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        station(helper, LOADING);
+        helper.startSequence()
+                .thenWaitUntil(() -> registered(helper, LOADING))
+                .thenWaitUntil(() -> synced(helper, cargo, true))
+                .thenExecute(() -> {
+                    ServerPlayer player = sneaker(helper, SIDE_Z);
+                    BlockPos taken = spot(cargo.hopperSpots().fillingNearest(player.getX(), player.getZ()).spot());
+                    helper.getLevel().setBlockAndUpdate(taken, Blocks.STONE.defaultBlockState());
+                    cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+                    if (!helper.getLevel().getBlockState(taken).is(Blocks.STONE) || player.getMainHandItem().getCount() != 4) {
+                        helper.fail("a hopper was set where stone stood, or used up", LOADING);
+                    }
+                    if (player.containerMenu instanceof ChestMenu) {
+                        helper.fail("a refused hopper opened the cargo instead", LOADING);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    private static void hopperRefusedAwayFromStation(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        ServerPlayer player = sneaker(helper, SIDE_Z);
+        BlockPos spot = spot(cargo.hopperSpots().fillingNearest(player.getX(), player.getZ()).spot());
+        cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        if (!helper.getLevel().getBlockState(spot).isAir() || player.getMainHandItem().getCount() != 4) {
+            helper.fail("a hopper was set by a car stopped at no Station", LOADING);
+        }
+        helper.succeed();
+    }
+
+    private static void useOpensCargo(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        for (boolean sneaking : new boolean[] {false, true}) {
+            ServerPlayer player = helper.makeMockServerPlayerInLevel();
+            player.setGameMode(GameType.SURVIVAL);
+            player.setShiftKeyDown(sneaking);
+            cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+            if (!(player.containerMenu instanceof ChestMenu menu) || menu.getContainer() != cargo.cargo()) {
+                helper.fail("using the Cargo car " + (sneaking ? "sneaking" : "standing") + " did not open its cargo", LOADING);
+            }
+        }
+        helper.succeed();
+    }
+
+    private static void notBoarded(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        player.setGameMode(GameType.SURVIVAL);
+        cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        if (player.getVehicle() != null || player.startRiding(cargo)) {
+            helper.fail("a player boarded the Cargo car", LOADING);
+        }
+        ServerPlayer leader = helper.makeMockServerPlayerInLevel();
+        leader.setGameMode(GameType.SURVIVAL);
+        Pig pig = helper.spawn(EntityType.PIG, LocomotiveTests.STAND.east(2));
+        pig.setLeashedTo(leader, true);
+        cargo.interact(leader, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        if (pig.getVehicle() != null || pig.getLeashHolder() != leader) {
+            helper.fail("a led pig was pulled into the Cargo car", LOADING);
+        }
+        helper.succeed();
+    }
+
+    /** A survival player sneaking with four hoppers in hand, beside the Span on the side at {@code z}. */
+    private static ServerPlayer sneaker(GameTestHelper helper, int z) {
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        player.setGameMode(GameType.SURVIVAL);
+        BlockPos stand = helper.absolutePos(new BlockPos(5, 1, z));
+        player.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
+        player.setShiftKeyDown(true);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.HOPPER, 4));
+        return player;
+    }
+
+    /**
+     * {@code player} sneak-uses their hopper at {@code cargo}: it must stand in the car's filling spot
+     * on their side, pointing {@code facing}, at the car. Its position.
+     */
+    private static BlockPos sneakHopper(GameTestHelper helper, CargoCarEntity cargo, ServerPlayer player, Direction facing) {
+        BlockPos expected = spot(cargo.hopperSpots().fillingNearest(player.getX(), player.getZ()).spot());
+        cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        BlockState placed = helper.getLevel().getBlockState(expected);
+        if (!placed.is(Blocks.HOPPER) || placed.getValue(HopperBlock.FACING) != facing) {
+            helper.fail("a hopper sneak-used at the car left " + placed + " at " + expected + ", not one facing " + facing, LOADING);
+        }
+        return expected;
     }
 
     private static void syncsAtStation(GameTestHelper helper) {

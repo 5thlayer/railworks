@@ -28,8 +28,8 @@ import org.joml.Vector3f;
 
 /**
  * Where hoppers go by a Cargo car stopped at a Station, drawn in the world as Factorio draws where an
- * inserter reaches: a yellow box over the car's roof where a hopper pointing down fills it, and an
- * amber one under the Rail where a hopper empties it. Every player sees them, whatever they hold, so
+ * inserter reaches: a yellow box on either side of the car at its floor, where a hopper sneak-used
+ * at the car fills it, and an amber one under the Rail where a hopper empties it. Every player sees them, whatever they hold, so
  * the boxes tell a player who has not met loading yet that hoppers are the way, and they go when the
  * Train leaves. The spots are {@link HopperSpots}', at the car's synced box; one a block already fills,
  * a Pylon or a Station under the Rail, is not drawn, since no hopper can go there.
@@ -61,8 +61,10 @@ final class HopperSpotsOverlay {
         for (Entity entity : event.getLevel().entitiesForRendering()) {
             if (entity instanceof CargoCarEntity car && car.atStation()) {
                 HopperSpots spots = car.hopperSpots();
-                add(boxes, event.getLevel(), spots.fill(), FILL);
-                add(boxes, event.getLevel(), spots.empty(), EMPTY);
+                for (HopperSpots.Filling filling : spots.filling()) {
+                    add(boxes, event.getLevel(), filling.spot(), FILL);
+                }
+                add(boxes, event.getLevel(), spots.emptying(), EMPTY);
             }
         }
         event.getRenderState().setRenderData(BOXES, boxes.isEmpty() ? null : List.copyOf(boxes));

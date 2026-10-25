@@ -10,11 +10,18 @@ import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.HopperSpots;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Train;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.SimpleContainer;
@@ -23,9 +30,18 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.HopperBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.neoforged.neoforge.common.util.BlockSnapshot;
+import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
@@ -33,7 +49,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
- * which its menu, vanilla's three-row chest, shows. It is not a {@link Container} itself, so a hopper
+ * which its menu, vanilla's three-row chest, shows when the car is used; nobody rides it. It is not a {@link Container} itself, so a hopper
  * cannot reach into it wherever it is: only while it is stopped at a Station does it give hoppers,
  * feeders and pipes its cargo, through {@link #automation()}, and a client sees that it is, to draw
  * its {@link #hopperSpots()}. Boarding and the rest are
@@ -50,7 +66,7 @@ public final class CargoCarEntity extends CarEntity {
     private final SimpleContainer cargo = new SimpleContainer(SLOTS) {
         @Override
         public boolean stillValid(Player player) {
-            return isAlive() && (hasPassenger(player) || player.distanceToSqr(CargoCarEntity.this) < REACH * REACH);
+            return isAlive() && player.distanceToSqr(CargoCarEntity.this) < REACH * REACH;
         }
     };
 
@@ -106,9 +122,64 @@ public final class CargoCarEntity extends CarEntity {
         return entityData.get(DATA_STATION);
     }
 
-    /** Where a hopper loads it and where one unloads it, from its box where it stands. */
+    /** Where a hopper loads it and where one unloads it, from its box where it stands and its heading. */
     public HopperSpots hopperSpots() {
-        return HopperSpots.of(getX(), getBoundingBox().minY, getZ(), getBbHeight());
+        float yaw = getYRot() * Mth.DEG_TO_RAD;
+        return HopperSpots.of(getX(), getBoundingBox().minY, getZ(), getBbWidth(), getBbHeight(), -Mth.sin(yaw), Mth.cos(yaw));
+    }
+
+    /** Nobody rides a Cargo car: using it opens its cargo, with or without sneaking. */
+    @Override
+    protected boolean rideable() {
+        return false;
+    }
+
+    /** Sneak-using a hopper at it sets the hopper beside it, pointing in; anything else opens its cargo. */
+    @Override
+    protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
+        if (!held.is(Items.HOPPER) || !player.isSecondaryUseActive()) {
+            return InteractionResult.PASS;
+        }
+        if (level() instanceof ServerLevel server) {
+            placeHopper(server, player, held);
+        }
+        return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * Sets a hopper in the filling spot on the player's side, pointing at the car, while its Train is
+     * stopped at a Station: the spots are where it stands, so a hopper set while it passes would load
+     * nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
+     */
+    private void placeHopper(ServerLevel level, Player player, ItemStack held) {
+        if (automation() == null) {
+            refuse(player, "message.railworks.hopper_not_at_station");
+            return;
+        }
+        HopperSpots.Filling filling = hopperSpots().fillingNearest(player.getX(), player.getZ());
+        BlockPos pos = new BlockPos(filling.spot().x(), filling.spot().y(), filling.spot().z());
+        if (!level.getBlockState(pos).canBeReplaced() || !player.mayBuild() || !level.mayInteract(player, pos)) {
+            refuse(player, "message.railworks.hopper_spot_taken");
+            return;
+        }
+        Direction toward = Direction.getApproximateNearest(filling.towardX(), 0, filling.towardZ());
+        BlockState hopper = Blocks.HOPPER.defaultBlockState().setValue(HopperBlock.FACING, toward);
+        BlockSnapshot before = BlockSnapshot.create(level.dimension(), level, pos);
+        level.setBlockAndUpdate(pos, hopper);
+        // A protection mod may forbid it, as it may any block a player places.
+        if (EventHooks.onBlockPlace(player, before, toward.getOpposite())) {
+            before.restore(Block.UPDATE_ALL);
+            return;
+        }
+        level.playSound(null, pos, hopper.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 0.8F);
+        level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
+        held.consume(1, player);
+    }
+
+    private static void refuse(Player player, String message) {
+        if (player instanceof ServerPlayer server) {
+            server.sendSystemMessage(Component.translatable(message), true);
+        }
     }
 
     @Override
@@ -123,7 +194,7 @@ public final class CargoCarEntity extends CarEntity {
         entityData.define(DATA_STATION, "");
     }
 
-    /** The menu, from the inventory key while riding and from sneaking at the car. */
+    /** The menu, from using the car. */
     @Override
     public void openCustomInventoryScreen(Player player) {
         open(player, new SimpleMenuProvider((id, inventory, opener) -> ChestMenu.threeRows(id, inventory, cargo),
