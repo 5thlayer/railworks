@@ -167,7 +167,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         }
         RailNetwork network = LevelRails.of(level).network();
         if (!model.onRail(network)) {
-            // The Span it hung from was cut, or its Arm moved: it falls off the Rail as an item.
+            // The Span it rode was cut, or its Arm moved: it falls off the Rail as an item.
             destroy(level, damageSources().generic());
             return;
         }
@@ -329,7 +329,7 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         for (int drop = 0; drop < 24 && !level().isOutsideBuildHeight(probe); drop++) {
             double floor = level().getBlockFloorHeight(probe);
             Vec3 spot = new Vec3(getX(), probe.getY() + floor, getZ());
-            if (Double.isFinite(floor) && floor < 1.0 && level().noCollision(passenger, passenger.getBoundingBox().move(
+            if (Double.isFinite(floor) && level().noCollision(passenger, passenger.getBoundingBox().move(
                     spot.subtract(passenger.position())))) {
                 return spot;
             }

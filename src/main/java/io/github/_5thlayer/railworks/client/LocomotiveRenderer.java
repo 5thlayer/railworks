@@ -54,12 +54,10 @@ public final class LocomotiveRenderer extends EntityRenderer<LocomotiveEntity, L
     @Override
     public void submit(State state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
         poseStack.pushPose();
-        // The body is built facing +z. The car's origin is the bottom centre of its box, and it
-        // pitches about the middle of the box so a climb tilts it round the rider.
-        poseStack.translate(0.0, LocomotiveEntity.HEIGHT / 2.0, 0.0);
+        // The body is built facing +z. The car's origin is the middle of its floor, on the flange's
+        // top, and it pitches about that point so a climb keeps the floor on the Rail.
         poseStack.mulPose(Axis.YP.rotationDegrees(-state.yRot));
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
-        poseStack.translate(0.0, -LocomotiveEntity.HEIGHT / 2.0, 0.0);
         int light = state.lightCoords;
         // The skirt down both sides of the web, the floor over it, the engine block and the roof.
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {

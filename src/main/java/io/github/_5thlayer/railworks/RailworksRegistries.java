@@ -53,7 +53,7 @@ public final class RailworksRegistries {
                     .updateInterval(1)
                     .noSummon());
 
-    /** The Locomotive's menu, opened with the car's entity id. */
+    /** The Locomotive's menu. */
     public static final DeferredHolder<MenuType<?>, MenuType<LocomotiveMenu>> LOCOMOTIVE_MENU =
             MENUS.register("burner_locomotive", () -> new MenuType<>(LocomotiveMenu::new, FeatureFlags.VANILLA_SET));
 

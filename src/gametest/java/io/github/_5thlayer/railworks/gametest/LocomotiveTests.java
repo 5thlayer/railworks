@@ -509,7 +509,7 @@ final class LocomotiveTests {
         return cars.getFirst();
     }
 
-    /** A car hung mid-Span, facing the second Pylon. */
+    /** A car set on the Span, facing the second Pylon. */
     private static LocomotiveEntity placed(GameTestHelper helper) {
         ServerPlayer player = player(helper, -45.0F);
         use(helper, player);

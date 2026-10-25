@@ -22,7 +22,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  */
 public final class Locomotive {
 
-    /** Where a Locomotive is, in Arm coordinates; the world adds where the Rail hangs from an Arm. */
+    /** Where a Locomotive is, in Arm coordinates; the world adds where the Rail rests on an Arm. */
     public record Point(double x, double y, double z) {
     }
 

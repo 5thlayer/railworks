@@ -13,6 +13,6 @@ public enum RailworksRefusal implements Refusal {
     OFF_SPAN,
     /** A Locomotive aimed at a Span another Locomotive already holds: one Train holds a Span at a time. */
     SPAN_TAKEN,
-    /** A Locomotive whose car would hang in a block, so the Span's Clearance is not clear. */
+    /** A Locomotive whose car would sit in a block, so the Span's Clearance is not clear. */
     BLOCKED_CAR,
 }

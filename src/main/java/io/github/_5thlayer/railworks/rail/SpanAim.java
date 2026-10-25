@@ -9,7 +9,7 @@ import java.util.Optional;
  * Which Span a player's line of sight is on, for placing a car on it. A Span is a straight segment
  * between its Arms, and the Rail has no block to hit, so the ray is measured against the segments.
  *
- * <p>Coordinates are the Arms': the caller subtracts where the Rail hangs from an Arm. Pure: no
+ * <p>Coordinates are the Arms': the caller subtracts where the Rail rests on an Arm. Pure: no
  * Minecraft types.
  */
 public final class SpanAim {
