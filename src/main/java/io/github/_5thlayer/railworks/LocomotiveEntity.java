@@ -6,9 +6,11 @@ package io.github._5thlayer.railworks;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Throttle;
+import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -40,10 +42,11 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Burner Locomotive in the world: the view of a {@link Locomotive}, which is the Train. The model
- * runs the drive and holds the place, speed, heading and joule fuel; this entity feeds it the
- * driver's keys and the fuel slot, rides the Rail where the model says, and mirrors the numbers a
- * client shows (Jade, the renderer's heading) into synched data.
+ * A Burner Locomotive in the world: the view of its {@link Locomotive}, a car in a {@link Train}.
+ * The model runs the drive and holds the place, speed and heading (the Train's) and the joule fuel
+ * (the car's); this entity feeds it the driver's keys and the fuel slot, rides the Rail where the
+ * model puts its car, and mirrors the numbers a client shows (Jade, the renderer's heading) into
+ * synched data.
  *
  * <p>Using it with fuel in hand fills the fuel slot; using it otherwise boards it, and sneaking
  * gets off (vanilla's dismount). It comes off the Rail, dropping itself and its fuel, when the Span
@@ -71,7 +74,9 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
 
     /** Steps the client's car toward each position the server sends, as a boat's does, rather than snapping to it. */
     private final InterpolationHandler interpolation = new InterpolationHandler(this, 3);
-    private @Nullable Locomotive model;
+    private @Nullable Train train;
+    /** Its car in {@link #train}. */
+    private @Nullable Locomotive locomotive;
     /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
         @Override
@@ -89,15 +94,23 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         this.setNoGravity(true);
     }
 
-    /** Sets this car on the Rail as {@code locomotive}; the entity is its view from then on. */
-    public void setLocomotive(Locomotive locomotive) {
-        this.model = locomotive;
+    /** Sets this car on the Rail as {@code locomotive} in {@code train}; the entity is its view from then on. */
+    public void setTrain(Train train, Locomotive locomotive) {
+        if (!train.cars().contains(locomotive)) {
+            throw new IllegalArgumentException(locomotive + " is not a car of " + train);
+        }
+        this.train = train;
+        this.locomotive = locomotive;
         moveToModel();
         syncFromModel();
     }
 
+    public @Nullable Train train() {
+        return train;
+    }
+
     public @Nullable Locomotive locomotive() {
-        return model;
+        return locomotive;
     }
 
     /** Whether some Locomotive in {@code level} rides {@code span}: one Train holds a Span at a time. */
@@ -109,8 +122,8 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
 
     /** The Arm at {@code from} moved to {@code to} with its Spans: this car stays on its Span. */
     public void armMoved(RailNetwork network, Arm from, Arm to) {
-        if (model != null) {
-            model.moveArm(network, from, to);
+        if (train != null) {
+            train.moveArm(network, from, to);
             moveToModel();
             syncFromModel();
         }
@@ -161,17 +174,20 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     }
 
     private void tickServer(ServerLevel level) {
-        if (model == null) {
+        if (train == null || locomotive == null) {
             discard();
             return;
         }
         RailNetwork network = LevelRails.of(level).network();
-        if (!model.onRail(network)) {
-            // The Span it rode was cut, or its Arm moved: it falls off the Rail as an item.
+        if (!train.onRail(network)) {
+            // A Span it rode was cut, or its Arm moved: it falls off the Rail as an item.
             destroy(level, damageSources().generic());
             return;
         }
-        model.tick(network, throttle(), this::ignite);
+        // The first car's view runs its Train's tick: a Train moves once a tick, whatever its length.
+        if (train.cars().getFirst() == locomotive) {
+            train.tick(network, throttle(), loco -> loco == locomotive ? ignite() : 0L);
+        }
         moveToModel();
         syncFromModel();
     }
@@ -207,13 +223,14 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
     }
 
     private void moveToModel() {
-        if (model == null) {
+        if (train == null || locomotive == null) {
             return;
         }
-        Vec3 rail = LocomotivePlacement.railPoint(model);
-        double speed = model.speed();
-        Arm front = model.front();
-        Arm back = model.span().otherEnd(front);
+        Place place = place();
+        Vec3 rail = LocomotivePlacement.railPoint(place);
+        double speed = train.speed();
+        Arm front = place.front();
+        Arm back = place.back();
         double dx = front.x() - back.x();
         double dy = front.y() - back.y();
         double dz = front.z() - back.z();
@@ -225,16 +242,24 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
         setPos(rail.x, rail.y, rail.z);
     }
 
+    /** Where its car is in its Train; the first car's place needs no Rail. */
+    private Place place() {
+        return level() instanceof ServerLevel server
+                ? train.placeOf(LevelRails.of(server).network(), locomotive)
+                : train.head();
+    }
+
     private void syncFromModel() {
-        if (model == null) {
+        if (train == null || locomotive == null) {
             return;
         }
-        entityData.set(DATA_SPAN_A, PylonColumn.block(model.span().a()));
-        entityData.set(DATA_SPAN_B, PylonColumn.block(model.span().b()));
-        entityData.set(DATA_FRONT_B, model.front().equals(model.span().b()));
-        entityData.set(DATA_SPEED, (float) model.speed());
-        entityData.set(DATA_FUEL, model.fuel().storedJoules());
-        entityData.set(DATA_FUEL_CAPACITY, model.fuel().gaugeCapacity());
+        Place place = place();
+        entityData.set(DATA_SPAN_A, PylonColumn.block(place.span().a()));
+        entityData.set(DATA_SPAN_B, PylonColumn.block(place.span().b()));
+        entityData.set(DATA_FRONT_B, place.front().equals(place.span().b()));
+        entityData.set(DATA_SPEED, (float) train.speed());
+        entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
+        entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
     }
 
@@ -376,15 +401,24 @@ public final class LocomotiveEntity extends VehicleEntity implements HasCustomIn
 
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
-        if (model != null) {
-            output.store("locomotive", Locomotive.CODEC, model);
+        if (train != null && locomotive != null) {
+            output.store("train", Train.CODEC, train);
+            output.putInt("car", train.cars().indexOf(locomotive));
         }
         cab.storeAsItemList(output.list("cab", ItemStack.OPTIONAL_CODEC));
     }
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
-        input.read("locomotive", Locomotive.CODEC).ifPresent(this::setLocomotive);
+        input.read("train", Train.CODEC)
+                // A Locomotive saved before Trains had cars.
+                .or(() -> input.read("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC))
+                .ifPresent(loaded -> {
+                    int car = input.getIntOr("car", 0);
+                    if (car >= 0 && car < loaded.cars().size() && loaded.cars().get(car) instanceof Locomotive loco) {
+                        setTrain(loaded, loco);
+                    }
+                });
         cab.fromItemList(input.listOrEmpty("cab", ItemStack.OPTIONAL_CODEC));
     }
 

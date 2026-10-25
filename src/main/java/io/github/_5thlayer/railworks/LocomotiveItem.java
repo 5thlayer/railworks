@@ -49,7 +49,7 @@ public final class LocomotiveItem extends Item implements PlansPlacement {
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         var result = LocomotivePlacement.plan(level, networkOf(level), player, player.blockPosition());
-        if (result == null || result.locomotive() == null) {
+        if (result == null || result.train() == null || result.locomotive() == null) {
             return InteractionResult.FAIL;
         }
         if (level instanceof ServerLevel server) {
@@ -58,7 +58,7 @@ public final class LocomotiveItem extends Item implements PlansPlacement {
             if (car == null) {
                 return InteractionResult.FAIL;
             }
-            car.setLocomotive(result.locomotive());
+            car.setTrain(result.train(), result.locomotive());
             server.addFreshEntity(car);
             server.gameEvent(player, GameEvent.ENTITY_PLACE, car.position());
             stack.consume(1, player);

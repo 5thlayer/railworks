@@ -4,7 +4,7 @@
 package io.github._5thlayer.railworks.rail;
 
 /**
- * What a driver asks of a Locomotive for one tick: forward accelerates the way it faces, back
+ * What a driver asks of a Train for one tick: forward accelerates the way it faces, back
  * brakes and then reverses, as in Factorio's manual driving. With no driver it is {@link #NONE}.
  *
  * <p>Pure: no Minecraft types.

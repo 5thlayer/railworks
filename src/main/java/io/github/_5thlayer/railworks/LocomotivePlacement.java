@@ -6,10 +6,12 @@ package io.github._5thlayer.railworks;
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Locomotive;
+import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.SpanAim;
+import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -29,8 +31,8 @@ public final class LocomotivePlacement {
     /** How far the line of sight may pass from the Rail and still be aimed at it. */
     static final double AIM_TOLERANCE = 0.75;
 
-    /** What a plan is built from: where the car would sit, or why it would not. */
-    public record Result(@Nullable Locomotive locomotive, PlacementPlan plan) {
+    /** What a plan is built from: the one-car Train it would set on the Rail, or why it would not. */
+    public record Result(@Nullable Train train, @Nullable Locomotive locomotive, PlacementPlan plan) {
     }
 
     private LocomotivePlacement() {
@@ -42,9 +44,9 @@ public final class LocomotivePlacement {
         return new AABB(rail.x - half, rail.y, rail.z - half, rail.x + half, rail.y + LocomotiveEntity.HEIGHT, rail.z + half);
     }
 
-    /** The world point on the flange's top under {@code locomotive}: where its floor rests. */
-    static Vec3 railPoint(Locomotive locomotive) {
-        Locomotive.Point p = locomotive.point();
+    /** The world point on the flange's top at {@code place}: where a car's floor rests. */
+    static Vec3 railPoint(Place place) {
+        Place.Point p = place.point();
         return new Vec3(p.x() + RailGeometry.ATTACH_X, p.y() + RailGeometry.RIDE_Y, p.z() + RailGeometry.ATTACH_Z);
     }
 
@@ -59,7 +61,7 @@ public final class LocomotivePlacement {
                 eye.x - RailGeometry.ATTACH_X, eye.y - RailGeometry.AIM_Y, eye.z - RailGeometry.ATTACH_Z,
                 look.x, look.y, look.z, player.blockInteractionRange(), AIM_TOLERANCE);
         if (aim.isEmpty()) {
-            return new Result(null, PlacementPlan.refused(aimedBlock, Blocks.FURNACE.defaultBlockState(), RailworksRefusal.OFF_SPAN));
+            return new Result(null, null, PlacementPlan.refused(aimedBlock, Blocks.FURNACE.defaultBlockState(), RailworksRefusal.OFF_SPAN));
         }
         Span span = aim.get().span();
         // The whole look vector, not its horizontal part: a steep Span has almost no horizontal run.
@@ -67,17 +69,18 @@ public final class LocomotivePlacement {
                 + (span.b().z() - span.a().z()) * look.z >= 0.0;
         Arm front = facesB ? span.b() : span.a();
         double toFront = facesB ? span.length() - aim.get().fromA() : aim.get().fromA();
-        Locomotive locomotive = Locomotive.on(span, front, toFront);
-        Vec3 rail = railPoint(locomotive);
+        Place place = new Place(span, front, toFront);
+        Vec3 rail = railPoint(place);
         AABB box = carBox(rail);
         BlockPos at = BlockPos.containing(box.getCenter());
         var state = Blocks.FURNACE.defaultBlockState();
         if (LocomotiveEntity.holding(level, span)) {
-            return new Result(null, PlacementPlan.refused(at, state, RailworksRefusal.SPAN_TAKEN));
+            return new Result(null, null, PlacementPlan.refused(at, state, RailworksRefusal.SPAN_TAKEN));
         }
         if (!level.noCollision(box)) {
-            return new Result(null, PlacementPlan.refused(at, state, RailworksRefusal.BLOCKED_CAR));
+            return new Result(null, null, PlacementPlan.refused(at, state, RailworksRefusal.BLOCKED_CAR));
         }
-        return new Result(locomotive, PlacementPlan.accepted(at, state));
+        Locomotive locomotive = Locomotive.burner();
+        return new Result(Train.of(place, locomotive), locomotive, PlacementPlan.accepted(at, state));
     }
 }

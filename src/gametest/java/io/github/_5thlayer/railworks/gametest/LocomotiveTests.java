@@ -16,6 +16,7 @@ import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -35,7 +36,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The Burner Locomotive through the item, the entity and a real player: placing it on a
  * Span the player looks along, the fuel slot, boarding and getting off, and driving. The drive's
- * numbers are {@code LocomotiveTest}'s; what only a server can show is that the keys, the fuel slot
+ * numbers are {@code TrainTest}'s; what only a server can show is that the keys, the fuel slot
  * and the Rail reach the model and that the entity ends up where the model says. All of these tests
  * share the {@code locomotive_} prefix.
  */
@@ -72,6 +73,7 @@ final class LocomotiveTests {
         tests.test("locomotive_comes_off_the_rail_when_its_span_is_cut", 20, LocomotiveTests::derails);
         tests.test("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
         tests.test("locomotive_is_saved_with_its_place_speed_and_fuel", 20, LocomotiveTests::saves);
+        tests.test("locomotive_saved_before_trains_had_cars_loads_in_place", 20, LocomotiveTests::loadsLegacySave);
     }
 
     // ---- placing ----
@@ -306,13 +308,13 @@ final class LocomotiveTests {
         press(driver, true, false);
         run(car, 10);
         double afterForward = car.getX();
-        if (car.locomotive().speed() <= 0.0 || afterForward <= start) {
+        if (car.train().speed() <= 0.0 || afterForward <= start) {
             helper.fail("forward should run the car the way it faces, but it went " + (afterForward - start), STAND);
         }
         press(driver, false, true);
         run(car, 30);
-        if (car.locomotive().speed() >= 0.0) {
-            helper.fail("holding back should brake and then reverse, but the speed is " + car.locomotive().speed(), STAND);
+        if (car.train().speed() >= 0.0) {
+            helper.fail("holding back should brake and then reverse, but the speed is " + car.train().speed(), STAND);
         }
         double before = car.getX();
         run(car, 5);
@@ -352,9 +354,9 @@ final class LocomotiveTests {
         press(driver, true, false);
         run(car, 120);
         double endX = helper.absolutePos(B).getX() + 0.5;
-        if (Math.abs(car.getX() - endX) > 1e-6 || car.locomotive().speed() != 0.0) {
+        if (Math.abs(car.getX() - endX) > 1e-6 || car.train().speed() != 0.0) {
             helper.fail("the car should be stopped at the line's end x=" + endX + " but is at " + car.getX()
-                    + " at speed " + car.locomotive().speed(), STAND);
+                    + " at speed " + car.train().speed(), STAND);
         }
         press(driver, false, true);
         run(car, 200);
@@ -371,14 +373,14 @@ final class LocomotiveTests {
         ServerPlayer driver = board(helper, car);
         press(driver, true, false);
         run(car, 5);
-        if (car.locomotive().speed() <= 0.0) {
+        if (car.train().speed() <= 0.0) {
             helper.fail("a fuelled car did not pick up speed", STAND);
         }
         run(car, 300);
         double endX = helper.absolutePos(B).getX() + 0.5;
-        if (car.locomotive().speed() != 0.0 || car.getX() >= endX - 0.5 || car.locomotive().fuel().storedJoules() >= LocomotiveSpec.JOULES_PER_TICK_AT_FULL_POWER) {
+        if (car.train().speed() != 0.0 || car.getX() >= endX - 0.5 || car.locomotive().fuel().storedJoules() >= LocomotiveSpec.JOULES_PER_TICK_AT_FULL_POWER) {
             helper.fail("the car should have run dry and stopped short of the end, speed "
-                    + car.locomotive().speed() + " at " + car.getX() + ", fuel " + car.locomotive().fuel().storedJoules(), STAND);
+                    + car.train().speed() + " at " + car.getX() + ", fuel " + car.locomotive().fuel().storedJoules(), STAND);
         }
         helper.succeed();
     }
@@ -414,7 +416,7 @@ final class LocomotiveTests {
 
     private static void staysWhenStacked(GameTestHelper helper) {
         LocomotiveEntity car = fuelled(helper);
-        double distance = car.locomotive().toFront() / car.locomotive().span().length();
+        double distance = car.train().head().toFront() / car.train().head().span().length();
         ServerPlayer builder = helper.makeMockServerPlayerInLevel();
         builder.setGameMode(GameType.SURVIVAL);
         BlockPos stand = helper.absolutePos(STAND);
@@ -434,7 +436,7 @@ final class LocomotiveTests {
         if (car.isRemoved() || !car.holds(moved)) {
             helper.fail("a car on a Span whose Arm moved should stay on it, removed=" + car.isRemoved(), STAND);
         }
-        double now = car.locomotive().toFront() / car.locomotive().span().length();
+        double now = car.train().head().toFront() / car.train().head().span().length();
         if (Math.abs(now - distance) > 1e-6) {
             helper.fail("the car moved along its Span from " + distance + " to " + now + " of the way", STAND);
         }
@@ -453,12 +455,39 @@ final class LocomotiveTests {
                 net.minecraft.world.entity.EntitySpawnReason.LOAD);
         reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
                 net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
-        var was = car.locomotive();
-        var now = reloaded.locomotive();
-        if (now == null || !now.span().equals(was.span()) || now.speed() != was.speed()
-                || now.toFront() != was.toFront() || now.fuel().storedJoules() != was.fuel().storedJoules()
+        var was = car.train();
+        var now = reloaded.train();
+        if (now == null || reloaded.locomotive() == null || !now.head().equals(was.head()) || now.speed() != was.speed()
+                || reloaded.locomotive().fuel().storedJoules() != car.locomotive().fuel().storedJoules()
                 || reloaded.fuelItem().getCount() != car.fuelItem().getCount()) {
             helper.fail("a saved and reloaded car came back different: " + now, STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void loadsLegacySave(GameTestHelper helper) {
+        LocomotiveEntity car = fuelled(helper);
+        ServerPlayer driver = board(helper, car);
+        press(driver, true, false);
+        run(car, 20);
+        var output = net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(
+                net.minecraft.util.ProblemReporter.DISCARDING);
+        car.saveWithoutId(output);
+        // The entity as a world saved before Trains had cars holds it: the Locomotive was the Train.
+        var tag = output.buildResult();
+        tag.remove("train");
+        tag.remove("car");
+        tag.put("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, car.train()).getOrThrow());
+        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
+                net.minecraft.world.entity.EntitySpawnReason.LOAD);
+        reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
+                net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
+        var now = reloaded.train();
+        if (now == null || reloaded.locomotive() == null || now.cars().size() != 1
+                || !now.head().equals(car.train().head()) || now.speed() != car.train().speed()
+                || reloaded.locomotive().fuel().storedJoules() != car.locomotive().fuel().storedJoules()
+                || !reloaded.position().equals(car.position()) || !reloaded.holds(span(helper))) {
+            helper.fail("a Locomotive saved before Trains had cars came back different: " + now + " at " + reloaded.position(), STAND);
         }
         helper.succeed();
     }
