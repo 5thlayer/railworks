@@ -30,6 +30,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.animal.pig.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.inventory.ChestMenu;
@@ -112,15 +113,12 @@ final class CargoCarTests {
     }
 
     private static void couplesAhead(GameTestHelper helper) {
-        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
-        // The structure's edge is a barrier cage, where the car ahead would stand over B.
-        for (int x = 9; x <= 10; x++) {
-            for (int y = 2; y <= 3; y++) {
-                for (int z = 2; z <= 4; z++) {
-                    helper.setBlock(new BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.AIR);
-                }
-            }
-        }
+        // Two blocks further from the line's end than the others, so a whole car fits ahead of it.
+        ServerPlayer placer = LocomotiveTests.player(helper, -45.0F);
+        placer.snapTo(placer.getX() - 2.0, placer.getY(), placer.getZ(), -45.0F, 5.0F);
+        LocomotiveTests.use(helper, placer);
+        LocomotiveEntity locomotive = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class,
+                LocomotiveTests.searchBox(helper)).getFirst();
         CargoCarEntity cargo = placeCargoBeside(helper, locomotive, 1);
         Train train = locomotive.train();
         if (train == null || train.cars().getFirst() != cargo.car() || train.cars().getLast() != locomotive.car()) {
@@ -277,7 +275,7 @@ final class CargoCarTests {
         ServerPlayer rider = helper.makeMockServerPlayerInLevel();
         rider.setGameMode(GameType.SURVIVAL);
         cargo.interact(rider, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (!(rider.getVehicle() instanceof net.minecraft.world.entity.HasCustomInventoryScreen vehicle)) {
+        if (!(rider.getVehicle() instanceof HasCustomInventoryScreen vehicle)) {
             helper.fail("the rider is not in a car that answers the inventory key", STAND);
             return;
         }

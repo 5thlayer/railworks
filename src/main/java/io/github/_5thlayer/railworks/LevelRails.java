@@ -110,11 +110,6 @@ public final class LevelRails extends SavedData {
         setDirty();
     }
 
-    /** A Train a car was saved with before the level held Trains. */
-    void adopt(Train train) {
-        add(train);
-    }
-
     /**
      * One tick of {@code train}, from its first car's view: the keys of the first player driving one
      * of its Locomotives, each Locomotive's fuel slot, and every car it has in view set where the

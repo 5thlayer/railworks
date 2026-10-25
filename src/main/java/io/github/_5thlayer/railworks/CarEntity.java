@@ -25,6 +25,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
@@ -92,11 +93,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         this.setNoGravity(true);
     }
 
-    /** What it rides as: the car it is the view of. */
-    public abstract String carKind();
-
-    /** Blocks along the Line, as its car's, which a client knows without the car. */
-    public abstract double carLength();
+    /** What kind of car it is the view of, which a client knows without the car. */
+    public abstract CarKind carKind();
 
     /** Sets this entity as the view of {@code car}, which {@code train} in its level's {@link LevelRails} holds. */
     public void setCar(Train train, Car car) {
@@ -504,16 +502,16 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
 
     /** Takes {@code train} into its level's {@link LevelRails} and views its car at {@code index}: a car saved with its own Train. */
     protected void adoptLegacy(Train train, int index) {
-        if (index < 0 || index >= train.cars().size() || !train.cars().get(index).kind().equals(carKind())
+        if (index < 0 || index >= train.cars().size() || !train.cars().get(index).kind().equals(carKind().model())
                 || !(level() instanceof ServerLevel server)) {
             return;
         }
-        LevelRails.of(server).adopt(train);
+        LevelRails.of(server).add(train);
         setCar(train, train.cars().get(index));
     }
 
     /** Opens a menu, if {@code player} is on the server. */
-    protected static void open(Player player, net.minecraft.world.MenuProvider menu) {
+    protected static void open(Player player, MenuProvider menu) {
         if (player instanceof ServerPlayer server) {
             server.openMenu(menu);
         }

@@ -184,11 +184,10 @@ public final class Train {
      * first: one Train holds a Span at a time.
      */
     public List<Span> spans(RailNetwork network) {
-        double frontHalf = cars.getFirst().length() / 2.0;
-        double backHalf = cars.getLast().length() / 2.0;
-        Place front = head.move(network, frontHalf).place();
-        Place back = tail(network).move(network, -backHalf).place();
-        List<Span> spans = front.spansBack(network, frontHalf + length() + backHalf);
+        Place front = frontFace(network);
+        Place back = backFace(network).turned();
+        List<Span> spans = front.spansBack(network,
+                cars.getFirst().length() / 2.0 + length() + cars.getLast().length() / 2.0);
         // A front stopped at a line's end ran short, so the count back overshoots the last car.
         int last = spans.indexOf(back.span());
         return last < 0 ? spans : List.copyOf(spans.subList(0, last + 1));
@@ -219,13 +218,15 @@ public final class Train {
 
     /**
      * Where a car {@code length} blocks long would stand coupled at {@code end}: its middle, with
-     * the Train's heading. Null where the line ends before the car would fit on it.
+     * the Train's heading. Null where the line ends before the whole car would fit on it.
      */
     public Place slot(RailNetwork network, End end, double length) {
-        Place.Moved moved = end == End.FRONT
-                ? head.move(network, (cars.getFirst().length() + length) / 2.0)
-                : tail(network).move(network, -(cars.getLast().length() + length) / 2.0);
-        return moved.stopped() ? null : moved.place();
+        int way = end == End.FRONT ? 1 : -1;
+        Place face = end == End.FRONT ? frontFace(network) : backFace(network).turned();
+        if (face.move(network, way * length).stopped()) {
+            return null;
+        }
+        return face.move(network, way * length / 2.0).place();
     }
 
     /**
@@ -317,7 +318,7 @@ public final class Train {
     /**
      * One tick under {@code throttle} from the cab of {@code driven}, whose forward is the way that
      * car faces. A powered tick has the Locomotives facing the way it pushes draw full power from
-     * their fuel buffers, or every Locomotive when none faces that way, lighting an item through
+     * their fuel buffers, or those facing the other way when none of them pays, lighting an item through
      * {@code ignite} when a buffer cannot cover it (the item's joules, or 0 for none); those that
      * paid pull the Train, and with none it brakes to a stop. Pushing against the motion brakes, for
      * free. Its Locomotives brake and its other cars do not, so a heavier Train starts and stops
@@ -369,19 +370,19 @@ public final class Train {
     }
 
     /**
-     * Has the Locomotives facing the way it pushes pay a tick of full power, or all of them when
-     * none faces that way, and says what those that paid weigh: the mass that pulls.
+     * Has the Locomotives facing the way it pushes pay a tick of full power, or, when none of them
+     * pays, those facing the other way, and says what those that paid weigh: the mass that pulls.
      */
     private double pay(int push, ToLongFunction<Locomotive> ignite) {
-        boolean anyFacing = false;
-        for (Car car : cars) {
-            if (car instanceof Locomotive && facingSign(car) == push) {
-                anyFacing = true;
-            }
-        }
+        double pulling = pay(push, true, ignite);
+        return pulling > 0.0 ? pulling : pay(push, false, ignite);
+    }
+
+    /** Has the Locomotives facing the way it pushes, or {@code facing} false the others, pay a tick; what those that paid weigh. */
+    private double pay(int push, boolean facing, ToLongFunction<Locomotive> ignite) {
         double pulling = 0.0;
         for (Car car : cars) {
-            if (car instanceof Locomotive locomotive && (!anyFacing || facingSign(car) == push)
+            if (car instanceof Locomotive locomotive && (facingSign(car) == push) == facing
                     && locomotive.pay(() -> ignite.applyAsLong(locomotive))) {
                 pulling += locomotive.mass();
             }
@@ -404,10 +405,17 @@ public final class Train {
 
     /** How far it can run {@code way}, up to {@code want} blocks, before its front or back face meets a taken Span. */
     private double room(RailNetwork network, int way, double want, Predicate<Span> taken) {
-        Place face = way > 0
-                ? head.move(network, cars.getFirst().length() / 2.0).place()
-                : tail(network).move(network, -cars.getLast().length() / 2.0).place().turned();
-        return face.room(network, want, taken);
+        return (way > 0 ? frontFace(network) : backFace(network)).room(network, want, taken);
+    }
+
+    /** Its first car's front, with the Train's heading. */
+    private Place frontFace(RailNetwork network) {
+        return head.move(network, cars.getFirst().length() / 2.0).place();
+    }
+
+    /** Its last car's back, facing back the way the Train came. */
+    private Place backFace(RailNetwork network) {
+        return tail(network).move(network, -cars.getLast().length() / 2.0).place().turned();
     }
 
     /** The one Locomotive a legacy record holds: only a Train of one Locomotive has one. */

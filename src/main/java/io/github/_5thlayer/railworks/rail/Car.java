@@ -34,10 +34,21 @@ public sealed interface Car permits Locomotive, CargoCar {
 
     /** A car saved with its kind, so a Train's cars load back as what they were. */
     Codec<Car> CODEC = Codec.STRING.comapFlatMap(
-            kind -> Locomotive.KIND.equals(kind) || CargoCar.KIND.equals(kind)
-                    ? DataResult.success(kind) : DataResult.error(() -> "no car kind " + kind),
+            kind -> fields(kind) != null ? DataResult.success(kind) : DataResult.error(() -> "no car kind " + kind),
             kind -> kind
-    ).dispatch("kind", Car::kind, kind -> Locomotive.KIND.equals(kind) ? Locomotive.MAP_CODEC : CargoCar.MAP_CODEC);
+    ).dispatch("kind", Car::kind, Car::fields);
+
+    /**
+     * A kind of car's fields, by the name it is saved under; null for no kind. A method, not a map:
+     * each car's codec names {@link #ID_FIELD}, so the cars' classes initialise after this one.
+     */
+    static MapCodec<? extends Car> fields(String kind) {
+        return switch (kind) {
+            case Locomotive.KIND -> Locomotive.MAP_CODEC;
+            case CargoCar.KIND -> CargoCar.MAP_CODEC;
+            default -> null;
+        };
+    }
 
     /** Which car it is, whatever Train it is coupled into. */
     UUID id();

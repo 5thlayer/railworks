@@ -145,7 +145,7 @@ public final class CarPlacement {
                 if (way > 0 ? !car.seenFirst() : !car.seenLast()) {
                     continue;
                 }
-                Place.Moved moved = seen.move(network, way * (car.carLength() + length) / 2.0);
+                Place.Moved moved = seen.move(network, way * (car.carKind().length() + length) / 2.0);
                 if (moved.stopped()) {
                     continue;
                 }

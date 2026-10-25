@@ -9,8 +9,8 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
- * A Cargo car: a car of a {@link Train} that carries items. It has no brakes and no engine, so it
- * is weight a Locomotive pulls and stops. What it holds is its entity's, since items are Minecraft's.
+ * A Cargo car: a car of a {@link Train} that carries items. It neither pulls nor brakes, so it is
+ * weight a Locomotive pulls and stops. What it holds is its entity's, since items are Minecraft's.
  *
  * <p>Pure: no Minecraft types.
  */

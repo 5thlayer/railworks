@@ -3,6 +3,8 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.function.Supplier;
+
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
@@ -12,15 +14,29 @@ import net.minecraft.world.level.block.Blocks;
 
 /** The cars an item sets on the Rail: the model's car, its entity, and the block its Placement Preview draws. */
 public enum CarKind {
-    LOCOMOTIVE(Locomotive.LENGTH, Blocks.FURNACE),
-    CARGO(CargoCar.LENGTH, Blocks.CHEST);
+    LOCOMOTIVE(Locomotive.KIND, Locomotive.LENGTH, Blocks.FURNACE, Locomotive::burner,
+            () -> RailworksRegistries.LOCOMOTIVE_ENTITY.get()),
+    CARGO(CargoCar.KIND, CargoCar.LENGTH, Blocks.CHEST, CargoCar::create,
+            () -> RailworksRegistries.CARGO_CAR_ENTITY.get());
 
+    private final String model;
     private final double length;
     private final Block preview;
+    private final Supplier<Car> create;
+    private final Supplier<EntityType<? extends CarEntity>> entityType;
 
-    CarKind(double length, Block preview) {
+    CarKind(String model, double length, Block preview, Supplier<Car> create,
+            Supplier<EntityType<? extends CarEntity>> entityType) {
+        this.model = model;
         this.length = length;
         this.preview = preview;
+        this.create = create;
+        this.entityType = entityType;
+    }
+
+    /** The {@link Car#kind()} of its model car. */
+    public String model() {
+        return model;
     }
 
     /** Blocks along the Line, as its model car's. */
@@ -34,10 +50,10 @@ public enum CarKind {
 
     /** A new car of this kind, for a new entity to view. */
     Car create() {
-        return this == LOCOMOTIVE ? Locomotive.burner() : CargoCar.create();
+        return create.get();
     }
 
     EntityType<? extends CarEntity> entityType() {
-        return this == LOCOMOTIVE ? RailworksRegistries.LOCOMOTIVE_ENTITY.get() : RailworksRegistries.CARGO_CAR_ENTITY.get();
+        return entityType.get();
     }
 }

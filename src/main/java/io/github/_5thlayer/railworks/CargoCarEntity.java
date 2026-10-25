@@ -44,13 +44,8 @@ public final class CargoCarEntity extends CarEntity {
     }
 
     @Override
-    public double carLength() {
-        return CargoCar.LENGTH;
-    }
-
-    @Override
-    public String carKind() {
-        return CargoCar.KIND;
+    public CarKind carKind() {
+        return CarKind.CARGO;
     }
 
     /** What it carries: the server's, for Jade and the menu. */

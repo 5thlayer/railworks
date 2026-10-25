@@ -564,4 +564,24 @@ class TrainTest {
         assertFalse(back.reversed(back.cars().get(1)));
         assertEquals(train.spans(network), back.spans(network));
     }
+
+    @Test
+    void whenTheLocomotivesFacingTheWayItRunsAreDryTheOthersPull() {
+        Locomotive front = Locomotive.burner();
+        Locomotive back = Locomotive.burner();
+        back.fuel().light(1_000_000_000L);
+        Train train = Train.of(new Place(network.get(A, B), B, 10.0), front)
+                .coupled(network, Train.End.BACK, back, true);
+        train.tick(network, Throttle.FORWARD, front, car -> 0L, span -> false);
+        // The dry front Locomotive pulls nothing, so the fuelled one facing back pulls 4,000 kg.
+        assertEquals(0.1 * 2.0 / 4.0, train.speed(), EPS);
+    }
+
+    @Test
+    void aCarCouplesOnlyWhereItsWholeBodyIsOnTheLine() {
+        // Its back 1.8 + 0.9 from A: a 1.8-block car fits behind it, a hair more does not.
+        Train train = train(network.get(A, B), B, 20.0 - 2.7);
+        assertTrue(train.slot(network, Train.End.BACK, 1.8) != null);
+        assertEquals(null, train.slot(network, Train.End.BACK, 1.81));
+    }
 }

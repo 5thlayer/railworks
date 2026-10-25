@@ -60,13 +60,8 @@ public final class LocomotiveEntity extends CarEntity {
     }
 
     @Override
-    public double carLength() {
-        return Locomotive.LENGTH;
-    }
-
-    @Override
-    public String carKind() {
-        return Locomotive.KIND;
+    public CarKind carKind() {
+        return CarKind.LOCOMOTIVE;
     }
 
     /** Its car, on the server. */
