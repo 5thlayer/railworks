@@ -145,4 +145,52 @@ class StringingTest {
         network.add(Span.of(A, B, 7));
         assertEquals(7, Stringing.click(network, A, B, 0).rail());
     }
+
+    @Test
+    void decidingChangesNothing() {
+        assertEquals(Stringing.Result.STRUNG, Stringing.decide(network, A, B, 100).result());
+        assertTrue(network.all().isEmpty());
+        network.add(Span.of(A, B, 10));
+        assertEquals(Stringing.Result.CUT, Stringing.decide(network, A, B, 0).result());
+        assertTrue(network.contains(A, B));
+    }
+
+    @Test
+    void theSlackIsHeldColourWhileAimingAtNothingOrTheHeldArm() {
+        assertEquals(Stringing.Tint.HELD, Stringing.tintFor(network, A, null, 100));
+        assertEquals(Stringing.Tint.HELD, Stringing.tintFor(network, A, A, 100));
+    }
+
+    @Test
+    void theSlackIsGreenWhereTheClickWouldString() {
+        assertEquals(Stringing.Tint.STRING, Stringing.tintFor(network, A, B, 10));
+    }
+
+    @Test
+    void theSlackIsOrangeWhereTheClickWouldCut() {
+        network.add(Span.of(A, B, 10));
+        assertEquals(Stringing.Tint.CUT, Stringing.tintFor(network, A, B, 0));
+    }
+
+    @Test
+    void theSlackIsRedForEveryRefusal() {
+        assertEquals(Stringing.Tint.REFUSED, Stringing.tintFor(network, A, B, 9));
+        assertEquals(Stringing.Tint.REFUSED, Stringing.tintFor(network, A, new Arm(limit() + 1, 5, 0), 1000));
+        Stringing.click(network, B, A, 100);
+        Stringing.click(network, B, C, 100);
+        assertEquals(Stringing.Tint.REFUSED, Stringing.tintFor(network, B, D, 100));
+    }
+
+    @Test
+    void thePreviewAndTheClickAgreeOnEveryAim() {
+        Arm[] aims = {A, B, C, D, new Arm(limit() + 1, 5, 0), new Arm(3, 5, 4)};
+        for (int rail : new int[] {0, 5, 100}) {
+            for (Arm aim : aims) {
+                var copy = new RailNetwork();
+                network.all().forEach(copy::add);
+                var decided = Stringing.decide(network, A, aim, rail);
+                assertEquals(decided, Stringing.click(copy, A, aim, rail));
+            }
+        }
+    }
 }

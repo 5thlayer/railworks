@@ -50,6 +50,7 @@ final class PreviewSpan {
         Vec3 end = SpanRenderer.attachPoint(PylonColumn.block(choice.get().target())).subtract(camera);
         int light = LightCoordsUtil.pack(level.getBrightness(LightLayer.BLOCK, pos), level.getBrightness(LightLayer.SKY, pos));
         geometry.getSubmitNodeCollector().submitCustomGeometry(geometry.getPoseStack(), RenderTypes.leash(),
-                (pose, buffer) -> SpanRenderer.drawSpan(pose.pose(), buffer, start, end, light, FADE));
+                (pose, buffer) -> SpanRenderer.drawSpan(pose.pose(), buffer, start, end, light, FADE,
+                        SpanRenderer.R, SpanRenderer.G, SpanRenderer.B));
     }
 }

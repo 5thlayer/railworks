@@ -26,17 +26,16 @@ public final class AutoStringing {
     /**
      * @param placed   the new column's Arm
      * @param arms     every other Arm that might be in reach
-     * @param railHeld the Rail the placer can spend; the nearest Arm is the only one tried, since a
-     *                 farther Span costs at least as much
+     * @param railHeld the Rail the placer can spend; a farther Span costs at least as much as a
+     *                 nearer one, so too little Rail for the nearest is too little for all
      * @return the Span to string, or empty where no Arm is in reach and free, or the Rail falls short
      */
     public static Optional<Choice> choose(RailNetwork network, Arm placed, Collection<Arm> arms, int railHeld) {
         return arms.stream()
                 .filter(arm -> !arm.equals(placed))
-                .filter(arm -> !SpanRules.tooLong(placed, arm))
-                .filter(arm -> network.spansAt(arm).size() < SpanRules.SPANS_PER_ARM)
+                // The click's own rule decides each candidate, so a refusal added there applies here too.
+                .filter(arm -> Stringing.decide(network, placed, arm, railHeld).result() == Stringing.Result.STRUNG)
                 .min(Comparator.comparingLong((Arm arm) -> placed.distanceSquaredTo(arm)).thenComparing(Comparator.naturalOrder()))
-                .map(arm -> new Choice(arm, SpanRules.cost(placed, arm)))
-                .filter(choice -> choice.cost() <= railHeld);
+                .map(arm -> new Choice(arm, SpanRules.cost(placed, arm)));
     }
 }

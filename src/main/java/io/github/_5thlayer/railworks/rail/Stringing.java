@@ -3,6 +3,8 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * The second click of the Rail gesture, from the Arm held to the Arm clicked: what it does to the
  * Spans and how much Rail moves. Nothing here touches a player's items; the caller moves
@@ -32,16 +34,31 @@ public final class Stringing {
     private Stringing() {
     }
 
+    /** What a held end's slack Rail looks like: the click's outcome as the player sees it before clicking. */
+    public enum Tint {
+        /** Nothing aimed at, or the held Arm itself, which cancels. */
+        HELD,
+        /** The click would string a Span. */
+        STRING,
+        /** The click would cut the Span between the two. */
+        CUT,
+        /** The click would be refused. */
+        REFUSED
+    }
+
     /**
+     * What a click from {@code anchor} on {@code target} would do, changing nothing. The one place
+     * the rules live: {@link #click} applies what this decides, and the preview draws it, so a Span
+     * the preview promises is a Span the click makes.
+     *
      * @param railHeld the Rail the player can spend
      */
-    public static Outcome click(RailNetwork network, Arm anchor, Arm target, int railHeld) {
+    public static Outcome decide(RailNetwork network, Arm anchor, Arm target, int railHeld) {
         if (anchor.equals(target)) {
             return new Outcome(Result.CANCELLED, 0);
         }
         Span existing = network.get(anchor, target);
         if (existing != null) {
-            network.remove(anchor, target);
             return new Outcome(Result.CUT, existing.cost());
         }
         if (network.spansAt(anchor).size() >= SpanRules.SPANS_PER_ARM
@@ -55,7 +72,36 @@ public final class Stringing {
         if (railHeld < cost) {
             return new Outcome(Result.SHORT_OF_RAIL, 0);
         }
-        network.add(Span.of(anchor, target, cost));
         return new Outcome(Result.STRUNG, cost);
+    }
+
+    /** The slack's tint for an aim at {@code target}, or at nothing when it is null. */
+    public static Tint tintFor(RailNetwork network, Arm anchor, @Nullable Arm target, int railHeld) {
+        if (target == null) {
+            return Tint.HELD;
+        }
+        return switch (decide(network, anchor, target, railHeld).result()) {
+            case CANCELLED -> Tint.HELD;
+            case STRUNG -> Tint.STRING;
+            case CUT -> Tint.CUT;
+            case TOO_LONG, ARM_FULL, SHORT_OF_RAIL -> Tint.REFUSED;
+        };
+    }
+
+    /**
+     * The second click of the gesture, from the Arm held to the Arm clicked: decides it
+     * ({@link #decide}) and applies a Span strung or cut.
+     *
+     * @param railHeld the Rail the player can spend
+     */
+    public static Outcome click(RailNetwork network, Arm anchor, Arm target, int railHeld) {
+        Outcome outcome = decide(network, anchor, target, railHeld);
+        switch (outcome.result()) {
+            case STRUNG -> network.add(Span.of(anchor, target, outcome.rail()));
+            case CUT -> network.remove(anchor, target);
+            default -> {
+            }
+        }
+        return outcome;
     }
 }
