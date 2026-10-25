@@ -9,6 +9,7 @@ import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.HopperSpots;
 import io.github._5thlayer.railworks.rail.Station;
+import io.github._5thlayer.railworks.rail.StraightLeg;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -46,7 +47,8 @@ import org.jspecify.annotations.Nullable;
  * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
  * which its menu, vanilla's three-row chest, shows when the car is used; nobody rides it. It is not a {@link Container} itself, so a hopper
  * cannot reach into it wherever it is: only while it is stopped at a Station does it give hoppers,
- * feeders and pipes its cargo, through {@link #automation()}, and a client sees that it is, to draw
+ * feeders and pipes its cargo, through {@link #automation()}, and only on a straight leg of Rail
+ * ({@link StraightLeg}); a client sees that it does, to draw
  * its {@link #hopperSpots()}. Nobody rides it; coupling and the rest are {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {
@@ -70,6 +72,9 @@ public final class CargoCarEntity extends CarEntity {
      */
     private static final EntityDataAccessor<String> DATA_STATION =
             SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.STRING);
+    /** Whether it loads where it stands: at a Station, on a straight leg. The overlay draws by it. */
+    private static final EntityDataAccessor<Boolean> DATA_LOADING =
+            SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -90,11 +95,19 @@ public final class CargoCarEntity extends CarEntity {
 
     /**
      * Its cargo to hoppers, feeders and pipes, NeoForge's item capability for automation: while its
-     * Train is stopped at a Station, wherever along the Train it stands, and null while the Train moves
-     * or stands away from every Station, or on a client.
+     * Train is stopped at a Station, wherever along the Train it stands, so long as it stands on a
+     * straight leg; null while the Train moves or stands away from every Station, on a bend or a
+     * diagonal, or on a client.
      */
     public @Nullable ResourceHandler<ItemResource> automation() {
-        return stoppedAt().isEmpty() ? null : handler;
+        return !stoppedAt().isEmpty() && onStraightLeg() ? handler : null;
+    }
+
+    /** Whether it stands wholly on a straight leg square to the blocks, on the server: where it loads. */
+    private boolean onStraightLeg() {
+        Train train = train();
+        return train != null && level() instanceof ServerLevel server
+                && StraightLeg.under(LevelRails.of(server).network(), train, train.car(carId()));
     }
 
     /** The Stations its Train is stopped at, on the server; none on a client or for a car no Train holds. */
@@ -106,7 +119,12 @@ public final class CargoCarEntity extends CarEntity {
         return LevelStations.of(server).stations().stoppedAt(LevelRails.of(server).network(), train);
     }
 
-    /** Whether its Train is stopped at a Station, as the server last synced it: what the overlay draws by. */
+    /** Whether it loads where it stands, as the server last synced it: what the overlay draws by. */
+    public boolean loading() {
+        return entityData.get(DATA_LOADING);
+    }
+
+    /** Whether its Train is stopped at a Station, as the server last synced it, loading there or not. */
     public boolean atStation() {
         return !stationName().isEmpty();
     }
@@ -142,12 +160,16 @@ public final class CargoCarEntity extends CarEntity {
 
     /**
      * Sets a hopper in the filling spot on the player's side, pointing at the car, while its Train is
-     * stopped at a Station: the spots are where it stands, so a hopper set while it passes would load
-     * nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
+     * stopped at a Station and the car stands on a straight leg: the spots are where it stands, so a
+     * hopper set while it passes, or where it does not load, would load nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
      */
     private void placeHopper(Player player, InteractionHand hand) {
-        if (automation() == null) {
+        if (stoppedAt().isEmpty()) {
             refuse(player, "message.railworks.hopper_not_at_station");
+            return;
+        }
+        if (!onStraightLeg()) {
+            refuse(player, "message.railworks.hopper_not_straight");
             return;
         }
         HopperSpots.Filling filling = hopperSpots().fillingNearest(player.getX(), player.getZ());
@@ -176,12 +198,14 @@ public final class CargoCarEntity extends CarEntity {
     protected void syncCar(Car car) {
         List<Station> at = stoppedAt();
         entityData.set(DATA_STATION, at.isEmpty() ? "" : at.getFirst().name());
+        entityData.set(DATA_LOADING, !at.isEmpty() && onStraightLeg());
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
         super.defineSynchedData(entityData);
         entityData.define(DATA_STATION, "");
+        entityData.define(DATA_LOADING, false);
     }
 
     /** The menu, from using the car. */

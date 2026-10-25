@@ -9,9 +9,11 @@ import io.github._5thlayer.railworks.CargoCarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
 import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.rail.HopperSpots;
+import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -76,6 +78,7 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_sneak_using_a_hopper_sets_it_beside_the_car_pointing_in", 40, CargoLoadingTests::setsHopperEitherSide);
         tests.test("cargo_loading_a_hopper_is_refused_where_its_spot_is_taken", 40, CargoLoadingTests::hopperRefusedWhereTaken);
         tests.test("cargo_loading_a_hopper_is_refused_by_a_car_at_no_station", 20, CargoLoadingTests::hopperRefusedAwayFromStation);
+        tests.test("cargo_loading_a_car_at_a_station_on_a_bend_neither_loads_nor_takes_a_hopper", 40, CargoLoadingTests::bendRefuses);
         tests.test("cargo_loading_using_a_car_opens_its_cargo_sneaking_or_not", 20, CargoLoadingTests::useOpensCargo);
         tests.test("cargo_loading_a_car_is_not_boarded_by_a_player_or_a_led_mob", 20, CargoLoadingTests::notBoarded);
         tests.test("cargo_loading_a_car_two_back_is_filled_when_the_locomotive_is_by_the_station", 200,
@@ -321,6 +324,30 @@ final class CargoLoadingTests {
         helper.succeed();
     }
 
+    private static void bendRefuses(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        station(helper, LOADING);
+        // A Span on from the second Pylon, off line: the Rail now bends through it, all along the Span the car is on.
+        var network = LevelRails.of(helper.getLevel()).network();
+        network.add(Span.of(PylonColumn.arm(helper.absolutePos(LocomotiveTests.B)),
+                PylonColumn.arm(helper.absolutePos(new BlockPos(13, 1, 7))), 6));
+        helper.startSequence()
+                .thenWaitUntil(() -> registered(helper, LOADING))
+                .thenWaitUntil(() -> synced(helper, cargo, true))
+                .thenExecute(() -> {
+                    if (cargo.loading() || cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null) != null) {
+                        helper.fail("a Cargo car at a Station on a bend loads", LOADING);
+                    }
+                    ServerPlayer player = sneaker(helper, SIDE_Z);
+                    BlockPos spot = spot(cargo.hopperSpots().fillingNearest(player.getX(), player.getZ()).spot());
+                    cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+                    if (!helper.getLevel().getBlockState(spot).isAir() || player.getMainHandItem().getCount() != 4) {
+                        helper.fail("a hopper was set by a Cargo car on a bend", LOADING);
+                    }
+                })
+                .thenSucceed();
+    }
+
     private static void useOpensCargo(GameTestHelper helper) {
         CargoCarEntity cargo = cargoBehindLocomotive(helper);
         for (boolean sneaking : new boolean[] {false, true}) {
@@ -392,6 +419,9 @@ final class CargoLoadingTests {
                 .thenWaitUntil(() -> registered(helper, LOADING))
                 .thenWaitUntil(() -> synced(helper, cargo, true))
                 .thenExecute(() -> {
+                    if (!cargo.loading()) {
+                        helper.fail("a Cargo car at a Station on a straight leg does not flag that it loads", LOADING);
+                    }
                     LocomotiveTests.fill(helper, locomotive, new ItemStack(Items.COAL, 4));
                     ServerPlayer driver = LocomotiveTests.board(helper, locomotive);
                     LocomotiveTests.press(driver, true, false);
