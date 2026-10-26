@@ -9,6 +9,7 @@ import java.util.stream.IntStream;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.HopperSpots;
+import io.github._5thlayer.railworks.rail.Schedule;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.StraightLeg;
 import io.github._5thlayer.railworks.rail.Train;
@@ -116,6 +117,20 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     /** What it carries: the server's, for its menu and the {@link Container} it is. */
     public Container cargo() {
         return cargo;
+    }
+
+    /** How full it is, for a Schedule's cargo wait: full when every slot holds all it can. */
+    public Schedule.Load load() {
+        if (cargo.isEmpty()) {
+            return Schedule.Load.EMPTY;
+        }
+        for (int slot = 0; slot < cargo.getContainerSize(); slot++) {
+            ItemStack stack = cargo.getItem(slot);
+            if (stack.isEmpty() || stack.getCount() < cargo.getMaxStackSize(stack)) {
+                return Schedule.Load.PARTLY;
+            }
+        }
+        return Schedule.Load.FULL;
     }
 
     /**
@@ -250,7 +265,7 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     }
 
     @Override
-    protected void syncCar(Car car) {
+    protected void syncCar(Train train, Car car) {
         entityData.set(DATA_LOADING, loading());
     }
 

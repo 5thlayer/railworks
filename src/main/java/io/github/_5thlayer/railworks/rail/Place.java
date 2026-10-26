@@ -128,6 +128,38 @@ public record Place(Span span, Arm front, double toFront) {
         return new Moved(new Place(span, front, toFront), false);
     }
 
+    /**
+     * How far on toward its front, through the Arms, the point {@code fromA} blocks along
+     * {@code target} from its first end is: -1 when the line ends first, or runs round a loop
+     * without reaching it.
+     */
+    public double distanceTo(RailNetwork network, Span target, double fromA) {
+        if (same(span, target)) {
+            double here = front.equals(span.a()) ? toFront : span.length() - toFront;
+            double ahead = front.equals(span.b()) ? fromA - here : here - fromA;
+            if (ahead >= 0.0) {
+                return ahead;
+            }
+        }
+        double distance = toFront;
+        Span span = this.span;
+        Arm arm = front;
+        // Each Span once, and the one it starts on again round a loop.
+        for (int left = network.size(); left >= 0; left--) {
+            Span next = beyond(network, span, arm);
+            if (next == null) {
+                return -1.0;
+            }
+            if (same(next, target)) {
+                return distance + (arm.equals(next.a()) ? fromA : next.length() - fromA);
+            }
+            distance += next.length();
+            arm = next.otherEnd(arm);
+            span = next;
+        }
+        return -1.0;
+    }
+
     /** The Spans from here back {@code length} blocks, this one first, as far as the line goes. */
     public List<Span> spansBack(RailNetwork network, double length) {
         List<Span> spans = new ArrayList<>();
@@ -169,10 +201,15 @@ public record Place(Span span, Arm front, double toFront) {
         return beyond(network, span, arm);
     }
 
+    /** Whether two Spans join the same Arms, whatever they cost. */
+    private static boolean same(Span one, Span other) {
+        return one.a().equals(other.a()) && one.b().equals(other.b());
+    }
+
     /** The Span past {@code arm} from {@code span}, or null at a line's end. */
     private static Span beyond(RailNetwork network, Span span, Arm arm) {
         for (Span other : network.spansAt(arm)) {
-            if (!other.a().equals(span.a()) || !other.b().equals(span.b())) {
+            if (!same(other, span)) {
                 return other;
             }
         }

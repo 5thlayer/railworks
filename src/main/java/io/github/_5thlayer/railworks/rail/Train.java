@@ -6,6 +6,7 @@ package io.github._5thlayer.railworks.rail;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -28,7 +29,10 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * car meets a line's end ahead or its last car one behind, or at the Arm of a Span another Train
  * holds.
  *
- * <p>Its cars are fixed: coupling and uncoupling make new Trains, at rest.
+ * <p>It carries its {@link Schedule}, which drives it unattended while it is automatic.
+ *
+ * <p>Its cars are fixed: coupling and uncoupling make new Trains, at rest. A Train coupled to
+ * keeps its Schedule; the Trains it parts into each keep a copy that does not drive them.
  *
  * <p>Pure: no Minecraft types.
  */
@@ -43,8 +47,13 @@ public final class Train {
             Place.MAP_CODEC.forGetter(Train::head),
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
             Car.CODEC.listOf(1, Integer.MAX_VALUE).fieldOf("cars").forGetter(Train::cars),
-            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed))
-    ).apply(i, (head, speed, cars, reversed) -> restore(head, speed, cars, Set.copyOf(reversed))));
+            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed)),
+            Schedule.CODEC.optionalFieldOf("schedule").forGetter(t -> Optional.of(t.schedule))
+    ).apply(i, (head, speed, cars, reversed, schedule) -> {
+        Train train = restore(head, speed, cars, Set.copyOf(reversed));
+        schedule.ifPresent(s -> train.schedule = s);
+        return train;
+    }));
 
     /**
      * What a Locomotive saved before Trains had cars looks like: the Locomotive was the whole Train,
@@ -63,6 +72,7 @@ public final class Train {
     private final Set<UUID> reversed;
     private Place head;
     private double speed;
+    private Schedule schedule = new Schedule();
 
     private Train(Place head, List<? extends Car> cars, Set<UUID> reversed) {
         if (cars.isEmpty()) {
@@ -113,6 +123,11 @@ public final class Train {
     /** Whether {@code car} faces against the Train's heading. */
     public boolean reversed(Car car) {
         return reversed.contains(car.id());
+    }
+
+    /** Its Schedule, which the Locomotive's menu edits. */
+    public Schedule schedule() {
+        return schedule;
     }
 
     /** Where its first car is, and the way the Train faces. */
@@ -253,7 +268,9 @@ public final class Train {
         if (reversed) {
             facing.add(car.id());
         }
-        return new Train(end == End.FRONT ? slot : head, joined, facing);
+        Train coupled = new Train(end == End.FRONT ? slot : head, joined, facing);
+        coupled.schedule = schedule;
+        return coupled;
     }
 
     /**
@@ -310,6 +327,7 @@ public final class Train {
     private Train part(RailNetwork network, int from, int to) {
         Train part = new Train(placeOf(network, cars.get(from)), cars.subList(from, to), reversed);
         part.speed = speed;
+        part.schedule = schedule.parted();
         return part;
     }
 
@@ -331,7 +349,24 @@ public final class Train {
      */
     public void tick(RailNetwork network, Throttle throttle, Car driven, ToLongFunction<Locomotive> ignite,
                      Predicate<Span> taken) {
-        int push = throttle.sign() * (reversed(driven) ? -1 : 1);
+        tick(network, throttle.sign() * (reversed(driven) ? -1 : 1), true, ignite, taken);
+    }
+
+    /**
+     * One tick on its {@link Schedule}, unattended: the Schedule says which way to push, asking
+     * {@code cars} what only the cars' entities know, and only Locomotives facing that way pull.
+     */
+    public void tick(RailNetwork network, Stations stations, ToLongFunction<Locomotive> ignite, Schedule.Cars cars,
+                     Predicate<Span> taken) {
+        tick(network, schedule.drive(network, stations, this, cars), false, ignite, taken);
+    }
+
+    /**
+     * One tick pushed {@code push}, +1 the Train's heading and -1 against it: those Locomotives facing
+     * that way pull, or, {@code eitherFacing}, those facing the other way when none of them pays.
+     */
+    void tick(RailNetwork network, int push, boolean eitherFacing, ToLongFunction<Locomotive> ignite,
+              Predicate<Span> taken) {
         if (push == 0) {
             coast();
         } else if (speed * push < 0) {
@@ -339,7 +374,7 @@ public final class Train {
         } else if (blocked(network, push, taken)) {
             coast();
         } else {
-            double pulling = pay(push, ignite);
+            double pulling = eitherFacing ? pay(push, ignite) : pay(push, true, ignite);
             if (pulling <= 0.0) {
                 // Out of fuel the brakes take it down: coasting on friction alone would run a fast
                 // Train on for minutes.
@@ -359,15 +394,19 @@ public final class Train {
         speed = towardZero(speed, LocomotiveSpec.friction());
     }
 
-    /** Its Locomotives' brakes over its whole mass: a lone Locomotive brakes at the configured rate. */
     private void brake() {
+        speed = towardZero(speed, brakingRate());
+    }
+
+    /** Its Locomotives' brakes over its whole mass, in blocks a tick squared: a lone Locomotive brakes at the configured rate. */
+    double brakingRate() {
         double braking = 0.0;
         for (Car car : cars) {
             if (car instanceof Locomotive) {
                 braking += car.mass();
             }
         }
-        speed = towardZero(speed, LocomotiveSpec.braking() * (braking / mass()));
+        return LocomotiveSpec.braking() * (braking / mass());
     }
 
     private static double towardZero(double value, double by) {

@@ -74,6 +74,7 @@ public final class RailworksGameTests {
         CurveTests.register(tests);
         CargoLoadingTests.register(tests);
         CarSoundTests.register(tests);
+        ScheduleTests.register(tests);
     }
 
     private static Identifier id(String path) {

@@ -3,9 +3,16 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+import io.github._5thlayer.railworks.network.ScheduleMenuPacket;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.Schedule;
+import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Throttle;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.network.chat.Component;
@@ -26,12 +33,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jspecify.annotations.Nullable;
 
 /**
  * A Burner Locomotive in the world: the view of its {@link Locomotive}, a car in a {@link Train}.
  * The model runs the drive and holds the joule fuel (the car's); this entity feeds it the driver's
- * keys and the fuel slot, and mirrors the fuel a client shows (Jade) into synched data.
+ * keys and the fuel slot, and mirrors the fuel and its Train's next Station that a client shows (Jade)
+ * into synched data. Its menu edits its Train's {@link Schedule}.
  *
  * <p>Fuel in hand fills the fuel slot rather than boarding; the rest is {@link CarEntity}'s.
  */
@@ -43,6 +52,14 @@ public final class LocomotiveEntity extends CarEntity {
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
+
+    /** The Station its Train's Schedule runs to, the one it waits at, and the one after that: empty for none. */
+    private static final EntityDataAccessor<String> DATA_HEADING =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> DATA_WAITING_AT =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> DATA_AFTER =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.STRING);
 
     /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
@@ -84,13 +101,32 @@ public final class LocomotiveEntity extends CarEntity {
         return entityData.get(DATA_FUEL_ITEM);
     }
 
+    /** The Station its Train's Schedule runs to, as the server last synced it; empty while it runs to none. */
+    public String headingSeen() {
+        return entityData.get(DATA_HEADING);
+    }
+
+    /** The Station its Train's Schedule waits at, as the server last synced it; empty while it waits at none. */
+    public String waitingAtSeen() {
+        return entityData.get(DATA_WAITING_AT);
+    }
+
+    /** The Station after the one it waits at, as the server last synced it. */
+    public String afterSeen() {
+        return entityData.get(DATA_AFTER);
+    }
+
     @Override
-    protected void syncCar(Car car) {
+    protected void syncCar(Train train, Car car) {
         if (car instanceof Locomotive locomotive) {
             entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
             entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         }
         entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
+        Schedule schedule = train.schedule();
+        entityData.set(DATA_HEADING, Objects.requireNonNullElse(schedule.heading(), ""));
+        entityData.set(DATA_WAITING_AT, Objects.requireNonNullElse(schedule.waitingAt(), ""));
+        entityData.set(DATA_AFTER, Objects.requireNonNullElse(schedule.after(), ""));
     }
 
     // ---- the drive ----
@@ -104,6 +140,11 @@ public final class LocomotiveEntity extends CarEntity {
             }
         }
         return Throttle.NONE;
+    }
+
+    /** Whether its slot holds fuel, which a Schedule counts as able to pull before its buffer is lit. */
+    boolean hasFuel() {
+        return fuelValue(level(), cab.getItem(LocomotiveMenu.FUEL)) > 0L;
     }
 
     /** Burns one fuel item from the slot whole and says what it was worth; 0 when there is none. */
@@ -162,11 +203,51 @@ public final class LocomotiveEntity extends CarEntity {
         held.shrink(moved);
     }
 
-    /** The menu, from the inventory key while riding and from sneaking at the car. */
+    /**
+     * The menu, from the inventory key while riding and from sneaking at the car, followed by its
+     * Train's Schedule and the level's Station names for the client to edit, to a client that took
+     * the channel.
+     */
     @Override
     public void openCustomInventoryScreen(Player player) {
-        open(player, new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
+        if (!(player instanceof ServerPlayer server) || !(level() instanceof ServerLevel level)) {
+            return;
+        }
+        var opened = server.openMenu(new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, cab, this),
                 Component.translatable("entity.railworks.burner_locomotive")));
+        if (opened.isEmpty()) {
+            return;
+        }
+        Train train = train();
+        Schedule schedule = train == null ? new Schedule() : train.schedule();
+        List<String> names = LevelStations.of(level).stations().all().stream()
+                .map(Station::name).distinct().sorted().toList();
+        ScheduleMenuPacket packet = new ScheduleMenuPacket(opened.getAsInt(),
+                new LocomotiveMenu.Opened(getId(), schedule.entries(), schedule.automatic(), names));
+        if (server.connection.hasChannel(packet)) {
+            PacketDistributor.sendToPlayer(server, packet);
+        }
+    }
+
+    /**
+     * {@code player} set its Train's Schedule in the menu: from the seat or within the menu's reach,
+     * each Station's name cleaned as a Station's is and an entry left with none dropped. False,
+     * changing nothing, from out of reach or for a car no Train holds.
+     */
+    public boolean editSchedule(Player player, List<Schedule.Entry> entries, boolean automatic) {
+        Train train = train();
+        if (train == null || !isAlive() || !(level() instanceof ServerLevel level)
+                || !(hasPassenger(player) || player.distanceToSqr(this) < LocomotiveMenu.REACH * LocomotiveMenu.REACH)) {
+            return false;
+        }
+        List<Schedule.Entry> cleaned = new ArrayList<>();
+        for (Schedule.Entry entry : entries) {
+            Station.name(entry.station()).ifPresent(name -> cleaned.add(new Schedule.Entry(name, entry.until(), entry.seconds())));
+        }
+        train.schedule().set(cleaned, automatic);
+        LevelRails.of(level).setDirty();
+        syncFromModel(train);
+        return true;
     }
 
     // ---- breaking it ----
@@ -193,6 +274,9 @@ public final class LocomotiveEntity extends CarEntity {
         entityData.define(DATA_FUEL, 0L);
         entityData.define(DATA_FUEL_CAPACITY, 0L);
         entityData.define(DATA_FUEL_ITEM, ItemStack.EMPTY);
+        entityData.define(DATA_HEADING, "");
+        entityData.define(DATA_WAITING_AT, "");
+        entityData.define(DATA_AFTER, "");
     }
 
     @Override

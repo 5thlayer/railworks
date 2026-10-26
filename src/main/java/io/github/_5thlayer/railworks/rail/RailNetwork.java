@@ -104,6 +104,11 @@ public final class RailNetwork {
         sent.forEach(this::add);
     }
 
+    /** How many Spans it holds. */
+    public int size() {
+        return spans.size();
+    }
+
     public Collection<Span> all() {
         return Collections.unmodifiableCollection(new ArrayList<>(spans.values()));
     }

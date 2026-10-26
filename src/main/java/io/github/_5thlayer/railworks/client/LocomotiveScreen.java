@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks.client;
 
 import io.github._5thlayer.railworks.LocomotiveMenu;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
@@ -13,8 +14,8 @@ import net.minecraft.world.entity.player.Inventory;
 
 /**
  * A Burner Locomotive's menu as a plain container: vanilla's one-row chest panel with the row's
- * other slots painted over, leaving the fuel slot where the menu puts it. Placeholder; the
- * Schedule (#3) adds its widgets here.
+ * other slots painted over, leaving the fuel slot where the menu puts it, and a button beside it
+ * that opens its Train's Schedule in a {@link ScheduleScreen}, closing the menu. Placeholder.
  */
 public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMenu> {
 
@@ -23,9 +24,34 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
     private static final int PANEL = 0xFFC6C6C6;
     private static final int FUEL_COLUMN = 4;
 
+    private Button schedule;
+
     public LocomotiveScreen(LocomotiveMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 114 + 18);
         this.inventoryLabelY = this.imageHeight - 94;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        // Over the painted-out slots right of the fuel slot.
+        schedule = addRenderableWidget(Button.builder(Component.translatable("menu.railworks.schedule.open"), button -> openSchedule())
+                .bounds(leftPos + 7 + (FUEL_COLUMN + 1) * 18 + 2, topPos + 17, 4 * 18 - 4, 18).build());
+    }
+
+    /** Until the server's Schedule arrives there is nothing to edit. */
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        schedule.active = menu.opened().car() >= 0;
+    }
+
+    private void openSchedule() {
+        if (minecraft.player != null && menu.opened().car() >= 0) {
+            LocomotiveMenu.Opened opened = menu.opened();
+            minecraft.player.closeContainer();
+            minecraft.setScreen(new ScheduleScreen(opened));
+        }
     }
 
     @Override

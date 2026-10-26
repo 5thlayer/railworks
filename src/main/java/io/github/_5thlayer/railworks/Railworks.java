@@ -5,6 +5,8 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.client.RailworksClient;
 import io.github._5thlayer.railworks.network.NameStationPacket;
+import io.github._5thlayer.railworks.network.ScheduleMenuPacket;
+import io.github._5thlayer.railworks.network.SchedulePacket;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.network.StationMenuPacket;
 import net.neoforged.api.distmarker.Dist;
@@ -27,7 +29,7 @@ public final class Railworks {
     /** The mod id, which gradle.properties' {@code mod_id} must match. */
     public static final String MOD_ID = "railworks";
 
-    private static final String NETWORK_VERSION = "1";
+    private static final String NETWORK_VERSION = "2";
 
     public Railworks(IEventBus modBus, ModContainer container) {
         RailworksConfig.register(container, modBus);
@@ -53,6 +55,8 @@ public final class Railworks {
         event.registrar(NETWORK_VERSION)
                 .playToClient(SpansPacket.TYPE, SpansPacket.STREAM_CODEC, SpansPacket::handle)
                 .playToClient(StationMenuPacket.TYPE, StationMenuPacket.STREAM_CODEC, StationMenuPacket::handle)
-                .playToServer(NameStationPacket.TYPE, NameStationPacket.STREAM_CODEC, NameStationPacket::handle);
+                .playToClient(ScheduleMenuPacket.TYPE, ScheduleMenuPacket.STREAM_CODEC, ScheduleMenuPacket::handle)
+                .playToServer(NameStationPacket.TYPE, NameStationPacket.STREAM_CODEC, NameStationPacket::handle)
+                .playToServer(SchedulePacket.TYPE, SchedulePacket.STREAM_CODEC, SchedulePacket::handle);
     }
 }
