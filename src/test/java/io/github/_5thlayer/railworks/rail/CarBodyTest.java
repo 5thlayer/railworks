@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,30 +26,35 @@ class CarBodyTest {
     }
 
     private static void check(CarBody body, double length) {
-        for (CarBody.Part part : body.parts()) {
-            assertTrue(part.minX() >= -HALF_WIDTH && part.maxX() <= HALF_WIDTH
-                    && part.minY() >= 0.0 && part.maxY() <= HEIGHT
-                    && part.minZ() >= -length / 2.0 && part.maxZ() <= length / 2.0, part + " leaves the car's box");
+        for (CarBody.Box box : boxes(body)) {
+            assertTrue(box.minX() >= -HALF_WIDTH && box.maxX() <= HALF_WIDTH
+                    && box.minY() >= 0.0 && box.maxY() <= HEIGHT
+                    && box.minZ() >= -length / 2.0 && box.maxZ() <= length / 2.0, box + " leaves the car's box");
         }
     }
 
     @Test
     void noTwoFacesOfABodyShareAPlane() {
         for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.CARGO)) {
-            List<CarBody.Part> parts = body.parts();
-            for (int i = 0; i < parts.size(); i++) {
-                for (int j = i + 1; j < parts.size(); j++) {
-                    String shared = sharedPlane(parts.get(i), parts.get(j));
+            List<CarBody.Box> boxes = boxes(body);
+            for (int i = 0; i < boxes.size(); i++) {
+                for (int j = i + 1; j < boxes.size(); j++) {
+                    String shared = sharedPlane(boxes.get(i), boxes.get(j));
                     if (shared != null) {
-                        fail(parts.get(i) + " and " + parts.get(j) + " share the plane " + shared);
+                        fail(boxes.get(i) + " and " + boxes.get(j) + " share the plane " + shared);
                     }
                 }
             }
         }
     }
 
+    /** Every box drawn for the body: its painted parts and its chests. */
+    private static List<CarBody.Box> boxes(CarBody body) {
+        return Stream.concat(body.parts().stream().map(CarBody.Part::box), body.chests().stream()).toList();
+    }
+
     /** The plane two boxes have faces in that overlap, by more than an edge, or null. */
-    private static String sharedPlane(CarBody.Part a, CarBody.Part b) {
+    private static String sharedPlane(CarBody.Box a, CarBody.Box b) {
         for (double x : new double[] {a.minX(), a.maxX()}) {
             if ((x == b.minX() || x == b.maxX()) && overlap(a.minY(), a.maxY(), b.minY(), b.maxY())
                     && overlap(a.minZ(), a.maxZ(), b.minZ(), b.maxZ())) {
@@ -75,18 +81,16 @@ class CarBodyTest {
     }
 
     @Test
-    void theRidersEyeIsAPlayersSeatedEyeAboveTheSeat() {
-        // A seated player's eye: their 1.62 eye height, less the 0.6 they sit below the seat.
-        assertEquals(CarBody.SEAT_Y + 1.02, CarBody.eye()[1], 1e-9);
-        assertEquals(0.0, CarBody.eye()[0]);
-        assertEquals(CarBody.SEAT_Z, CarBody.eye()[2]);
-    }
-
-    @Test
-    void theRiderSitsForwardInTheCabBehindTheFront() {
-        assertTrue(CarBody.SEAT_Z > 0.0, "the seat is not forward of the car's middle");
+    void theRiderSitsForwardInTheCabBehindTheDashAndTheFrontsFrame() {
+        CarBody.Point eye = CarBody.eye();
+        assertTrue(eye.z() > 0.0, "the rider does not sit forward of the car's middle");
         for (CarBody.Part part : CarBody.LOCOMOTIVE.parts()) {
-            assertTrue(!contains(part, CarBody.eye()), "the rider's eye is inside " + part);
+            CarBody.Box box = part.box();
+            assertTrue(!contains(box, eye), "the rider's eye is inside " + part);
+            // The dash, the roof's edge and the nose, across the car in front of the rider.
+            if (box.minX() < 0.0 && box.maxX() > 0.0 && box.minZ() > 0.0) {
+                assertTrue(box.minZ() > eye.z(), "the rider's eye is not behind " + part);
+            }
         }
     }
 
@@ -96,7 +100,7 @@ class CarBodyTest {
         // at the grade limit), and 20 either side.
         for (int pitch = -20; pitch <= 15; pitch++) {
             for (int yaw = -20; yaw <= 20; yaw++) {
-                CarBody.Part hit = firstHit(pitch, yaw);
+                CarBody.Box hit = firstSeen(pitch, yaw);
                 if (hit != null) {
                     fail("looking " + pitch + " up and " + yaw + " across, the rider sees " + hit);
                 }
@@ -109,7 +113,7 @@ class CarBodyTest {
         for (int pitch = -20; pitch <= 15; pitch++) {
             for (int yaw = 60; yaw <= 120; yaw++) {
                 for (int side : new int[] {1, -1}) {
-                    CarBody.Part hit = firstHit(pitch, side * yaw);
+                    CarBody.Box hit = firstSeen(pitch, side * yaw);
                     if (hit != null) {
                         fail("looking " + pitch + " up and " + side * yaw + " across, the rider sees " + hit);
                     }
@@ -119,35 +123,43 @@ class CarBodyTest {
     }
 
     @Test
-    void theRiderDoesNotSeeThroughTheRoofOrTheSidesBehindThem() {
-        assertTrue(firstHit(60, 0) != null, "the roof does not cover the rider");
-        assertTrue(firstHit(0, 150) != null && firstHit(0, -150) != null, "the sides behind the cab are open");
+    void theRoofAndTheSidesBehindTheCabBlockTheRidersView() {
+        for (int pitch = 40; pitch <= 90; pitch += 10) {
+            assertTrue(firstSeen(pitch, 0) != null, "looking " + pitch + " up, the rider sees out through the roof");
+        }
+        for (int yaw : new int[] {150, -150}) {
+            assertTrue(firstSeen(0, yaw) != null, "looking " + yaw + " across, the rider sees out behind the cab");
+        }
     }
 
-    /** The first part a ray from the rider's eye meets before it leaves the car's front, or null. */
-    private static CarBody.Part firstHit(double pitchDegrees, double yawDegrees) {
+    /** The first box the rider sees, looking that far up and across from ahead, or null. */
+    private static CarBody.Box firstSeen(double pitchDegrees, double yawDegrees) {
         double pitch = Math.toRadians(pitchDegrees);
         double yaw = Math.toRadians(yawDegrees);
-        double[] eye = CarBody.eye();
-        double[] direction = {Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)};
-        // Far enough to leave the car's box any way it looks.
+        CarBody.Point eye = CarBody.eye();
+        return firstHit(boxes(CarBody.LOCOMOTIVE), new double[] {eye.x(), eye.y(), eye.z()},
+                new double[] {Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)});
+    }
+
+    /** The first box a ray meets within reach of the car's box, or null. */
+    private static CarBody.Box firstHit(List<CarBody.Box> boxes, double[] from, double[] direction) {
         double reach = 4.0;
-        CarBody.Part nearest = null;
+        CarBody.Box nearest = null;
         double nearestT = Double.POSITIVE_INFINITY;
-        for (CarBody.Part part : CarBody.LOCOMOTIVE.parts()) {
-            double t = entry(part, eye, direction, reach);
+        for (CarBody.Box box : boxes) {
+            double t = entry(box, from, direction, reach);
             if (t < nearestT) {
                 nearestT = t;
-                nearest = part;
+                nearest = box;
             }
         }
         return nearest;
     }
 
     /** Where along the ray it enters the box, by the slab method, or infinity if it misses. */
-    private static double entry(CarBody.Part part, double[] from, double[] direction, double reach) {
-        double[] min = {part.minX(), part.minY(), part.minZ()};
-        double[] max = {part.maxX(), part.maxY(), part.maxZ()};
+    private static double entry(CarBody.Box box, double[] from, double[] direction, double reach) {
+        double[] min = {box.minX(), box.minY(), box.minZ()};
+        double[] max = {box.maxX(), box.maxY(), box.maxZ()};
         double near = 0.0;
         double far = reach;
         for (int axis = 0; axis < 3; axis++) {
@@ -168,22 +180,28 @@ class CarBodyTest {
         return near;
     }
 
-    private static boolean contains(CarBody.Part part, double[] at) {
-        return at[0] > part.minX() && at[0] < part.maxX() && at[1] > part.minY() && at[1] < part.maxY()
-                && at[2] > part.minZ() && at[2] < part.maxZ();
+    private static boolean contains(CarBody.Box box, CarBody.Point at) {
+        return at.x() > box.minX() && at.x() < box.maxX() && at.y() > box.minY() && at.y() < box.maxY()
+                && at.z() > box.minZ() && at.z() < box.maxZ();
     }
 
     @Test
     void theCargoCarShowsAChestSetIntoEachSide() {
-        List<CarBody.Part> chests = CarBody.CARGO.parts().stream()
-                .filter(part -> part.paint() == CarBody.Paint.CHEST).toList();
+        List<CarBody.Box> chests = CarBody.CARGO.chests();
         assertEquals(2, chests.size(), "a chest on each side");
-        double outerWall = CarBody.CARGO.parts().stream()
-                .filter(part -> part.paint() == CarBody.Paint.SHELL && part.minY() > 0.6)
-                .mapToDouble(CarBody.Part::maxX).max().orElseThrow();
-        assertTrue(chests.stream().anyMatch(chest -> chest.maxX() < outerWall && chest.maxX() > outerWall - 0.1),
-                "no chest is set just behind the right side's face");
-        assertTrue(chests.stream().anyMatch(chest -> chest.minX() > -outerWall && chest.minX() < -outerWall + 0.1),
-                "no chest is set just behind the left side's face");
+        for (CarBody.Box chest : chests) {
+            assertEquals(chest.maxY() - chest.minY(), chest.maxX() - chest.minX(), 1e-9, chest + " is not a cube");
+            assertEquals(chest.maxY() - chest.minY(), chest.maxZ() - chest.minZ(), 1e-9, chest + " is not a cube");
+            // Looking at the car square on from beside it, at the chest's middle, the chest is the first
+            // thing seen, and something stands proud of it around the recess.
+            double side = Math.signum(chest.minX() + chest.maxX());
+            double y = (chest.minY() + chest.maxY()) / 2.0;
+            double z = (chest.minZ() + chest.maxZ()) / 2.0;
+            double[] inward = {-side, 0.0, 0.0};
+            assertEquals(chest, firstHit(boxes(CarBody.CARGO), new double[] {side, y, z}, inward), "the chest is hidden");
+            CarBody.Box frame = firstHit(boxes(CarBody.CARGO), new double[] {side, chest.maxY() + 0.03, z}, inward);
+            assertTrue(frame != null && Math.abs(side > 0 ? frame.maxX() : frame.minX()) > Math.abs(side > 0 ? chest.maxX() : chest.minX()),
+                    "nothing frames the chest above it");
+        }
     }
 }
