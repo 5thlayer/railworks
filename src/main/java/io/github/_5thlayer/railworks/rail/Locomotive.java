@@ -21,7 +21,7 @@ public final class Locomotive implements Car {
 
     public static final String KIND = "locomotive";
 
-    /** Blocks along the Line: the 1.8-block body {@code CarRenderer} draws. */
+    /** Blocks along the Line: the length of its {@link CarBody}. */
     public static final double LENGTH = 1.8;
 
     static final MapCodec<Locomotive> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(

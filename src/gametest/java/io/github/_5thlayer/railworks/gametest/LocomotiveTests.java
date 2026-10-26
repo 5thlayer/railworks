@@ -75,6 +75,8 @@ final class LocomotiveTests {
         tests.test("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
         tests.test("locomotive_is_saved_with_its_place_speed_and_fuel", 20, LocomotiveTests::saves);
         tests.test("locomotive_saved_before_trains_had_cars_loads_in_place", 20, LocomotiveTests::loadsLegacySave);
+        tests.test("locomotive_cab_seats_its_rider_forward_facing_east", 20, helper -> seatsForward(helper, -45.0F, 1));
+        tests.test("locomotive_cab_seats_its_rider_forward_facing_west", 20, helper -> seatsForward(helper, 45.0F, -1));
     }
 
     // ---- placing ----
@@ -338,13 +340,31 @@ final class LocomotiveTests {
         for (int tick = 0; tick < 25; tick++) {
             car.tick();
             driver.rideTick();
-            if (Math.abs(driver.getX() - car.getX()) > 0.01 || Math.abs(driver.getZ() - car.getZ()) > 0.01) {
+            // Seated in the cab, forward of the car's middle; the car faces east.
+            if (Math.abs(driver.getX() - (car.getX() + 0.3)) > 0.01 || Math.abs(driver.getZ() - car.getZ()) > 0.01) {
                 helper.fail("on tick " + tick + " the rider is at " + driver.getX() + ", " + driver.getZ()
                         + " but the car is at " + car.getX() + ", " + car.getZ(), STAND);
             }
         }
         if (car.getX() - start < 0.1) {
             helper.fail("the car did not move, so the rider's following proved nothing", STAND);
+        }
+        helper.succeed();
+    }
+
+    /** A rider sits in the cab, 0.3 forward of the car's middle the way it faces, on the floor. */
+    private static void seatsForward(GameTestHelper helper, float lookYaw, int east) {
+        ServerPlayer placer = player(helper, lookYaw);
+        use(helper, placer);
+        LocomotiveEntity car = onlyCar(helper);
+        ServerPlayer driver = board(helper, car);
+        driver.rideTick();
+        double x = car.getX() + 0.3 * east;
+        // A seated player's feet are 0.6 below the seat, 1.2 over the floor's underside.
+        double y = car.getY() + 0.6;
+        if (Math.abs(driver.getX() - x) > 1e-3 || Math.abs(driver.getY() - y) > 1e-3
+                || Math.abs(driver.getZ() - car.getZ()) > 1e-3) {
+            helper.fail("the rider sits at " + driver.position() + ", not in the cab at " + new Vec3(x, y, car.getZ()), STAND);
         }
         helper.succeed();
     }

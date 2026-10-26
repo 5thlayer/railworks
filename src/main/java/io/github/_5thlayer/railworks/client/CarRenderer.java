@@ -7,23 +7,27 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import io.github._5thlayer.railworks.CarEntity;
-import io.github._5thlayer.railworks.rail.RailGeometry;
+import io.github._5thlayer.railworks.rail.CarBody;
+import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.model.object.chest.ChestModel;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import org.joml.Matrix4f;
 
 /**
- * A car, drawn as placeholder boxes in the Rail's rust red: a skirt down both sides of the web and a
- * floor over it. A Burner Locomotive adds a roof, so the driver shows in the open cab, and a darker
- * engine block at the front so the heading reads; a Cargo car adds a low crate, a rider sitting on
- * its lid. Every
- * face is its own triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its
- * tube, so the strips the pipeline joins in one buffer leave no triangles between them.
+ * A car, drawn from its {@link CarBody} as placeholder boxes: a boxy straddle monorail car in the
+ * Rail's rust red, and on a Cargo car a vanilla chest set into each side. Every face is its own
+ * triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its tube, so the strips
+ * the pipeline joins in one buffer leave no triangles between them.
  */
 public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, CarRenderer.State> {
 
@@ -32,26 +36,27 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         float xRot;
     }
 
-    /** Rust red, as the Rail's, with the six faces shaded apart: top, bottom, then the four sides. */
+    /** The six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
 
-    /** How far a box that meets another stops short of the other's faces. */
-    private static final float INSET = 0.01F;
+    private final CarBody body;
+    private final ChestModel chest;
+    private final SpriteGetter sprites;
 
-    private final boolean cargo;
-
-    private CarRenderer(EntityRendererProvider.Context context, boolean cargo) {
+    private CarRenderer(EntityRendererProvider.Context context, CarBody body) {
         super(context);
-        this.cargo = cargo;
+        this.body = body;
+        this.chest = new ChestModel(context.bakeLayer(ModelLayers.CHEST));
+        this.sprites = context.getSprites();
         this.shadowRadius = 0.0F;
     }
 
     public static <T extends CarEntity> CarRenderer<T> locomotive(EntityRendererProvider.Context context) {
-        return new CarRenderer<>(context, false);
+        return new CarRenderer<>(context, CarBody.LOCOMOTIVE);
     }
 
     public static <T extends CarEntity> CarRenderer<T> cargo(EntityRendererProvider.Context context) {
-        return new CarRenderer<>(context, true);
+        return new CarRenderer<>(context, CarBody.CARGO);
     }
 
     @Override
@@ -74,32 +79,47 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         poseStack.mulPose(Axis.YP.rotationDegrees(-state.yRot));
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
         int light = state.lightCoords;
-        // The skirt down both sides of the web and the floor over it, then the car's own body. Where two
-        // boxes meet, one is inset by INSET and reaches into the other, so no two faces share a plane
-        // and the depth test never has to choose between them.
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
-            float web = (float) (RailGeometry.WEB_WIDTH / 2.0);
-            float skirt = (float) (CarEntity.WIDTH / 2.0);
-            float floor = (float) (RailGeometry.WEB_HEIGHT + 0.05);
-            float in = skirt - INSET;
-            box(pose.pose(), buffer, -in, 0.0F, -0.9F + INSET, -web - 0.02F, floor + 0.2F, 0.9F - INSET,
-                    0.40F, 0.17F, 0.12F, light);
-            box(pose.pose(), buffer, web + 0.02F, 0.0F, -0.9F + INSET, in, floor + 0.2F, 0.9F - INSET,
-                    0.40F, 0.17F, 0.12F, light);
-            box(pose.pose(), buffer, -skirt, floor, -0.9F, skirt, floor + 0.15F, 0.9F, 0.62F, 0.27F, 0.18F, light);
-            if (cargo) {
-                // A crate the length of the car, its lid lighter so the top reads; the crate stands in
-                // the floor and its top in the lid.
-                box(pose.pose(), buffer, -skirt + 0.05F + INSET, floor + 0.1F, -0.85F + INSET,
-                        skirt - 0.05F - INSET, floor + 0.67F, 0.85F - INSET, 0.48F, 0.22F, 0.15F, light);
-                box(pose.pose(), buffer, -skirt + 0.05F, floor + 0.65F, -0.85F, skirt - 0.05F, floor + 0.72F, 0.85F,
-                        0.62F, 0.27F, 0.18F, light);
-            } else {
-                box(pose.pose(), buffer, -0.45F, floor + 0.1F, 0.2F, 0.45F, 1.6F, 0.9F - INSET, 0.40F, 0.17F, 0.12F, light);
-                box(pose.pose(), buffer, -skirt, 2.6F, -0.9F, skirt, 2.75F, 0.9F, 0.62F, 0.27F, 0.18F, light);
+            for (CarBody.Part part : body.parts()) {
+                if (part.paint() != CarBody.Paint.CHEST) {
+                    float[] rgb = colour(part.paint());
+                    box(pose.pose(), buffer, (float) part.minX(), (float) part.minY(), (float) part.minZ(),
+                            (float) part.maxX(), (float) part.maxY(), (float) part.maxZ(), rgb[0], rgb[1], rgb[2], light);
+                }
             }
         });
+        for (CarBody.Part part : body.parts()) {
+            if (part.paint() == CarBody.Paint.CHEST) {
+                submitChest(part, poseStack, collector, light);
+            }
+        }
         poseStack.popPose();
+    }
+
+    /** A closed chest filling the part's box as it would a block, its front out of the car's nearer side. */
+    private void submitChest(CarBody.Part part, PoseStack poseStack, SubmitNodeCollector collector, int light) {
+        float size = (float) (part.maxY() - part.minY());
+        boolean right = part.minX() + part.maxX() > 0.0;
+        poseStack.pushPose();
+        poseStack.translate((part.minX() + part.maxX()) / 2.0, part.minY(), (part.minZ() + part.maxZ()) / 2.0);
+        // The chest's model faces +z; turn it to face out of its side.
+        poseStack.mulPose(Axis.YP.rotationDegrees(right ? 90.0F : -90.0F));
+        poseStack.scale(size, size, size);
+        poseStack.translate(-0.5F, 0.0F, -0.5F);
+        collector.submitModel(chest, 0.0F, poseStack, light, OverlayTexture.NO_OVERLAY, -1,
+                Sheets.CHEST_REGULAR.select(ChestType.SINGLE), sprites, 0, null);
+        poseStack.popPose();
+    }
+
+    private static float[] colour(CarBody.Paint paint) {
+        return switch (paint) {
+            case SHELL -> new float[] {0.62F, 0.27F, 0.18F};
+            case UNDER -> new float[] {0.40F, 0.17F, 0.12F};
+            case TRIM -> new float[] {0.13F, 0.08F, 0.07F};
+            case NOSE -> new float[] {0.30F, 0.10F, 0.08F};
+            case LAMP -> new float[] {0.95F, 0.90F, 0.62F};
+            case CHEST -> throw new IllegalArgumentException("a chest is drawn with its own model");
+        };
     }
 
     /** An axis-aligned box, six faces each as a padded strip of four. */
