@@ -50,6 +50,7 @@ public final class HatchBlockEntity extends BlockEntity {
      * Puts itself in the level's hatches as it loads, if it is not there yet, as after a command placed
      * it. A record there of the other mode is a stale one, left by a hatch a command removed with no
      * side effects: what it held is dropped, and a fresh record of this block's mode takes its place.
+     * One of the same mode cannot be told from its own, and this block takes it over as it is.
      */
     @Override
     public void onLoad() {
@@ -59,7 +60,7 @@ public final class HatchBlockEntity extends BlockEntity {
             HatchMode mode = getBlockState().getValue(HatchBlock.MODE);
             hatches.at(worldPosition).filter(stale -> stale.mode() != mode).ifPresent(stale -> {
                 hatches.remove(worldPosition);
-                Hatches.drop(server, stale);
+                stale.drop(server);
             });
         }
         hatch();
@@ -69,7 +70,7 @@ public final class HatchBlockEntity extends BlockEntity {
     @Override
     public void preRemoveSideEffects(BlockPos pos, BlockState state) {
         if (level instanceof ServerLevel server) {
-            LevelHatches.of(server).remove(pos).ifPresent(hatch -> Hatches.drop(server, hatch));
+            LevelHatches.of(server).remove(pos).ifPresent(hatch -> hatch.drop(server));
         }
     }
 }

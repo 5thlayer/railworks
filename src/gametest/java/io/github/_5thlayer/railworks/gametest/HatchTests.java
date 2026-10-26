@@ -94,6 +94,7 @@ final class HatchTests {
         tests.test("logistics_hatch_a_hopper_fills_and_empties_it", 100, HatchTests::hoppers);
         tests.test("logistics_hatch_leaves_and_rejoins_its_station_as_the_platform_goes_and_comes", 20, HatchTests::rejoins);
         tests.test("logistics_hatch_placed_by_a_command_registers_as_it_loads", 20, HatchTests::command);
+        tests.test("logistics_hatch_set_over_a_stale_record_of_the_other_mode_drops_it", 20, HatchTests::staleRecord);
         tests.test("logistics_hatch_breaking_it_drops_what_it_holds", 20, HatchTests::breaking);
         tests.test("logistics_hatch_one_a_command_removed_is_forgotten", 20, HatchTests::removedByCommand);
         tests.test("logistics_hatch_jade_shows_its_mode_request_and_station", 20, HatchTests::report);
@@ -343,6 +344,31 @@ final class HatchTests {
                         helper.fail("a hatch set by a command is in the level's hatches as " + hatch.map(Hatches.Hatch::mode), FIRST);
                     }
                     expectJoined(helper, FIRST, 0);
+                })
+                .thenSucceed();
+    }
+
+    /** A command removes a provider with no side effects, leaving its record, and sets a requester there. */
+    private static void staleRecord(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.PROVIDER);
+        insert(helper, FIRST, new ItemStack(Items.COAL, 3));
+        BlockPos at = helper.absolutePos(FIRST);
+        helper.getLevel().setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS);
+        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    var hatch = record(helper, FIRST);
+                    if (hatch.mode() != HatchMode.REQUESTER || count(hatch.contents()) != 0) {
+                        helper.fail("the requester took over the stale provider's record: " + hatch.mode() + " holding "
+                                + count(hatch.contents()), FIRST);
+                    }
+                    int coal = helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(at).inflate(1.5)).stream()
+                            .filter(item -> item.getItem().is(Items.COAL)).mapToInt(item -> item.getItem().getCount()).sum();
+                    if (coal != 3) {
+                        helper.fail("the stale record's coal was not dropped: " + coal, FIRST);
+                    }
                 })
                 .thenSucceed();
     }

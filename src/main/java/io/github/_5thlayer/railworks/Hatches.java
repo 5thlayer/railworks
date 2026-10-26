@@ -14,8 +14,6 @@ import java.util.Optional;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github._5thlayer.railworks.rail.HatchRequest;
-import io.github._5thlayer.railworks.rail.Platform;
-import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -23,7 +21,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Containers;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -55,6 +52,7 @@ public final class Hatches {
             ByteBufCodecs.VAR_INT, HatchRequest::stacks,
             HatchRequest::new);
 
+    /** Every hatch as it is saved, in the order they were placed. */
     public static final Codec<Hatches> CODEC = Entry.CODEC.listOf()
             .xmap(Hatches::read, hatches -> hatches.hatches.values().stream().map(Entry::of).toList());
 
@@ -105,41 +103,6 @@ public final class Hatches {
     /** Every hatch, in the order they were placed. */
     public Collection<Hatch> all() {
         return Collections.unmodifiableCollection(new ArrayList<>(hatches.values()));
-    }
-
-    /**
-     * The hatches of {@code level} that join {@code station}, asked afresh. A record whose block is
-     * loaded but no longer a hatch, as after a command replaced it with no side effects, is stale and
-     * taken out, its contents lost with the block as a chest's are.
-     */
-    public List<Hatch> joinedTo(ServerLevel level, Station station) {
-        List<Hatch> joined = new ArrayList<>();
-        for (Hatch hatch : all()) {
-            BlockPos pos = hatch.pos();
-            if (!Platform.near(station, pos.getX(), pos.getY(), pos.getZ())) {
-                continue;
-            }
-            if (level.isLoaded(pos) && !level.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
-                remove(pos);
-                continue;
-            }
-            if (PlatformsNear.joined(level, pos).filter(at -> at.station().samePlace(station)).isPresent()) {
-                joined.add(hatch);
-            }
-        }
-        return joined;
-    }
-
-    /** Drops everything {@code hatch} holds at the centre of its block, as the block is removed. */
-    public static void drop(Level level, Hatch hatch) {
-        ItemStacksResourceHandler contents = hatch.contents();
-        BlockPos pos = hatch.pos();
-        for (int slot = 0; slot < contents.size(); slot++) {
-            ItemStack stack = contents.getResource(slot).toStack(contents.getAmountAsInt(slot));
-            if (!stack.isEmpty()) {
-                Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, stack);
-            }
-        }
     }
 
     private static Hatches read(List<Entry> entries) {
@@ -215,6 +178,16 @@ public final class Hatches {
         public void clearRequest() {
             request = Optional.empty();
             hatches.onChange.run();
+        }
+
+        /** Drops everything it holds at the centre of its block, as the block is removed. */
+        public void drop(Level level) {
+            for (int slot = 0; slot < contents.size(); slot++) {
+                ItemStack stack = contents.getResource(slot).toStack(contents.getAmountAsInt(slot));
+                if (!stack.isEmpty()) {
+                    Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, stack);
+                }
+            }
         }
     }
 

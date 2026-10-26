@@ -54,7 +54,12 @@ public final class Platform {
      * The blocks beside one car spot on one side of the Rail, the two a hatch may stand in there,
      * and whether the Line runs along x there, rather than z.
      */
-    public record Side(int spot, List<Beside> blocks, boolean alongX) {
+    public record Side(List<Beside> blocks, boolean alongX) {
+
+        /** The car spot it is beside. */
+        public int spot() {
+            return blocks.getFirst().spot();
+        }
     }
 
     /** Some of one Span the platform covers, as how far along it from its first end, low to high. */
@@ -254,7 +259,7 @@ public final class Platform {
                         left.remove(pair);
                         side.add(pair);
                     });
-            sides.add(new Side(one.spot(), List.copyOf(side), alongX));
+            sides.add(new Side(List.copyOf(side), alongX));
         }
         return sides;
     }

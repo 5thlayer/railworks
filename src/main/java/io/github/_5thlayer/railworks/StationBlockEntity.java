@@ -63,7 +63,7 @@ public final class StationBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel server)) {
             return 0;
         }
-        return LevelHatches.of(server).joinedTo(server, station()).size();
+        return PlatformsNear.joinedTo(server, station()).size();
     }
 
     /** Puts itself in the level's Stations under its name, on a server. */

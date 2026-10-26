@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import io.github._5thlayer.railworks.client.ClientRails;
 import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.RailNetwork;
@@ -28,6 +29,11 @@ public final class PlatformsNear {
     private static final double HALF_GAP = (CarBody.PITCH - CarBody.LENGTH) / 2.0;
 
     private PlatformsNear() {
+    }
+
+    /** The Rail on this side: the level's on a server, and on a client the Spans it was sent. */
+    static RailNetwork network(Level level) {
+        return level instanceof ServerLevel server ? LevelRails.of(server).network() : ClientRails.network();
     }
 
     /**
@@ -58,7 +64,7 @@ public final class PlatformsNear {
 
     /** Which Station a hatch at {@code pos} joins or would join, and at which car spot; empty beside no car spot. */
     public static Optional<Platform.Joined> joined(Level level, BlockPos pos) {
-        return Platform.joined(StationItem.networkOf(level), stations(level, pos), pos.getX(), pos.getY(), pos.getZ());
+        return Platform.joined(network(level), stations(level, pos), pos.getX(), pos.getY(), pos.getZ());
     }
 
     /**
@@ -68,7 +74,7 @@ public final class PlatformsNear {
      * short of its spot's ends, so the spots read as the cars that will stand there.
      */
     public static List<AABB> freeSpots(Level level, BlockPos pos) {
-        RailNetwork network = StationItem.networkOf(level);
+        RailNetwork network = network(level);
         List<AABB> boxes = new ArrayList<>();
         for (Station station : stations(level, pos)) {
             Platform.of(network, station).ifPresent(platform -> {
@@ -92,6 +98,31 @@ public final class PlatformsNear {
             });
         }
         return boxes;
+    }
+
+    /**
+     * The hatches of {@code level} that join {@code station}, asked afresh. A record whose block is
+     * loaded but no longer a hatch, as after a command replaced it with no side effects, is stale: it
+     * is taken out and what it held dropped there, as {@link HatchBlockEntity} drops one it loads over.
+     */
+    public static List<Hatches.Hatch> joinedTo(ServerLevel level, Station station) {
+        Hatches hatches = LevelHatches.of(level);
+        List<Hatches.Hatch> joined = new ArrayList<>();
+        for (Hatches.Hatch hatch : hatches.all()) {
+            BlockPos pos = hatch.pos();
+            if (!Platform.near(station, pos.getX(), pos.getY(), pos.getZ())) {
+                continue;
+            }
+            if (level.isLoaded(pos) && !level.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
+                hatches.remove(pos);
+                hatch.drop(level);
+                continue;
+            }
+            if (joined(level, pos).filter(at -> at.station().samePlace(station)).isPresent()) {
+                joined.add(hatch);
+            }
+        }
+        return joined;
     }
 
     private static BlockPos block(Platform.Beside beside) {

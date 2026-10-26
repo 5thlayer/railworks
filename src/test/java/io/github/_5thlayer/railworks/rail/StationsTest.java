@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -121,7 +122,7 @@ class StationsTest {
     }
 
     /** The same, with the Spans {@code taken} says another Train holds. */
-    private int settled(Train train, java.util.function.Predicate<Span> taken) {
+    private int settled(Train train, Predicate<Span> taken) {
         int ticks = 0;
         while (ticks < 100 && stations.settle(network, train, taken)) {
             ticks++;

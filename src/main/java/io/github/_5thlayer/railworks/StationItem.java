@@ -8,12 +8,9 @@ import java.util.Optional;
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
-import io.github._5thlayer.railworks.client.ClientRails;
-import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
@@ -36,14 +33,10 @@ public final class StationItem extends BlockItem implements PlansPlacement {
         super(block, properties);
     }
 
-    static RailNetwork networkOf(Level level) {
-        return level instanceof ServerLevel server ? LevelRails.of(server).network() : ClientRails.network();
-    }
-
     private static Optional<StationPlacement.Refused> refusal(BlockPlaceContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
-        return StationPlacement.refusal(networkOf(level), PlatformsNear.stations(level, pos), pos);
+        return StationPlacement.refusal(PlatformsNear.network(level), PlatformsNear.stations(level, pos), pos);
     }
 
     @Override

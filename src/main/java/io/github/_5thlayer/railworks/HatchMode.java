@@ -19,6 +19,7 @@ public enum HatchMode implements StringRepresentable {
     PROVIDER, REQUESTER;
 
     public static final Codec<HatchMode> CODEC = StringRepresentable.fromEnum(HatchMode::values);
+    /** A mode as it is sent to a client. */
     public static final StreamCodec<ByteBuf, HatchMode> STREAM_CODEC =
             ByteBufCodecs.idMapper(ordinal -> values()[ordinal], HatchMode::ordinal);
 

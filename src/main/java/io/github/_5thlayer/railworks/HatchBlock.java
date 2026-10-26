@@ -85,7 +85,7 @@ public final class HatchBlock extends Block implements EntityBlock {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (level instanceof ServerLevel server) {
             Hatches hatches = LevelHatches.of(server);
-            hatches.remove(pos).ifPresent(stale -> Hatches.drop(server, stale));
+            hatches.remove(pos).ifPresent(stale -> stale.drop(server));
             hatches.put(pos, state.getValue(MODE));
         }
     }

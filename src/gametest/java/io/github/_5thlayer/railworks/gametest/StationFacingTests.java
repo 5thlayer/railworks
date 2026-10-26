@@ -10,6 +10,7 @@ import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.railworks.CargoCarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
+import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlock;
@@ -24,6 +25,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * A Station faces the way it serves (ADR 0008): placed by a real player beside {@link LocomotiveTests}'
@@ -59,6 +62,8 @@ final class StationFacingTests {
                 helper -> serves(helper, NORTH, Direction.EAST, false));
         tests.testDrivingLeft("logistics_station_driving_left_south_of_the_rail_serves_trains_heading_west", 20,
                 helper -> serves(helper, SOUTH, Direction.WEST, true));
+        tests.test("logistics_station_a_train_at_rest_by_it_settles_onto_its_mark", 60, helper -> settles(helper, false));
+        tests.test("logistics_station_a_train_with_its_driver_seated_does_not_settle", 60, helper -> settles(helper, true));
     }
 
     private static void refusedUnder(GameTestHelper helper) {
@@ -118,6 +123,43 @@ final class StationFacingTests {
                     // Still pointing its way a tick after it loaded and looked again.
                     if (helper.getBlockState(pos).getValue(StationBlock.FACING) != facing) {
                         helper.fail("the Station's arrow turned to " + helper.getBlockState(pos).getValue(StationBlock.FACING), pos);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A Train at rest by a Station, short of its mark: with nobody in its Locomotive it eases onto the
+     * mark, and with a driver seated, pressing nothing, it stays where it was brought to rest.
+     */
+    private static void settles(GameTestHelper helper, boolean seated) {
+        CargoCarEntity cargo = CargoAccessTests.cargoBehindLocomotive(helper);
+        var train = cargo.train();
+        if (seated) {
+            ServerPlayer driver = helper.makeMockServerPlayerInLevel();
+            driver.setGameMode(GameType.SURVIVAL);
+            var locomotive = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class,
+                    new AABB(helper.absolutePos(NORTH)).inflate(8.0)).getFirst();
+            locomotive.interact(driver, InteractionHand.MAIN_HAND, Vec3.ZERO);
+            if (driver.getVehicle() != locomotive) {
+                helper.fail("the driver did not board the Locomotive", NORTH);
+                return;
+            }
+        }
+        var start = train.head();
+        CargoAccessTests.station(helper, NORTH);
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    var network = LevelRails.of(helper.getLevel()).network();
+                    var stations = LevelStations.of(helper.getLevel()).stations();
+                    boolean moved = !train.head().equals(start);
+                    if (seated && moved) {
+                        helper.fail("a Train with its driver seated moved from " + start + " to " + train.head(), NORTH);
+                    }
+                    if (!seated && (!moved || stations.settle(network, train, span -> false))) {
+                        helper.fail("a Train at rest by the Station did not settle onto its mark: from " + start
+                                + " to " + train.head(), NORTH);
                     }
                 })
                 .thenSucceed();
