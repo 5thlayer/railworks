@@ -101,7 +101,7 @@ public final class Trains {
         Slot nearest = null;
         double best = COUPLING_REACH * COUPLING_REACH;
         for (Train train : trains) {
-            if (train.speed() != 0.0) {
+            if (!train.atRest()) {
                 continue;
             }
             for (Train.End end : Train.End.values()) {
@@ -109,7 +109,7 @@ public final class Trains {
                 if (place == null) {
                     continue;
                 }
-                double distance = distanceSquared(place.point(), aim);
+                double distance = distanceSquared(place.point(network), aim);
                 if (distance <= best) {
                     best = distance;
                     nearest = new Slot(train, end, place);

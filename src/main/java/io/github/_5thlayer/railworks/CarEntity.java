@@ -11,6 +11,7 @@ import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.RailCurve;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Train;
@@ -27,6 +28,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.InterpolationHandler;
@@ -53,7 +55,7 @@ import org.jspecify.annotations.Nullable;
  * The view of a Train's first car runs the Train's tick and moves the other cars' views with it.
  *
  * <p>Using a car boards it. Sneaking at it opens its menu, as does the inventory key while riding;
- * sneaking gets off. Shears uncouple it from the car on the side used, parting a Train at rest in
+ * sneaking gets off. A kind of car nobody rides, the Cargo car, opens its menu when used instead. Shears uncouple it from the car on the side used, parting a Train at rest in
  * two. A player leading a mob puts the mob in instead, and a lead used on a car carrying a mob leads
  * it out. A car comes off the Rail, dropping itself and what it holds, when a Span its Train stands
  * on is cut.
@@ -228,19 +230,15 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (car == null || !(level() instanceof ServerLevel server)) {
             return;
         }
-        Place place = train.facing(LevelRails.of(server).network(), car);
-        Vec3 rail = CarPlacement.railPoint(place);
+        // On the Span's curve, heading and pitched the way it runs there toward the car's front.
+        RailNetwork network = LevelRails.of(server).network();
+        RailCurve.Pose pose = train.facing(network, car).pose(network);
+        Vec3 rail = CarPlacement.railPoint(pose.point());
         double speed = train.reversed(car) ? -train.speed() : train.speed();
-        Arm front = place.front();
-        Arm back = place.back();
-        double dx = front.x() - back.x();
-        double dy = front.y() - back.y();
-        double dz = front.z() - back.z();
-        double horizontal = Math.sqrt(dx * dx + dz * dz);
-        setYRot((float) (Mth.atan2(-dx, dz) * Mth.RAD_TO_DEG));
-        setXRot((float) (-Mth.atan2(dy, horizontal) * Mth.RAD_TO_DEG));
-        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        setDeltaMovement(dx / length * speed, dy / length * speed, dz / length * speed);
+        double horizontal = Math.sqrt(pose.dx() * pose.dx() + pose.dz() * pose.dz());
+        setYRot((float) (Mth.atan2(-pose.dx(), pose.dz()) * Mth.RAD_TO_DEG));
+        setXRot((float) (-Mth.atan2(pose.dy(), horizontal) * Mth.RAD_TO_DEG));
+        setDeltaMovement(pose.dx() * speed, pose.dy() * speed, pose.dz() * speed);
         setPos(rail.x, rail.y, rail.z);
     }
 
@@ -293,12 +291,14 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
             }
             return InteractionResult.SUCCESS;
         }
+        // A car nobody rides is used for what it holds: its own use of the item in hand, else its menu.
+        if (!rideable()) {
+            InteractionResult used = useHeld(player, hand, held);
+            return used != InteractionResult.PASS ? used : openMenu(player);
+        }
         // Sneaking at the car from outside opens its menu.
         if (player.isSecondaryUseActive()) {
-            if (!level().isClientSide()) {
-                openCustomInventoryScreen(player);
-            }
-            return InteractionResult.SUCCESS;
+            return openMenu(player);
         }
         if (held.is(Items.LEAD) && getFirstPassenger() instanceof Mob mob && mob instanceof Leashable leashable
                 && leashable.canBeLeashed()) {
@@ -326,7 +326,22 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return InteractionResult.SUCCESS;
     }
 
-    /** What this kind of car does with {@code held} before boarding; PASS to board. */
+    private InteractionResult openMenu(Player player) {
+        if (!level().isClientSide()) {
+            openCustomInventoryScreen(player);
+        }
+        return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * Whether players and led mobs board this kind of car: the one switch for riding it. One nobody
+     * rides opens its menu when used.
+     */
+    protected boolean rideable() {
+        return true;
+    }
+
+    /** What this kind of car does with {@code held} before boarding, or before its menu opens; PASS to go on. */
     protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
         return InteractionResult.PASS;
     }
@@ -405,7 +420,14 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
 
     @Override
     protected boolean canAddPassenger(Entity passenger) {
-        return getPassengers().isEmpty();
+        return rideable() && getPassengers().isEmpty();
+    }
+
+    /** The seat stands square to the car's floor, so a rider leans back on a climb and forward on a descent. */
+    @Override
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
+        Vec3 seat = getDefaultPassengerAttachmentPoint(this, passenger, dimensions.attachments()).yRot(getYRot() * Mth.DEG_TO_RAD);
+        return seat.xRot(-getXRot() * Mth.DEG_TO_RAD).yRot(-getYRot() * Mth.DEG_TO_RAD);
     }
 
     // No getControllingPassenger: the server drives the car, and a controlling passenger would make

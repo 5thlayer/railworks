@@ -35,6 +35,9 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     /** Rust red, as the Rail's, with the six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
 
+    /** How far a box that meets another stops short of the other's faces. */
+    private static final float INSET = 0.01F;
+
     private final boolean cargo;
 
     private CarRenderer(EntityRendererProvider.Context context, boolean cargo) {
@@ -71,22 +74,28 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         poseStack.mulPose(Axis.YP.rotationDegrees(-state.yRot));
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
         int light = state.lightCoords;
-        // The skirt down both sides of the web and the floor over it, then the car's own body.
+        // The skirt down both sides of the web and the floor over it, then the car's own body. Where two
+        // boxes meet, one is inset by INSET and reaches into the other, so no two faces share a plane
+        // and the depth test never has to choose between them.
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
             float web = (float) (RailGeometry.WEB_WIDTH / 2.0);
             float skirt = (float) (CarEntity.WIDTH / 2.0);
             float floor = (float) (RailGeometry.WEB_HEIGHT + 0.05);
-            box(pose.pose(), buffer, -skirt, 0.0F, -0.9F, -web - 0.02F, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
-            box(pose.pose(), buffer, web + 0.02F, 0.0F, -0.9F, skirt, floor + 0.2F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+            float in = skirt - INSET;
+            box(pose.pose(), buffer, -in, 0.0F, -0.9F + INSET, -web - 0.02F, floor + 0.2F, 0.9F - INSET,
+                    0.40F, 0.17F, 0.12F, light);
+            box(pose.pose(), buffer, web + 0.02F, 0.0F, -0.9F + INSET, in, floor + 0.2F, 0.9F - INSET,
+                    0.40F, 0.17F, 0.12F, light);
             box(pose.pose(), buffer, -skirt, floor, -0.9F, skirt, floor + 0.15F, 0.9F, 0.62F, 0.27F, 0.18F, light);
             if (cargo) {
-                // A crate the length of the car, its lid lighter so the top reads.
-                box(pose.pose(), buffer, -skirt + 0.05F, floor + 0.15F, -0.85F, skirt - 0.05F, floor + 0.65F, 0.85F,
-                        0.48F, 0.22F, 0.15F, light);
+                // A crate the length of the car, its lid lighter so the top reads; the crate stands in
+                // the floor and its top in the lid.
+                box(pose.pose(), buffer, -skirt + 0.05F + INSET, floor + 0.1F, -0.85F + INSET,
+                        skirt - 0.05F - INSET, floor + 0.67F, 0.85F - INSET, 0.48F, 0.22F, 0.15F, light);
                 box(pose.pose(), buffer, -skirt + 0.05F, floor + 0.65F, -0.85F, skirt - 0.05F, floor + 0.72F, 0.85F,
                         0.62F, 0.27F, 0.18F, light);
             } else {
-                box(pose.pose(), buffer, -0.45F, floor + 0.15F, 0.2F, 0.45F, 1.6F, 0.9F, 0.40F, 0.17F, 0.12F, light);
+                box(pose.pose(), buffer, -0.45F, floor + 0.1F, 0.2F, 0.45F, 1.6F, 0.9F - INSET, 0.40F, 0.17F, 0.12F, light);
                 box(pose.pose(), buffer, -skirt, 2.6F, -0.9F, skirt, 2.75F, 0.9F, 0.62F, 0.27F, 0.18F, light);
             }
         });

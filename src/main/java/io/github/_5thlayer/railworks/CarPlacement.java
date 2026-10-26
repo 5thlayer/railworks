@@ -4,9 +4,9 @@
 package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
-import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.RailCurve;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
@@ -52,9 +52,13 @@ public final class CarPlacement {
         return new AABB(rail.x - half, rail.y, rail.z - half, rail.x + half, rail.y + CarEntity.HEIGHT, rail.z + half);
     }
 
-    /** The world point on the flange's top at {@code place}: where a car's floor rests. */
-    static Vec3 railPoint(Place place) {
-        Place.Point p = place.point();
+    /** The world point on the flange's top at {@code place}, on its Span's curve: where a car's floor rests. */
+    static Vec3 railPoint(RailNetwork network, Place place) {
+        return railPoint(place.point(network));
+    }
+
+    /** The world point on the flange's top over {@code p}, a point in Arm coordinates. */
+    static Vec3 railPoint(Place.Point p) {
         return new Vec3(p.x() + RailGeometry.ATTACH_X, p.y() + RailGeometry.RIDE_Y, p.z() + RailGeometry.ATTACH_Z);
     }
 
@@ -74,16 +78,14 @@ public final class CarPlacement {
             return refused(PlacementPlan.refused(aimedBlock, state, RailworksRefusal.OFF_SPAN));
         }
         Span span = aim.get().span();
-        boolean facesB = facesSecond(span, look);
-        Arm front = facesB ? span.b() : span.a();
-        double toFront = facesB ? span.length() - aim.get().fromA() : aim.get().fromA();
-        Place aimed = new Place(span, front, toFront);
+        Place towardB = new Place(span, span.b(), span.length() - aim.get().fromA());
+        Place aimed = looksAlong(network, towardB, look) ? towardB : towardB.turned();
         Car car = kind.create();
         Coupling coupling = level instanceof ServerLevel server
                 ? serverCoupling(server, network, aimed, car)
                 : clientCoupling(level, network, aimed, kind.length());
         Place place = coupling == null ? aimed : coupling.place();
-        Vec3 rail = railPoint(place);
+        Vec3 rail = railPoint(network, place);
         AABB box = carBox(rail);
         BlockPos at = BlockPos.containing(box.getCenter());
         if (coupling == null ? taken(level, network, Train.of(aimed, car)) : coupling.taken()) {
@@ -96,7 +98,7 @@ public final class CarPlacement {
             return new Result(car, Train.of(aimed, car), null, false, PlacementPlan.accepted(at, state));
         }
         // The car faces the way the player looks along the Rail, which may be against the Train.
-        boolean reversed = facesSecond(place.span(), look) != place.front().equals(place.span().b());
+        boolean reversed = !looksAlong(network, place, look);
         return new Result(car, null, coupling.slot(), reversed, PlacementPlan.accepted(at, state));
     }
 
@@ -104,10 +106,13 @@ public final class CarPlacement {
         return new Result(null, null, null, false, plan);
     }
 
-    /** Whether {@code look} runs toward the Span's second end. The whole vector: a steep Span has almost no horizontal run. */
-    private static boolean facesSecond(Span span, Vec3 look) {
-        return (span.b().x() - span.a().x()) * look.x + (span.b().y() - span.a().y()) * look.y
-                + (span.b().z() - span.a().z()) * look.z >= 0.0;
+    /**
+     * Whether {@code look} runs the way the curve at {@code place} heads, toward its front. The whole
+     * vector: a steep Span has almost no horizontal run.
+     */
+    private static boolean looksAlong(RailNetwork network, Place place, Vec3 look) {
+        RailCurve.Pose pose = place.pose(network);
+        return pose.dx() * look.x + pose.dy() * look.y + pose.dz() * look.z >= 0.0;
     }
 
     /**
@@ -120,7 +125,7 @@ public final class CarPlacement {
 
     private static @Nullable Coupling serverCoupling(ServerLevel level, RailNetwork network, Place aimed, Car car) {
         Trains trains = LevelRails.of(level).trains();
-        Trains.Slot slot = trains.slotNear(network, aimed.point(), car.length());
+        Trains.Slot slot = trains.slotNear(network, aimed.point(network), car.length());
         if (slot == null) {
             return null;
         }
@@ -131,9 +136,9 @@ public final class CarPlacement {
 
     /** The nearest place a client sees a car would couple: past a first or last car of a Train at rest. */
     private static @Nullable Coupling clientCoupling(Level level, RailNetwork network, Place aimed, double length) {
-        Vec3 at = railPoint(aimed);
+        Vec3 at = railPoint(network, aimed);
         AABB around = new AABB(at, at).inflate(CarEntity.HEIGHT + Trains.COUPLING_REACH + 2.0);
-        Place.Point aim = aimed.point();
+        Place.Point aim = aimed.point(network);
         Place best = null;
         double bestDistance = Trains.COUPLING_REACH * Trains.COUPLING_REACH;
         for (CarEntity car : level.getEntitiesOfClass(CarEntity.class, around, CarEntity::seenAtRest)) {
@@ -149,7 +154,7 @@ public final class CarPlacement {
                 if (moved.stopped()) {
                     continue;
                 }
-                Place.Point p = moved.place().point();
+                Place.Point p = moved.place().point(network);
                 double dx = p.x() - aim.x();
                 double dy = p.y() - aim.y();
                 double dz = p.z() - aim.z();

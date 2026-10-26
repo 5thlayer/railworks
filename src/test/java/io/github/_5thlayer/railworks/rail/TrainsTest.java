@@ -57,12 +57,12 @@ class TrainsTest {
         Train train = locomotiveAt(10.0);
         // 1.8 blocks behind the Locomotive's middle, toward A, is where a Cargo car would stand.
         Place aimed = new Place(network.get(A, B), B, 12.0);
-        Trains.Slot slot = trains.slotNear(network, aimed.point(), CargoCar.LENGTH);
+        Trains.Slot slot = trains.slotNear(network, aimed.point(network), CargoCar.LENGTH);
         assertNotNull(slot);
         assertSame(train, slot.train());
         assertEquals(Train.End.BACK, slot.end());
         assertEquals(11.8, slot.place().toFront(), EPS);
-        assertNull(trains.slotNear(network, new Place(network.get(A, B), B, 16.0).point(), CargoCar.LENGTH),
+        assertNull(trains.slotNear(network, new Place(network.get(A, B), B, 16.0).point(network), CargoCar.LENGTH),
                 "too far from either end");
     }
 
@@ -71,14 +71,14 @@ class TrainsTest {
         Train train = locomotiveAt(10.0);
         train.cars().stream().map(Locomotive.class::cast).forEach(l -> l.fuel().light(1_000_000_000L));
         train.tick(network, Throttle.FORWARD, car -> 0L);
-        assertNull(trains.slotNear(network, new Place(network.get(A, B), B, 12.0).point(), CargoCar.LENGTH));
+        assertNull(trains.slotNear(network, new Place(network.get(A, B), B, 12.0).point(network), CargoCar.LENGTH));
     }
 
     @Test
     void couplingReplacesTheTrainWithTheLongerOne() {
         Train train = locomotiveAt(10.0);
         CargoCar cargo = CargoCar.create();
-        Trains.Slot slot = trains.slotNear(network, new Place(network.get(A, B), B, 12.0).point(), CargoCar.LENGTH);
+        Trains.Slot slot = trains.slotNear(network, new Place(network.get(A, B), B, 12.0).point(network), CargoCar.LENGTH);
         Train coupled = trains.couple(network, slot, cargo, false);
         assertEquals(List.of(coupled), trains.all());
         assertSame(coupled, trains.of(cargo.id()));

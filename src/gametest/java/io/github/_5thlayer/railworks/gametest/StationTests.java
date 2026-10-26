@@ -11,8 +11,11 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
+import io.github._5thlayer.railworks.StationItem;
 import io.github._5thlayer.railworks.network.NameStationPacket;
+import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Stations;
@@ -33,10 +36,11 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Stations through the item, the block and a real player: placing one by the Rail, refused off it
- * and in its Clearance, naming it, and the level's Stations following the blocks. Which stretch of a
- * Span a Station serves is {@code StationTest}'s; what only a server shows is that the click asks
- * the level's Spans and that the name survives a save. All of these tests share the {@code station_}
+ * Stations through the item, the block and a real player: placing one by the Rail, refused off it,
+ * in its Clearance and by a bend or a diagonal, with the line it says why, naming it, and the
+ * level's Stations following the blocks. Which stretch of a Span a Station serves is
+ * {@code StationTest}'s, and where Rail is a Straight leg {@code StraightLegTest}'s; what only a
+ * server shows is that the click asks the level's Spans and that the name survives a save. All of these tests share the {@code station_}
  * prefix.
  */
 final class StationTests {
@@ -60,6 +64,10 @@ final class StationTests {
         tests.test("station_places_beside_the_rail_and_under_it", 20, StationTests::placesByTheRail);
         tests.test("station_is_refused_off_the_rail", 20, StationTests::refusedOffRail);
         tests.test("station_is_refused_in_the_clearance", 20, StationTests::refusedInClearance);
+        tests.test("station_is_refused_beside_a_bend", 20, StationTests::refusedBesideBend);
+        tests.test("station_is_refused_by_a_diagonal", 20, StationTests::refusedByDiagonal);
+        tests.test("station_is_refused_near_a_pylon_where_the_span_beyond_bends", 20, StationTests::refusedNearBendBeyond);
+        tests.test("station_places_by_a_straight_climbing_leg", 20, StationTests::placesByClimb);
         tests.test("station_is_named_in_its_menu", 20, StationTests::named);
         tests.test("station_is_not_named_from_out_of_reach", 20, StationTests::notNamedFromAfar);
         tests.test("station_name_is_kept_across_a_save_and_reload", 20, StationTests::nameSaved);
@@ -100,12 +108,63 @@ final class StationTests {
         refused(helper, IN_CLEARANCE, RailworksRefusal.STATION_IN_CLEARANCE);
     }
 
-    private static void refused(GameTestHelper helper, BlockPos pos, RailworksRefusal expected) {
+    private static void refusedBesideBend(GameTestHelper helper) {
         ServerPlayer player = player(helper);
+        // On from B, off line: the Rail bends through B, all along A to B.
+        network(helper).add(Span.of(arm(helper, B), arm(helper, new BlockPos(13, 1, 7)), 6));
+        refused(helper, player, BESIDE, RailworksRefusal.STATION_NOT_STRAIGHT);
+    }
+
+    private static void refusedByDiagonal(GameTestHelper helper) {
+        ServerPlayer player = player(helper);
+        network(helper).remove(arm(helper, A), arm(helper, B));
+        network(helper).add(Span.of(arm(helper, new BlockPos(1, 1, 1)), arm(helper, new BlockPos(7, 1, 7)), 9));
+        refused(helper, player, new BlockPos(4, 1, 3), RailworksRefusal.STATION_NOT_STRAIGHT);
+    }
+
+    private static void refusedNearBendBeyond(GameTestHelper helper) {
+        ServerPlayer player = player(helper);
+        // B on to C in line, then off line at C: A to B stays straight, B to C bends.
+        BlockPos c = new BlockPos(13, 1, 3);
+        network(helper).add(Span.of(arm(helper, B), arm(helper, c), 4));
+        network(helper).add(Span.of(arm(helper, c), arm(helper, new BlockPos(17, 1, 7)), 6));
+        // By B, the stretch reaches over it onto B to C; two blocks short of it, it stays on A to B.
+        BlockPos byPylon = new BlockPos(9, 1, 2);
+        PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, byPylon));
+        if (plan == null || !plan.isRefused() || plan.refusal() != RailworksRefusal.STATION_NOT_STRAIGHT) {
+            helper.fail("a Station by B planned " + plan + ", not refused for the bend beyond B", byPylon);
+            return;
+        }
+        BlockPos shortOfPylon = new BlockPos(7, 1, 2);
+        if (!place(helper, player, shortOfPylon).consumesAction()
+                || !helper.getBlockState(shortOfPylon).is(RailworksRegistries.STATION.get())) {
+            helper.fail("a Station two blocks short of B, by straight Rail, was refused", shortOfPylon);
+        }
+        helper.succeed();
+    }
+
+    private static void placesByClimb(GameTestHelper helper) {
+        ServerPlayer player = player(helper);
+        network(helper).remove(arm(helper, A), arm(helper, B));
+        network(helper).add(Span.of(arm(helper, A), arm(helper, B.above()), 9));
+        if (!place(helper, player, UNDER).consumesAction() || !helper.getBlockState(UNDER).is(RailworksRegistries.STATION.get())) {
+            helper.fail("a Station under a straight climbing leg did not place", UNDER);
+        }
+        helper.succeed();
+    }
+
+    private static void refused(GameTestHelper helper, BlockPos pos, RailworksRefusal expected) {
+        refused(helper, player(helper), pos, expected);
+    }
+
+    private static void refused(GameTestHelper helper, ServerPlayer player, BlockPos pos, RailworksRefusal expected) {
         PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, pos));
         if (plan == null || !plan.isRefused() || plan.refusal() != expected) {
             helper.fail("a Station at " + pos + " planned " + plan + ", not refused " + expected, pos);
             return;
+        }
+        if (!StationItem.messageKey(expected).equals("message.railworks." + expected.name().toLowerCase(java.util.Locale.ROOT))) {
+            helper.fail("a Station refused for " + expected + " says " + StationItem.messageKey(expected), pos);
         }
         if (place(helper, player, pos).consumesAction()
                 || !helper.getBlockState(pos).isAir() || player.getMainHandItem().getCount() != 4) {
@@ -218,6 +277,14 @@ final class StationTests {
 
     private static Span span(GameTestHelper helper) {
         return Span.of(PylonColumn.arm(helper.absolutePos(A)), PylonColumn.arm(helper.absolutePos(B)), 8);
+    }
+
+    private static RailNetwork network(GameTestHelper helper) {
+        return LevelRails.of(helper.getLevel()).network();
+    }
+
+    private static Arm arm(GameTestHelper helper, BlockPos pos) {
+        return PylonColumn.arm(helper.absolutePos(pos));
     }
 
     private static Stations stations(GameTestHelper helper) {

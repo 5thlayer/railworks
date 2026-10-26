@@ -12,7 +12,9 @@ class SpanAimTest {
 
     private static final Arm A = new Arm(0, 5, 0);
     private static final Arm B = new Arm(20, 5, 0);
-    private static final Arm C = new Arm(0, 5, 10);
+    /** Apart from A, so neither Span bends the other. */
+    private static final Arm C = new Arm(0, 5, 2);
+    private static final Arm D = new Arm(0, 5, 12);
 
     private final RailNetwork network = new RailNetwork();
 
@@ -48,9 +50,9 @@ class SpanAimTest {
     @Test
     void theNearerOfTwoSpansWins() {
         network.add(Span.of(A, B, 20));
-        network.add(Span.of(A, C, 10));
+        network.add(Span.of(C, D, 10));
         var aim = SpanAim.nearest(network, 0, 0, 5, 0, 1, 0, 8, 0.5).orElseThrow();
-        assertEquals(Span.of(A, C, 10), aim.span());
-        assertEquals(5.0, aim.fromA(), 1e-9);
+        assertEquals(Span.of(C, D, 10), aim.span());
+        assertEquals(3.0, aim.fromA(), 1e-9);
     }
 }

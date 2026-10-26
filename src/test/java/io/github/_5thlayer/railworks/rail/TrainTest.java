@@ -219,7 +219,7 @@ class TrainTest {
     @Test
     void itsPointIsOnTheSpanBetweenTheArms() {
         Train train = train(network.get(A, B), B, 5.0);
-        var p = train.head().point();
+        var p = train.head().point(network);
         assertEquals(15.0, p.x(), EPS);
         assertEquals(5.0, p.y(), EPS);
         assertEquals(0.0, p.z(), EPS);

@@ -1,0 +1,165 @@
+// SPDX-FileCopyrightText: 2026 5thlayer
+// SPDX-License-Identifier: MIT
+
+package io.github._5thlayer.railworks.rail;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+/** Where Rail is a straight leg, square to the blocks, so a Cargo car loads there. */
+class StraightLegTest {
+
+    private static final Arm A = new Arm(0, 5, 0);
+    private static final Arm B = new Arm(10, 5, 0);
+    private static final Arm IN_LINE = new Arm(20, 5, 0);
+    private static final Arm OFF_LINE = new Arm(18, 5, 6);
+
+    private final RailNetwork network = new RailNetwork();
+
+    private Span string(Arm one, Arm other) {
+        Span span = Span.of(one, other, 10);
+        network.add(span);
+        return span;
+    }
+
+    /** {@code fromA} along {@code span} from its first Arm, heading for its second. */
+    private static Place along(Span span, double fromA) {
+        return new Place(span, span.b(), span.length() - fromA);
+    }
+
+    @Test
+    void aSpanWithALinesEndAtEachArmIsStraight() {
+        assertTrue(StraightLeg.loads(network, string(A, B)));
+    }
+
+    @Test
+    void spansCarryingOnInLineAreStraight() {
+        Span ab = string(A, B);
+        Span on = string(B, IN_LINE);
+        assertTrue(StraightLeg.loads(network, ab));
+        assertTrue(StraightLeg.loads(network, on));
+    }
+
+    @Test
+    void aBendAtAnArmBendsBothSpansThere() {
+        Span ab = string(A, B);
+        Span off = string(B, OFF_LINE);
+        assertFalse(StraightLeg.straight(network, ab));
+        assertFalse(StraightLeg.straight(network, off));
+    }
+
+    @Test
+    void aBendTwoArmsAwayLeavesASpanStraight() {
+        Span ab = string(A, B);
+        string(B, IN_LINE);
+        string(IN_LINE, new Arm(26, 5, 6));
+        assertTrue(StraightLeg.loads(network, ab));
+    }
+
+    @Test
+    void aSpanDoublingBackIsABend() {
+        Span ab = string(A, B);
+        string(B, new Arm(4, 5, 0));
+        assertFalse(StraightLeg.straight(network, ab));
+    }
+
+    @Test
+    void aStraightDiagonalIsNotSquareToTheBlocks() {
+        Span diagonal = string(A, new Arm(8, 5, 8));
+        assertTrue(StraightLeg.straight(network, diagonal));
+        assertFalse(StraightLeg.loads(network, diagonal));
+    }
+
+    @Test
+    void aClimbingSpanAlongTheBlocksLoads() {
+        assertTrue(StraightLeg.loads(network, string(A, new Arm(10, 7, 0))));
+    }
+
+    @Test
+    void aBodyAcrossAnArmNeedsBothSpansStraight() {
+        Span ab = string(A, B);
+        string(B, IN_LINE);
+        assertTrue(StraightLeg.under(network, along(ab, 9.5), 1.8));
+        network.remove(B, IN_LINE);
+        string(B, OFF_LINE);
+        assertFalse(StraightLeg.under(network, along(ab, 9.5), 1.8));
+        assertFalse(StraightLeg.under(network, along(ab, 2.0), 1.8));
+    }
+
+    @Test
+    void aBodyStoppedAtALinesEndIsAskedOnlyOfTheRailUnderIt() {
+        // A to B bends at A; B on to a line's end a block further is straight.
+        string(A, B);
+        string(A, new Arm(0, 5, 6));
+        Arm end = new Arm(11, 5, 0);
+        Span last = string(B, end);
+        // A car stopped with its centre at the line's end reaches 0.9 back, all on the last Span.
+        assertTrue(StraightLeg.under(network, new Place(last, end, 0.0), 1.8));
+        assertFalse(StraightLeg.under(network, new Place(last, end, 0.0), 2.4));
+    }
+
+    @Test
+    void eachCarOfATrainIsAskedWhereItStands() {
+        // A to B straight; B on to IN_LINE bent at IN_LINE.
+        string(A, B);
+        Span bent = string(B, IN_LINE);
+        string(IN_LINE, OFF_LINE);
+        // The Locomotive just past B, on the bent Span; its Cargo car behind it, wholly before B.
+        Train train = Train.of(along(bent, 0.5), List.of(Locomotive.burner(), CargoCar.create()));
+        assertFalse(StraightLeg.under(network, train, train.cars().getFirst()));
+        assertTrue(StraightLeg.under(network, train, train.cars().getLast()));
+    }
+
+    /** A Station beside the Rail at ride height, {@code x} blocks along it, on the side z is 1. */
+    private static Station beside(int x, int y) {
+        return new Station(x, y, 1, "Mine");
+    }
+
+    @Test
+    void aStationByAStraightLegIsAtOne() {
+        string(A, B);
+        assertTrue(StraightLeg.at(network, beside(5, 6)));
+    }
+
+    @Test
+    void aStationByASpanBentThroughAnArmIsNot() {
+        string(A, B);
+        string(B, OFF_LINE);
+        assertFalse(StraightLeg.at(network, beside(5, 6)));
+    }
+
+    @Test
+    void aStationNearAPylonIsNotWhereItsStretchReachesABentSpanBeyond() {
+        // A to B straight; B on to IN_LINE in line, but bent at IN_LINE.
+        string(A, B);
+        string(B, IN_LINE);
+        string(IN_LINE, new Arm(26, 5, 6));
+        // By B the stretch reaches a block on over it; a block short, it ends at B.
+        assertFalse(StraightLeg.at(network, beside(10, 6)));
+        assertTrue(StraightLeg.at(network, beside(9, 6)));
+    }
+
+    @Test
+    void aStationByADiagonalIsNot() {
+        Span diagonal = string(A, new Arm(8, 5, 8));
+        Station station = new Station(4, 6, 3, "Mine");
+        assertTrue(station.foot(network).isPresent());
+        assertFalse(StraightLeg.at(network, station));
+        assertTrue(StraightLeg.straight(network, diagonal));
+    }
+
+    @Test
+    void aStationByAClimbingLegIsAtOne() {
+        string(A, new Arm(10, 7, 0));
+        assertTrue(StraightLeg.at(network, beside(5, 7)));
+    }
+
+    @Test
+    void aStationByNoRailIsNot() {
+        assertFalse(StraightLeg.at(network, beside(5, 6)));
+    }
+}

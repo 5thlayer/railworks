@@ -19,4 +19,6 @@ public enum RailworksRefusal implements Refusal {
     STATION_OFF_RAIL,
     /** A Station in the Clearance of the Span it would serve, where a passing car would hit it. */
     STATION_IN_CLEARANCE,
+    /** A Station by Rail that bends or runs on a diagonal along its stretch, where no Cargo car would load. */
+    STATION_NOT_STRAIGHT,
 }
