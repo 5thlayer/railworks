@@ -87,9 +87,6 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         }
     };
 
-    /** How many have its menu open, on the server: a chest sounds for the first to open it and the last to close it. */
-    private int openers;
-
     /** Whether it loads where it stands, for a client: the overlay draws by it. */
     private static final EntityDataAccessor<Boolean> DATA_LOADING =
             SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
@@ -100,6 +97,9 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     /** The game time {@link #loading()} last asked the Stations and the Rail at, and what they said. */
     private long loadingAskedAt = Long.MIN_VALUE;
     private boolean loadingWhenAsked;
+
+    /** How many have its menu open, on the server: a chest sounds for the first to open it and the last to close it. */
+    private int openers;
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -236,9 +236,11 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
      */
     private void sendPlaceSound(ServerPlayer placer, BlockPos pos) {
         SoundType type = level().getBlockState(pos).getSoundType(level(), pos, placer);
-        placer.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(type.getPlaceSound()), SoundSource.BLOCKS,
-                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
-                (type.getVolume() + 1.0F) / 2.0F, type.getPitch() * 0.8F, random.nextLong()));
+        // BlockItem's volume and pitch for a placed block.
+        float volume = (type.getVolume() + 1.0F) / 2.0F;
+        float pitch = type.getPitch() * 0.8F;
+        placer.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(type.getPlaceSound()),
+                SoundSource.BLOCKS, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, volume, pitch, random.nextLong()));
     }
 
     private static void refuse(Player player, String message) {
@@ -321,6 +323,7 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         cargo.clearContent();
     }
 
+    /** Someone opened its menu: a chest's open sound for the first, and a chest boat's game event. */
     private void opened(ContainerUser user) {
         if (openers++ == 0) {
             chestSound(SoundEvents.CHEST_OPEN);
@@ -328,6 +331,7 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         level().gameEvent(GameEvent.CONTAINER_OPEN, position(), GameEvent.Context.of(user.getLivingEntity()));
     }
 
+    /** Someone closed its menu: a chest's close sound for the last, and a chest boat's game event. */
     private void closed(ContainerUser user) {
         if (openers > 0 && --openers == 0) {
             chestSound(SoundEvents.CHEST_CLOSE);
