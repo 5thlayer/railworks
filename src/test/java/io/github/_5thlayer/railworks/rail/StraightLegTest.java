@@ -6,11 +6,9 @@ package io.github._5thlayer.railworks.rail;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
-
 import org.junit.jupiter.api.Test;
 
-/** Where Rail is a straight leg, square to the blocks, so a Cargo car loads there. */
+/** Where Rail is a Straight leg: straight, and square to the blocks. */
 class StraightLegTest {
 
     private static final Arm A = new Arm(0, 5, 0);
@@ -33,15 +31,15 @@ class StraightLegTest {
 
     @Test
     void aSpanWithALinesEndAtEachArmIsStraight() {
-        assertTrue(StraightLeg.loads(network, string(A, B)));
+        assertTrue(StraightLeg.is(network, string(A, B)));
     }
 
     @Test
     void spansCarryingOnInLineAreStraight() {
         Span ab = string(A, B);
         Span on = string(B, IN_LINE);
-        assertTrue(StraightLeg.loads(network, ab));
-        assertTrue(StraightLeg.loads(network, on));
+        assertTrue(StraightLeg.is(network, ab));
+        assertTrue(StraightLeg.is(network, on));
     }
 
     @Test
@@ -57,7 +55,7 @@ class StraightLegTest {
         Span ab = string(A, B);
         string(B, IN_LINE);
         string(IN_LINE, new Arm(26, 5, 6));
-        assertTrue(StraightLeg.loads(network, ab));
+        assertTrue(StraightLeg.is(network, ab));
     }
 
     @Test
@@ -71,12 +69,12 @@ class StraightLegTest {
     void aStraightDiagonalIsNotSquareToTheBlocks() {
         Span diagonal = string(A, new Arm(8, 5, 8));
         assertTrue(StraightLeg.straight(network, diagonal));
-        assertFalse(StraightLeg.loads(network, diagonal));
+        assertFalse(StraightLeg.is(network, diagonal));
     }
 
     @Test
     void aClimbingSpanAlongTheBlocksLoads() {
-        assertTrue(StraightLeg.loads(network, string(A, new Arm(10, 7, 0))));
+        assertTrue(StraightLeg.is(network, string(A, new Arm(10, 7, 0))));
     }
 
     @Test
@@ -100,18 +98,6 @@ class StraightLegTest {
         // A car stopped with its centre at the line's end reaches 0.9 back, all on the last Span.
         assertTrue(StraightLeg.under(network, new Place(last, end, 0.0), 1.8));
         assertFalse(StraightLeg.under(network, new Place(last, end, 0.0), 2.4));
-    }
-
-    @Test
-    void eachCarOfATrainIsAskedWhereItStands() {
-        // A to B straight; B on to IN_LINE bent at IN_LINE.
-        string(A, B);
-        Span bent = string(B, IN_LINE);
-        string(IN_LINE, OFF_LINE);
-        // The Locomotive just past B, on the bent Span; its Cargo car behind it, wholly before B.
-        Train train = Train.of(along(bent, 0.5), List.of(Locomotive.burner(), CargoCar.create()));
-        assertFalse(StraightLeg.under(network, train, train.cars().getFirst()));
-        assertTrue(StraightLeg.under(network, train, train.cars().getLast()));
     }
 
     /** A Station beside the Rail at ride height, {@code x} blocks along it, on the side z is 1. */

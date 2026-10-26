@@ -331,7 +331,15 @@ public final class Train {
      */
     public void tick(RailNetwork network, Throttle throttle, Car driven, ToLongFunction<Locomotive> ignite,
                      Predicate<Span> taken) {
-        int push = throttle.sign() * (reversed(driven) ? -1 : 1);
+        tick(network, throttle.sign() * (reversed(driven) ? -1 : 1), true, ignite, taken);
+    }
+
+    /**
+     * One tick pushed {@code push}, +1 the Train's heading and -1 against it: those Locomotives facing
+     * that way pull, or, {@code eitherFacing}, those facing the other way when none of them pays.
+     */
+    void tick(RailNetwork network, int push, boolean eitherFacing, ToLongFunction<Locomotive> ignite,
+              Predicate<Span> taken) {
         if (push == 0) {
             coast();
         } else if (speed * push < 0) {
@@ -339,7 +347,7 @@ public final class Train {
         } else if (blocked(network, push, taken)) {
             coast();
         } else {
-            double pulling = pay(push, ignite);
+            double pulling = eitherFacing ? pay(push, ignite) : pay(push, true, ignite);
             if (pulling <= 0.0) {
                 // Out of fuel the brakes take it down: coasting on friction alone would run a fast
                 // Train on for minutes.
@@ -359,15 +367,20 @@ public final class Train {
         speed = towardZero(speed, LocomotiveSpec.friction());
     }
 
-    /** Its Locomotives' brakes over its whole mass: a lone Locomotive brakes at the configured rate. */
+    /** Slows it by {@link #brakingRate()}, to a stop and no further. */
     private void brake() {
+        speed = towardZero(speed, brakingRate());
+    }
+
+    /** Its Locomotives' brakes over its whole mass, in blocks a tick squared: a lone Locomotive brakes at the configured rate. */
+    double brakingRate() {
         double braking = 0.0;
         for (Car car : cars) {
             if (car instanceof Locomotive) {
                 braking += car.mass();
             }
         }
-        speed = towardZero(speed, LocomotiveSpec.braking() * (braking / mass()));
+        return LocomotiveSpec.braking() * (braking / mass());
     }
 
     private static double towardZero(double value, double by) {
@@ -393,6 +406,20 @@ public final class Train {
             }
         }
         return pulling;
+    }
+
+    /**
+     * Whether a Locomotive facing {@code way}, +1 the Train's heading and -1 against it, has fuel to
+     * pull with, in its buffer or, as {@code slotFuelled} says, waiting in its slot.
+     */
+    boolean pulls(int way, Predicate<Locomotive> slotFuelled) {
+        for (Car car : cars) {
+            if (car instanceof Locomotive locomotive && facingSign(car) == way
+                    && (locomotive.fuelled() || slotFuelled.test(locomotive))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int facingSign(Car car) {

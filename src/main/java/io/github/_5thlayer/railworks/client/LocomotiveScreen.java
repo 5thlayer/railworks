@@ -14,7 +14,7 @@ import net.minecraft.world.entity.player.Inventory;
 /**
  * A Burner Locomotive's menu as a plain container: vanilla's one-row chest panel with the row's
  * other slots painted over, leaving the fuel slot where the menu puts it. Placeholder; the
- * Schedule (#3) adds its widgets here.
+ * Automatic toggle (#26) adds its widgets here.
  */
 public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMenu> {
 

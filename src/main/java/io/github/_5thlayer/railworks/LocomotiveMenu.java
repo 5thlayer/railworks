@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Burner Locomotive's menu: the cab's slots over the player's inventory, laid out as a vanilla
- * container's. The cab holds the fuel slot only, which takes furnace fuel; the Schedule (#3) adds
+ * container's. The cab holds the fuel slot only, which takes furnace fuel; logistics (#26) adds
  * its own slots or widgets to the cab, so {@link #CAB_SLOTS} is the number of slots the cab
  * holds, not "one".
  */

@@ -1,6 +1,6 @@
 # Railworks
 
-Trains: Locomotives and Cargo cars riding on top of a raised Rail, carrying players, mobs and items between Stations, by hand or on a schedule. It is Factorio's train game as a straddle-beam monorail, kept apart from vanilla rails, and it plays alone in vanilla on Groundworks.
+Trains: Locomotives and Cargo cars riding on top of a raised Rail, carrying players, mobs and items between Stations, driven by hand or running jobs between hatches. It is Factorio's train game as a straddle-beam monorail, kept apart from vanilla rails, and it plays alone in vanilla on Groundworks.
 
 ## Language
 
@@ -40,7 +40,7 @@ _Avoid_: segment (a Pylon's), section, block (Factorio's rail block), link
 
 **Line**:
 Spans joined Arm to Arm that a Train can run along without leaving the Rail. A line's end is an Arm with one Span.
-_Avoid_: route (a Schedule's word), track
+_Avoid_: route, track
 
 **Junction**:
 An Arm with three or more Spans. Any two of them that bend gently enough are a way through it; nothing is switched.
@@ -65,7 +65,7 @@ A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electr
 _Avoid_: engine (Wireworks' steam engine), loco
 
 **Cargo car**:
-A car that carries items, loaded and unloaded only while its Train is stopped at a Station and it stands on a Straight leg: by a hopper beside it at its floor, set by sneak-using the hopper at the car, and by one under the Rail beneath it, the spots drawn while it is stopped there and looked at. Using it opens what it holds; nobody rides one.
+A car that carries items, loaded and unloaded by the hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand through what it holds, which using it opens. Nobody rides one.
 _Avoid_: wagon, freight car
 
 **Straight leg**:
@@ -73,12 +73,46 @@ Rail without a bend, square to the blocks: Spans each in line through both their
 _Avoid_: straight track
 
 **Station**:
-A named block beside the Rail or under it, by a Straight leg, serving the nearest Span in reach: a Train at rest with any car within a block either way of the point of the Span nearest it is at the Station, every car of it (ADR 0007). A Schedule names Stations, and several may share a name.
-_Avoid_: stop (Voidworks' Stop), train stop, depot, platform
+A named block beside the Rail, by a Straight leg, serving the Trains that have it on their drive side and letting the others pass. A Train stops with its leading car at it, its cars on its platform (ADRs 0007, 0008). Several may share a name, which is only shown.
+_Avoid_: stop (Voidworks' Stop), train stop, depot
 
-**Schedule**:
-The list of Stations a Train runs through, each with when to leave.
-_Avoid_: route, orders, timetable
+**Drive side**:
+The side of the Rail a Station stands on to serve a Train, seen the way the Train runs: the right, unless the server sets the left.
+_Avoid_: handedness, traffic side
+
+**Platform**:
+The Straight leg behind a Station, up to four cars long, where a Train stopped there stands; no two Stations' platforms overlap.
+_Avoid_: siding, bay, loading area
+
+**Car spot**:
+The two blocks of a platform a stopped car stands over, counted back from the Station, the first its leading car's.
+_Avoid_: slot (an inventory's), position, bay
+
+**Automatic**:
+A Train taking jobs, as against one driven by hand, which is manual.
+_Avoid_: autopilot, scheduled, unattended
+
+### Logistics
+
+**Hatch**:
+A container beside a Station's platform at a car's floor, joining that Station, which trades with the Cargo car standing at its car spot. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
+_Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
+
+**Provider**:
+A hatch offering what is put in it to requesters at the same car spot of other Stations; it never asks.
+_Avoid_: source, output hatch, giver
+
+**Requester**:
+A hatch asking for one item, so many stacks of it: automatic Trains deliver it there until it holds that many, counting the loads already on their way, and it never gives.
+_Avoid_: sink, input hatch, receiver
+
+**Job**:
+An automatic Train's errand: from a provider Station to a requester Station, with one load for each car spot where the requester asks for what the provider offers, each claimed against its two hatches as it is planned. A delivery job has no provider, and carries what the Train holds already.
+_Avoid_: Trip (Voidworks'), order, route, schedule, task
+
+**Leftover**:
+What a Cargo car holds that no job of its Train claims, left after a requester stopped wanting it, or put in by hand; its Train takes only delivery jobs until it is gone.
+_Avoid_: stowed load, surplus
 
 ### Dev runs
 

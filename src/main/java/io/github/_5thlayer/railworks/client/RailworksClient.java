@@ -20,8 +20,6 @@ public final class RailworksClient {
         modBus.addListener(RailworksClient::registerScreens);
         NeoForge.EVENT_BUS.addListener(ClientRails::onLevelUnload);
         NeoForge.EVENT_BUS.addListener(PreviewSpan::onOverlay);
-        NeoForge.EVENT_BUS.addListener(HopperSpotsOverlay::onExtract);
-        NeoForge.EVENT_BUS.addListener(HopperSpotsOverlay::onSubmit);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {

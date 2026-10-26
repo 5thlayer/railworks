@@ -3,11 +3,17 @@
 
 package io.github._5thlayer.railworks.gametest;
 
+import java.util.List;
+
+import io.github._5thlayer.railworks.CarEntity;
+import io.github._5thlayer.railworks.CargoCarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailCurve;
@@ -21,6 +27,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -28,9 +35,11 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A car on the curved Rail: that the entity stands where {@code RailCurve} says and faces and
- * pitches the way it runs, that driving through an Arm turns it without a jump, and that the rider's
- * seat stands square to a climbing floor. The curve's own geometry is {@code RailCurveTest}'s. All of
- * these tests share the {@code curve_} prefix.
+ * pitches the way it runs, that driving through an Arm turns it without a jump, that coupled cars
+ * stand two blocks apart through a bend as on the straight, and that the rider's seat stands square
+ * to a climbing floor. The curve's own geometry is {@code RailCurveTest}'s. All of
+ * these tests share the {@code curve_} prefix but the coupled cars' one, which has the logistics work's
+ * (#26) {@code logistics_} prefix.
  */
 final class CurveTests {
 
@@ -49,6 +58,7 @@ final class CurveTests {
         tests.test("curve_car_stands_faces_and_pitches_along_the_curve", 20, CurveTests::followsCurve);
         tests.test("curve_car_driven_through_an_arm_turns_without_a_jump", 100, CurveTests::throughArm);
         tests.test("curve_rider_seat_stands_square_to_a_climbing_floor", 20, CurveTests::seatOnClimb);
+        tests.test("logistics_coupled_cars_stand_two_blocks_apart_through_an_arm", 20, CurveTests::coupledThroughArm);
     }
 
     private static void followsCurve(GameTestHelper helper) {
@@ -98,6 +108,35 @@ final class CurveTests {
         }
         if (!crossed) {
             helper.fail("the car never ran through the Arm onto the next Span", STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void coupledThroughArm(GameTestHelper helper) {
+        RailNetwork network = bend(helper);
+        Span before = network.get(arm(helper, A), arm(helper, B));
+        Span beyond = network.get(arm(helper, B), arm(helper, C));
+        // The Locomotive a block past the bend's Arm, the Cargo car coupled behind it, a block short of it.
+        Locomotive locomotive = Locomotive.burner();
+        CargoCar cargo = CargoCar.create();
+        Train train = Train.of(new Place(beyond, arm(helper, C), beyond.length() - 1.0), List.of(locomotive, cargo));
+        LevelRails.of(helper.getLevel()).add(train);
+        LocomotiveEntity front = view(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, locomotive);
+        CargoCarEntity back = view(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, cargo);
+        Place behind = train.placeOf(network, cargo);
+        if (!behind.span().equals(before) || Math.abs(behind.toFront() - 1.0) > 1e-6) {
+            helper.fail("the Cargo car stands at " + behind + ", not a block short of the Arm", STAND);
+        }
+        // Two blocks along the Line; drawn on the curve, which runs a little off the Spans through a
+        // bend, they stand within a few hundredths of that apart, and each car on the curve.
+        double apart = front.position().distanceTo(back.position());
+        if (Math.abs(apart - 2.0) > 0.05) {
+            helper.fail("coupled cars through the bend stand " + apart + " apart, not about two blocks", STAND);
+        }
+        RailCurve.Pose pose = behind.pose(network);
+        Vec3 expected = new Vec3(pose.x() + RailGeometry.ATTACH_X, pose.y() + RailGeometry.RIDE_Y, pose.z() + RailGeometry.ATTACH_Z);
+        if (back.position().distanceTo(expected) > 1e-6) {
+            helper.fail("the Cargo car is at " + back.position() + ", not on the curve at " + expected, STAND);
         }
         helper.succeed();
     }
@@ -164,9 +203,14 @@ final class CurveTests {
         Locomotive locomotive = Locomotive.burner();
         Train train = Train.of(place, locomotive);
         LevelRails.of(helper.getLevel()).add(train);
-        LocomotiveEntity car = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
-        car.setCar(train, locomotive);
-        helper.getLevel().addFreshEntity(car);
-        return car;
+        return view(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, locomotive);
+    }
+
+    /** {@code car}'s entity, of {@code type}, added to the level as the view of it in {@code train}. */
+    private static <E extends CarEntity> E view(GameTestHelper helper, EntityType<E> type, Train train, Car car) {
+        E view = type.create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
+        view.setCar(train, car);
+        helper.getLevel().addFreshEntity(view);
+        return view;
     }
 }

@@ -12,8 +12,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
@@ -27,26 +25,19 @@ public final class Railworks {
     /** The mod id, which gradle.properties' {@code mod_id} must match. */
     public static final String MOD_ID = "railworks";
 
-    private static final String NETWORK_VERSION = "1";
+    private static final String NETWORK_VERSION = "3";
 
     public Railworks(IEventBus modBus, ModContainer container) {
         RailworksConfig.register(container, modBus);
         RailworksRegistries.register(modBus);
         modBus.addListener(WorksTabContents::add);
         modBus.addListener(Railworks::registerPayloads);
-        modBus.addListener(Railworks::registerCapabilities);
         NeoForge.EVENT_BUS.addListener(LevelRails::onChunkSent);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onPlayerTick);
         if (FMLEnvironment.getDist() == Dist.CLIENT) {
             RailworksClient.register(modBus);
         }
-    }
-
-    /** A Cargo car's cargo to hoppers and pipes, only while it is stopped at a Station (ADR 0007). */
-    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
-        event.registerEntity(Capabilities.Item.ENTITY_AUTOMATION, RailworksRegistries.CARGO_CAR_ENTITY.get(),
-                (car, side) -> car.automation());
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {

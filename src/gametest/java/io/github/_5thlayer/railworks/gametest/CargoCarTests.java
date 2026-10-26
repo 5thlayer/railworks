@@ -102,8 +102,9 @@ final class CargoCarTests {
             helper.fail("the Cargo car did not couple behind the Locomotive: " + train + " and " + cargo.train(), STAND);
             return;
         }
+        // Two blocks apart, middle to middle, so a stopped Train's cars line up with the blocks.
         double gap = locomotive.getX() - cargo.getX();
-        if (Math.abs(gap - (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0) > 1e-6) {
+        if (Math.abs(gap - 2.0) > 1e-6) {
             helper.fail("the coupled car stands " + gap + " behind the Locomotive", STAND);
         }
         helper.succeed();
