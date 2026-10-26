@@ -352,7 +352,7 @@ final class LocomotiveTests {
         helper.succeed();
     }
 
-    /** A rider sits in the cab, 0.3 forward of the car's middle the way it faces, on the floor. */
+    /** A rider sits in the cab, 0.3 forward of the car's middle the way it faces, their eye at 2.22. */
     private static void seatsForward(GameTestHelper helper, float lookYaw, int east) {
         ServerPlayer placer = player(helper, lookYaw);
         use(helper, placer);
@@ -365,6 +365,10 @@ final class LocomotiveTests {
         if (Math.abs(driver.getX() - x) > 1e-3 || Math.abs(driver.getY() - y) > 1e-3
                 || Math.abs(driver.getZ() - car.getZ()) > 1e-3) {
             helper.fail("the rider sits at " + driver.position() + ", not in the cab at " + new Vec3(x, y, car.getZ()), STAND);
+        }
+        // Their eye, 1.62 over their feet, at the height CarBody's sight lines are drawn from.
+        if (Math.abs(driver.getEyeY() - (car.getY() + 2.22)) > 1e-3) {
+            helper.fail("the rider's eye is " + (driver.getEyeY() - car.getY()) + " over the car, not 2.22", STAND);
         }
         helper.succeed();
     }

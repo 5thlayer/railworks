@@ -3,6 +3,9 @@
 
 package io.github._5thlayer.railworks.client;
 
+import java.util.EnumMap;
+import java.util.Map;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
@@ -24,7 +27,7 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import org.joml.Matrix4f;
 
 /**
- * A car, drawn from its {@link CarBody} as placeholder boxes: a boxy straddle monorail car in the
+ * A car, drawn from its {@link CarBody} as placeholder boxes: a boxy car straddling the Rail, in the
  * Rail's rust red, and on a Cargo car a vanilla chest set into each side. Every face is its own
  * triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its tube, so the strips
  * the pipeline joins in one buffer leave no triangles between them.
@@ -35,6 +38,14 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         float yRot;
         float xRot;
     }
+
+    /** Each paint's colour, red, green and blue. */
+    private static final Map<CarBody.Paint, float[]> COLOURS = new EnumMap<>(Map.of(
+            CarBody.Paint.SHELL, new float[] {0.62F, 0.27F, 0.18F},
+            CarBody.Paint.DARK_RUST, new float[] {0.40F, 0.17F, 0.12F},
+            CarBody.Paint.TRIM, new float[] {0.13F, 0.08F, 0.07F},
+            CarBody.Paint.DEEP_RED, new float[] {0.30F, 0.10F, 0.08F},
+            CarBody.Paint.LAMP, new float[] {0.95F, 0.90F, 0.62F}));
 
     /** The six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
@@ -81,27 +92,24 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         int light = state.lightCoords;
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
             for (CarBody.Part part : body.parts()) {
-                if (part.paint() != CarBody.Paint.CHEST) {
-                    float[] rgb = colour(part.paint());
-                    box(pose.pose(), buffer, (float) part.minX(), (float) part.minY(), (float) part.minZ(),
-                            (float) part.maxX(), (float) part.maxY(), (float) part.maxZ(), rgb[0], rgb[1], rgb[2], light);
-                }
+                CarBody.Box b = part.box();
+                float[] rgb = COLOURS.get(part.paint());
+                box(pose.pose(), buffer, (float) b.minX(), (float) b.minY(), (float) b.minZ(),
+                        (float) b.maxX(), (float) b.maxY(), (float) b.maxZ(), rgb[0], rgb[1], rgb[2], light);
             }
         });
-        for (CarBody.Part part : body.parts()) {
-            if (part.paint() == CarBody.Paint.CHEST) {
-                submitChest(part, poseStack, collector, light);
-            }
+        for (CarBody.Box chest : body.chests()) {
+            submitChest(chest, poseStack, collector, light);
         }
         poseStack.popPose();
     }
 
-    /** A closed chest filling the part's box as it would a block, its front out of the car's nearer side. */
-    private void submitChest(CarBody.Part part, PoseStack poseStack, SubmitNodeCollector collector, int light) {
-        float size = (float) (part.maxY() - part.minY());
-        boolean right = part.minX() + part.maxX() > 0.0;
+    /** A closed chest filling the cube as it would a block, its front out of the car's nearer side. */
+    private void submitChest(CarBody.Box cube, PoseStack poseStack, SubmitNodeCollector collector, int light) {
+        float size = (float) (cube.maxY() - cube.minY());
+        boolean right = cube.minX() + cube.maxX() > 0.0;
         poseStack.pushPose();
-        poseStack.translate((part.minX() + part.maxX()) / 2.0, part.minY(), (part.minZ() + part.maxZ()) / 2.0);
+        poseStack.translate((cube.minX() + cube.maxX()) / 2.0, cube.minY(), (cube.minZ() + cube.maxZ()) / 2.0);
         // The chest's model faces +z; turn it to face out of its side.
         poseStack.mulPose(Axis.YP.rotationDegrees(right ? 90.0F : -90.0F));
         poseStack.scale(size, size, size);
@@ -109,17 +117,6 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         collector.submitModel(chest, 0.0F, poseStack, light, OverlayTexture.NO_OVERLAY, -1,
                 Sheets.CHEST_REGULAR.select(ChestType.SINGLE), sprites, 0, null);
         poseStack.popPose();
-    }
-
-    private static float[] colour(CarBody.Paint paint) {
-        return switch (paint) {
-            case SHELL -> new float[] {0.62F, 0.27F, 0.18F};
-            case UNDER -> new float[] {0.40F, 0.17F, 0.12F};
-            case TRIM -> new float[] {0.13F, 0.08F, 0.07F};
-            case NOSE -> new float[] {0.30F, 0.10F, 0.08F};
-            case LAMP -> new float[] {0.95F, 0.90F, 0.62F};
-            case CHEST -> throw new IllegalArgumentException("a chest is drawn with its own model");
-        };
     }
 
     /** An axis-aligned box, six faces each as a padded strip of four. */
