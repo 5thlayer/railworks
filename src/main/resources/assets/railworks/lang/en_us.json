@@ -31,5 +31,8 @@
   "message.railworks.station_not_straight": "A Station goes by a straight leg of Rail along the blocks, not by a bend or a diagonal",
   "tooltip.railworks.station.jade.name": "Name: %s",
   "tooltip.railworks.station.jade.off_rail": "By no Rail",
-  "tooltip.railworks.station.jade.not_straight": "The Rail here now bends or runs diagonally: a Cargo car standing here won't load"
+  "tooltip.railworks.station.jade.not_straight": "The Rail here now bends or runs diagonally: a Cargo car standing here won't load",
+  "config.jade.plugin_railworks.pylon": "Pylon",
+  "config.jade.plugin_railworks.station": "Station",
+  "config.jade.plugin_railworks.burner_locomotive": "Burner Locomotive"
 }
