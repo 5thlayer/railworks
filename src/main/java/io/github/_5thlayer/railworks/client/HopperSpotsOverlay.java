@@ -59,7 +59,7 @@ final class HopperSpotsOverlay {
     static void onExtract(ExtractLevelRenderStateEvent event) {
         List<Box> boxes = new ArrayList<>();
         for (Entity entity : event.getLevel().entitiesForRendering()) {
-            if (entity instanceof CargoCarEntity car && car.loading()) {
+            if (entity instanceof CargoCarEntity car && car.loadingSeen()) {
                 HopperSpots spots = car.hopperSpots();
                 for (HopperSpots.Filling filling : spots.filling()) {
                     add(boxes, event.getLevel(), filling.spot(), FILL);

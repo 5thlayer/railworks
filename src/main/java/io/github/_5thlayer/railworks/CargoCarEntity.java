@@ -69,12 +69,16 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         }
     };
 
-    /** Whether it loads where it stands: at a Station, on a straight leg. The overlay draws by it. */
+    /** Whether it loads where it stands, for a client: the overlay draws by it. */
     private static final EntityDataAccessor<Boolean> DATA_LOADING =
             SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
 
     private static final int[] ALL_SLOTS = IntStream.range(0, SLOTS).toArray();
     private static final int[] NO_SLOTS = new int[0];
+
+    /** The game time {@link #loading()} last asked the Stations and the Rail at, and what they said. */
+    private long loadingAskedAt = Long.MIN_VALUE;
+    private boolean loadingWhenAsked;
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -88,7 +92,7 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         return CarKind.CARGO;
     }
 
-    /** What it carries: the server's, for Jade and the menu. */
+    /** What it carries: the server's, for its menu and the {@link Container} it is. */
     public Container cargo() {
         return cargo;
     }
@@ -96,13 +100,12 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     /**
      * Its cargo to hoppers, feeders and pipes, NeoForge's item capability for automation: while its
      * Train is stopped at a Station, wherever along the Train it stands, so long as it stands on a
-     * straight leg; null while the Train moves or stands away from every Station, on a bend or a
-     * diagonal, or on a client.
+     * Straight leg, as {@link #loading()} says; null while the Train moves or stands away from every
+     * Station, or on a bend or a diagonal.
      */
     public @Nullable ResourceHandler<ItemResource> automation() {
         return loading() ? handler : null;
     }
-
 
     /** Whether it stands wholly on a straight leg square to the blocks, on the server: where it loads. */
     private boolean onStraightLeg() {
@@ -121,10 +124,26 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     }
 
     /**
-     * Whether it loads where it stands, as the server worked it out on its last tick: the one bit the
-     * capability, the hoppers' sides and the overlay all go by.
+     * Whether it loads where it stands: its Train at rest at a Station, the car on a Straight leg. The
+     * one rule the capability and the hoppers' sides go by, and a client {@link #loadingSeen() sees}.
+     * It is asked afresh, the Train's rest every time, so a Train pulling away closes its sides at
+     * once, and the Stations and Rail once a tick, since hoppers ask a slot at a time. False on a
+     * client.
      */
     public boolean loading() {
+        Train train = train();
+        if (train == null || !(level() instanceof ServerLevel server) || !train.atRest()) {
+            return false;
+        }
+        if (loadingAskedAt != server.getGameTime()) {
+            loadingAskedAt = server.getGameTime();
+            loadingWhenAsked = !stoppedAt().isEmpty() && onStraightLeg();
+        }
+        return loadingWhenAsked;
+    }
+
+    /** Whether it loads, as the server last synced it: what a client draws the hopper spots by. */
+    public boolean loadingSeen() {
         return entityData.get(DATA_LOADING);
     }
 
@@ -190,7 +209,7 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
 
     @Override
     protected void syncCar(Car car) {
-        entityData.set(DATA_LOADING, !stoppedAt().isEmpty() && onStraightLeg());
+        entityData.set(DATA_LOADING, loading());
     }
 
     @Override
@@ -251,7 +270,7 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         cargo.setChanged();
     }
 
-    /** As a chest boat's: while it is whole and the player near it. */
+    /** While it is whole and the player within reach of it, as its menu stays open. */
     @Override
     public boolean stillValid(Player player) {
         return cargo.stillValid(player);

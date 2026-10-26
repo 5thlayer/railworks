@@ -217,8 +217,8 @@ final class CargoLoadingTests {
                     }
                 })
                 .thenWaitUntil(() -> {
-                    if (!first.loading() || !second.loading()) {
-                        helper.fail("the Cargo cars flag " + first.loading() + " and " + second.loading()
+                    if (!first.loadingSeen() || !second.loadingSeen()) {
+                        helper.fail("the Cargo cars flag " + first.loadingSeen() + " and " + second.loadingSeen()
                                 + " for loading by the Station their Locomotive is by", BY_LOCOMOTIVE);
                     }
                 })
@@ -341,7 +341,7 @@ final class CargoLoadingTests {
                 // A tick for the car to sync what it would flag.
                 .thenIdle(2)
                 .thenExecute(() -> {
-                    if (cargo.loading() || cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null) != null) {
+                    if (cargo.loading() || cargo.loadingSeen() || cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null) != null) {
                         helper.fail("a Cargo car at a Station on a bend loads", LOADING);
                     }
                     ServerPlayer player = sneaker(helper, SIDE_Z);
@@ -384,9 +384,17 @@ final class CargoLoadingTests {
     private static void hoppersIdleOnBend(GameTestHelper helper) {
         CargoCarEntity cargo = cargoBehindLocomotive(helper);
         station(helper, LOADING);
-        LevelRails.of(helper.getLevel()).network().add(Span.of(PylonColumn.arm(helper.absolutePos(LocomotiveTests.B)),
+        var network = LevelRails.of(helper.getLevel()).network();
+        network.add(Span.of(PylonColumn.arm(helper.absolutePos(LocomotiveTests.B)),
                 PylonColumn.arm(helper.absolutePos(new BlockPos(13, 1, 7))), 6));
-        hoppersIdle(helper, cargo);
+        helper.startSequence()
+                .thenWaitUntil(() -> registered(helper, LOADING))
+                .thenExecute(() -> {
+                    if (LevelStations.of(helper.getLevel()).stations().stoppedAt(network, cargo.train()).isEmpty()) {
+                        helper.fail("the Train is not stopped at the Station, so the bend proves nothing", LOADING);
+                    }
+                    hoppersIdle(helper, cargo);
+                });
     }
 
     /**
@@ -401,6 +409,11 @@ final class CargoLoadingTests {
         helper.getLevel().setBlockAndUpdate(emptying, Blocks.HOPPER.defaultBlockState());
         hopper(helper, filling).setItem(0, new ItemStack(Items.IRON_ORE, 4));
         cargo.cargo().setItem(0, new ItemStack(Items.COAL, 4));
+        // The hoppers reach the car as a Container, so through its sides, not through its capability.
+        if (HopperBlockEntity.getContainerOrHandlerAt(helper.getLevel(), filling.south(), Direction.NORTH).container() != cargo
+                || HopperBlockEntity.getContainerOrHandlerAt(helper.getLevel(), emptying.above(), Direction.DOWN).container() != cargo) {
+            helper.fail("a hopper by the Cargo car does not find it as a Container", LOADING);
+        }
         helper.startSequence()
                 .thenIdle(40)
                 .thenExecute(() -> {
@@ -481,7 +494,7 @@ final class CargoLoadingTests {
         station(helper, LOADING);
         helper.startSequence()
                 .thenExecute(() -> {
-                    if (cargo.loading()) {
+                    if (cargo.loading() || cargo.loadingSeen()) {
                         helper.fail("a Cargo car flags it loads before there is a Station", LOADING);
                     }
                 })
@@ -492,6 +505,10 @@ final class CargoLoadingTests {
                     ServerPlayer driver = LocomotiveTests.board(helper, locomotive);
                     LocomotiveTests.press(driver, true, false);
                     LocomotiveTests.run(locomotive, 2);
+                    // At once on the server, before the car's own next tick syncs it.
+                    if (cargo.getSlotsForFace(Direction.NORTH).length != 0) {
+                        helper.fail("a Cargo car whose Train pulled away still opens its slots", LOADING);
+                    }
                 })
                 .thenWaitUntil(() -> synced(helper, cargo, false))
                 .thenSucceed();
@@ -503,8 +520,9 @@ final class CargoLoadingTests {
      * client runs here to receive it.
      */
     private static void synced(GameTestHelper helper, CargoCarEntity cargo, boolean expected) {
-        if (cargo.loading() != expected) {
-            helper.fail("the Cargo car flags " + cargo.loading() + " for loading, with its capability "
+        if (cargo.loadingSeen() != expected || cargo.loading() != expected) {
+            helper.fail("the Cargo car flags " + cargo.loadingSeen() + " for loading and works out " + cargo.loading()
+                    + ", with its capability "
                     + cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null), LOADING);
         }
     }
