@@ -5,11 +5,13 @@ package io.github._5thlayer.railworks.compat;
 
 import java.util.List;
 
+import io.github._5thlayer.libworks.machine.jade.MachineItems;
 import io.github._5thlayer.railworks.CargoCarEntity;
 import io.github._5thlayer.railworks.Railworks;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import snownee.jade.api.Accessor;
+import snownee.jade.api.IWailaClientRegistration;
 import snownee.jade.api.IWailaCommonRegistration;
 import snownee.jade.api.IWailaPlugin;
 import snownee.jade.api.WailaPlugin;
@@ -19,8 +21,9 @@ import snownee.jade.api.view.ViewGroup;
 
 /**
  * A Cargo car's contents in Jade, through Jade's own item storage view, as a chest's: the server
- * reads the car's cargo and Jade draws it. Found by Jade's annotation scan and named nowhere else, so
- * Jade stays a soft dependency.
+ * reads the car's cargo, and libworks' client half draws each stack with its count, as a
+ * machine's. Found by Jade's annotation scan and named nowhere else, so Jade stays a soft
+ * dependency.
  */
 @WailaPlugin
 public class CargoCarJadePlugin implements IWailaPlugin {
@@ -30,6 +33,12 @@ public class CargoCarJadePlugin implements IWailaPlugin {
     @Override
     public void register(IWailaCommonRegistration registration) {
         registration.registerItemStorage(new Cargo(), CargoCarEntity.class);
+    }
+
+    /** Jade drops a server group with no client half on its uid, so the cargo never showed without it. */
+    @Override
+    public void registerClient(IWailaClientRegistration registration) {
+        registration.registerItemStorageClient(new MachineItems.Client(UID));
     }
 
     private static final class Cargo implements IServerExtensionProvider<ItemStack> {
