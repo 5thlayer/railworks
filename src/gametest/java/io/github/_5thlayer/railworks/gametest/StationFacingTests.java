@@ -172,13 +172,14 @@ final class StationFacingTests {
                     if (!train.head().equals(held.get())) {
                         helper.fail("a settled Train went on moving, to " + train.head(), NORTH);
                     }
-                    // Its Cargo car leads west: its middle on the Station's mark, the cars on the car spots.
+                    // Its Cargo car leads west: its middle on the Station's mark.
                     var network = LevelRails.of(helper.getLevel()).network();
                     BlockPos at = helper.absolutePos(NORTH);
                     var platform = Platform.of(network, LevelStations.of(helper.getLevel()).stations().get(at.getX(), at.getY(), at.getZ()))
                             .orElseThrow();
                     double off = platform.toLeadMark(network, train.placeOf(network, cargo.car()).turned(), Station.STRETCH);
-                    if (Math.abs(off) > 1e-6) {
+                    // NaN, too, when it stands out of reach of the mark or faces away.
+                    if (!(Math.abs(off) <= 1e-6)) {
                         helper.fail("the Train settled " + off + " off the Station's mark", NORTH);
                     }
                 })
