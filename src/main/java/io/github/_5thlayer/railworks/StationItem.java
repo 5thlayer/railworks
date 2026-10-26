@@ -53,7 +53,7 @@ public final class StationItem extends BlockItem implements PlansPlacement {
             return LevelStations.of(server).stations().all();
         }
         // Two platforms overlap from as far apart as both their lengths, each Station a block or two off the Rail.
-        int reach = (int) Math.ceil(2 * Platform.MAX_CARS * Platform.SPOT) + 3;
+        int reach = (int) Math.ceil(2 * (Platform.MAX_CARS + 1) * Platform.SPOT) + 3;
         List<Station> near = new ArrayList<>();
         for (int cx = SectionPos.blockToSectionCoord(pos.getX() - reach); cx <= SectionPos.blockToSectionCoord(pos.getX() + reach); cx++) {
             for (int cz = SectionPos.blockToSectionCoord(pos.getZ() - reach); cz <= SectionPos.blockToSectionCoord(pos.getZ() + reach); cz++) {

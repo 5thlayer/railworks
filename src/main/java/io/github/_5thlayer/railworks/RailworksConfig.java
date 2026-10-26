@@ -44,7 +44,7 @@ public final class RailworksConfig {
                 .defineInRange("spanBendLimit", SpanRules.DEFAULT_BEND_LIMIT, 1.0, 180.0);
         DRIVE_SIDE = builder.comment("The side of the Rail a Station stands on to serve a Train, seen the way the Train runs: RIGHT, as Factorio's train stops, or LEFT.")
                 .defineEnum("driveSide", DriveSide.DEFAULT);
-        PLATFORM_CARS = builder.comment("How many car spots of two blocks a Station's platform has at most, back from the Station along its straight leg. 4 at most.")
+        PLATFORM_CARS = builder.comment("How many car spots of two blocks a Station's platform has at most, behind the leading car's place at the Station along its straight leg. 4 at most.")
                 .defineInRange("platformCars", Platform.MAX_CARS, 1, Platform.MAX_CARS);
         HATCH_SLOTS = builder.comment("How many slots a hatch holds, a chest's 27 by default. A hatch keeps the slots it was placed with.")
                 .defineInRange("hatchSlots", LevelHatches.DEFAULT_SLOTS, 1, 54);

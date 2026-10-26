@@ -113,7 +113,7 @@ public final class LevelRails extends SavedData {
     /**
      * One tick of {@code train}, from its first car's view: the keys of the first player driving one
      * of its Locomotives, each Locomotive's fuel slot, and every car it has in view set where the
-     * model now puts it.
+     * model now puts it. Left at rest by a Station, it settles onto the Station's mark.
      */
     void tick(ServerLevel level, Train train) {
         Car driven = train.cars().getFirst();
@@ -130,6 +130,10 @@ public final class LevelRails extends SavedData {
         train.tick(network, throttle, driven,
                 locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L,
                 trains.takenFrom(network, train));
+        if (throttle == Throttle.NONE) {
+            // At rest within a Station's stretch, it eases onto the Station's mark, its cars onto the car spots.
+            LevelStations.of(level).stations().settle(network, train, trains.takenFrom(network, train));
+        }
         if (train.speed() != speed || !train.head().equals(head)) {
             setDirty();
         }

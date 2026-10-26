@@ -9,6 +9,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 import com.mojang.serialization.Codec;
 import org.jspecify.annotations.Nullable;
@@ -76,6 +78,58 @@ public final class Stations {
                                 Math.abs(platform.toLeadMark(network, lead, Station.STRETCH)) <= Station.STRETCH))
                         .orElse(false))
                 .toList();
+    }
+
+    /** How far a Train settling onto a Station's mark moves in a tick, in blocks: a block a second. */
+    public static final double SETTLE_STEP = 0.05;
+    /** How near its mark a Train is settled, in blocks: closer than the floating point can tell apart. */
+    private static final double SETTLED = 1e-9;
+    /** How far from a Station block its leading car may stand and still be within its stretch, along x or z, in blocks. */
+    private static final double NEAR = Station.STRETCH + Station.REACH + 1.0;
+
+    /**
+     * One tick of {@code train} settling at a Station it is stopped at: while it is at rest, its
+     * leading car eases up to {@link #SETTLE_STEP} toward the nearest {@link Platform#leadMark} it is
+     * within a Station's stretch of, either end of a Train leading as {@link #stoppedAt} says, so a
+     * Train brought to rest by hand ends with its cars on the car spots, as the hatches beside them
+     * expect. Settled at one Station it moves no more, though another is near. It moves nowhere
+     * {@code taken} says another Train holds, nor past a line's end. Returns whether it moved.
+     */
+    public boolean settle(RailNetwork network, Train train, Predicate<Span> taken) {
+        if (!train.atRest()) {
+            return false;
+        }
+        List<Integer> ways = train.cars().size() == 1
+                ? List.of(train.reversed(train.cars().getFirst()) ? -1 : 1)
+                : List.of(1, -1);
+        int bestWay = 0;
+        double best = Double.NaN;
+        for (int way : ways) {
+            Place lead = train.lead(network, way);
+            Place.Point at = lead.point(network);
+            for (Station station : stations.values()) {
+                if (Math.abs(station.x() - at.x()) > NEAR || Math.abs(station.z() - at.z()) > NEAR) {
+                    continue;
+                }
+                Optional<Platform> platform = Platform.of(network, station);
+                if (platform.isEmpty()) {
+                    continue;
+                }
+                double ahead = platform.get().toLeadMark(network, lead, Station.STRETCH);
+                if (Math.abs(ahead) <= SETTLED) {
+                    return false;
+                }
+                if (Math.abs(ahead) <= Station.STRETCH && !(Math.abs(ahead) >= Math.abs(best))) {
+                    best = ahead;
+                    bestWay = way;
+                }
+            }
+        }
+        if (bestWay == 0) {
+            return false;
+        }
+        double step = Math.max(-SETTLE_STEP, Math.min(SETTLE_STEP, best));
+        return train.nudge(network, bestWay * step, taken);
     }
 
     public Collection<Station> all() {

@@ -470,6 +470,19 @@ public final class Train {
         return placeOf(network, cars.getLast());
     }
 
+    /**
+     * Moves it {@code by} blocks while it stays at rest, positive along its heading, as far as the
+     * Rail and {@code taken} let it: how a Train settles onto a Station's mark. Returns whether it moved.
+     */
+    boolean nudge(RailNetwork network, double by, Predicate<Span> taken) {
+        Place was = head;
+        // The same run as a tick at that speed, so a line's end and a taken Span stop it alike.
+        speed = by;
+        advance(network, taken);
+        speed = 0.0;
+        return !head.equals(was);
+    }
+
     private void advance(RailNetwork network, Predicate<Span> taken) {
         if (speed > 0.0) {
             double by = Math.min(speed, room(network, 1, speed, taken));

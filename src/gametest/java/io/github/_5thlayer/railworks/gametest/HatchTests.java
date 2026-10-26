@@ -55,9 +55,9 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
  * Hatches join a Station's platform (#36, ADR 0008): a Station north of {@link LocomotiveTests}'
- * Span, which runs east from x 1 to x 9 along z 3, serves Trains heading west, so its platform runs
- * back east from it, its first car spot beside x 5 and 6 and its second beside x 7 and 8, either side
- * of the Rail at a car's floor, y 2. A hatch places beside a car spot and nowhere else, keeps its mode, request and
+ * Span, which runs east from x 1 to x 9 along z 3, at x 3 serves Trains heading west, so its platform
+ * runs back east from it: the leading car's place beside x 3 and 4, its first car spot beside x 5 and
+ * 6 and its second beside x 7 and 8, either side of the Rail at a car's floor, y 2. A hatch places beside a car spot and nowhere else, keeps its mode, request and
  * contents in the level's {@link LevelHatches}, is reached by hoppers through its block, and joins
  * the Station as long as its platform covers it. Which block is beside which spot is
  * {@code PlatformTest}'s. All share the {@code logistics_hatch_} prefix.
@@ -65,7 +65,9 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 final class HatchTests {
 
     /** Where the Station stands, beside the Rail a block below a car's floor, north of it. */
-    private static final BlockPos STATION = CargoAccessTests.BY_CARGO;
+    private static final BlockPos STATION = new BlockPos(3, 1, 2);
+    /** Beside the leading car's place, which has no car spot. */
+    private static final BlockPos LEADER = new BlockPos(4, 2, 2);
     /** Beside the first car spot at a car's floor, over the block behind the Station. */
     private static final BlockPos FIRST = new BlockPos(6, 2, 2);
     /** Beside the first car spot across the Rail. */
@@ -81,8 +83,8 @@ final class HatchTests {
     static void register(RailworksGameTests.Registrar tests) {
         tests.test("logistics_hatch_crafts_from_iron_round_a_chest_and_a_hopper", 20, HatchTests::crafts);
         tests.test("logistics_hatch_places_beside_a_car_spot_and_joins_its_station", 20, HatchTests::places);
-        tests.test("logistics_hatch_is_refused_beside_no_car_spot", 20, HatchTests::refused);
-        tests.test("logistics_hatch_free_car_spot_blocks_are_drawn_while_one_is_held", 20, HatchTests::freeBlocks);
+        tests.test("logistics_hatch_is_refused_beside_no_car_spot_and_beside_the_leading_car", 20, HatchTests::refused);
+        tests.test("logistics_hatch_free_car_spots_are_drawn_while_one_is_held", 20, HatchTests::freeSpots);
         tests.test("logistics_hatch_switches_in_the_air_and_placed_keeping_what_it_holds", 20, HatchTests::switches);
         tests.test("logistics_hatch_requester_asks_for_a_stack_more_and_an_empty_hand_clears_it", 20, HatchTests::requests);
         tests.test("logistics_hatch_provider_gives_an_empty_hand_its_first_stack", 20, HatchTests::gives);
@@ -143,21 +145,38 @@ final class HatchTests {
                 || player.getMainHandItem().getCount() != 4) {
             helper.fail("a hatch ahead of the Station was placed or spent", AHEAD);
         }
+        if (place(helper, player, LEADER).consumesAction() || !helper.getBlockState(LEADER).isAir()) {
+            helper.fail("a hatch beside the leading car's place was placed", LEADER);
+        }
         helper.succeed();
     }
 
-    private static void freeBlocks(GameTestHelper helper) {
+    private static void freeSpots(GameTestHelper helper) {
         ServerPlayer player = withStation(helper);
         BlockPos first = helper.absolutePos(FIRST);
-        List<BlockPos> free = HatchItem.freeBlocks(helper.getLevel(), helper.absolutePos(STATION));
-        if (!free.contains(first) || !free.contains(helper.absolutePos(SECOND)) || free.contains(helper.absolutePos(STATION)) || free.contains(helper.absolutePos(AHEAD))) {
-            helper.fail("the free blocks beside the car spots are " + free, STATION);
+        // Drawn spot by spot: two spots, each a box on either side of the Rail, a car gap short of its ends.
+        List<AABB> spots = ownSpots(helper);
+        if (spots.size() != 4 || !spots.stream().allMatch(box -> Math.abs(box.getXsize() - 1.8) < 1e-6 && box.getZsize() == 1.0)
+                || spots.stream().noneMatch(box -> box.intersects(new AABB(first).deflate(0.01)))
+                || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(LEADER)).deflate(0.01))
+                        || box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {
+            helper.fail("the free car spots are drawn as " + spots, STATION);
         }
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
-        if (HatchItem.freeBlocks(helper.getLevel(), helper.absolutePos(STATION)).contains(first)) {
-            helper.fail("a block with a hatch in it is still drawn free", FIRST);
+        List<AABB> left = ownSpots(helper);
+        if (left.size() != 4 || left.stream().filter(box -> Math.abs(box.getXsize() - 0.9) < 1e-6).count() != 1
+                || left.stream().anyMatch(box -> box.intersects(new AABB(first).deflate(0.01)))) {
+            helper.fail("with a hatch beside the first spot, the free car spots are drawn as " + left, FIRST);
         }
         helper.succeed();
+    }
+
+    /** The free car spots drawn in this test's own plot: a server asks every Station of the level. */
+    private static List<AABB> ownSpots(GameTestHelper helper) {
+        Vec3 station = Vec3.atCenterOf(helper.absolutePos(STATION));
+        return HatchItem.freeSpots(helper.getLevel(), helper.absolutePos(STATION)).stream()
+                .filter(box -> box.getCenter().distanceTo(station) < 7.0)
+                .toList();
     }
 
     // ---- using ----

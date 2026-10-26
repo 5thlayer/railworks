@@ -11,8 +11,10 @@ import java.util.Optional;
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
+import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.RailNetwork;
+import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -26,6 +28,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -37,6 +40,9 @@ import org.jspecify.annotations.Nullable;
  * platforms near are drawn.
  */
 public final class HatchItem extends BlockItem implements PlansPlacement {
+
+    /** Half the gap between two coupled cars' bodies, by which a drawn car spot falls short of each of its ends. */
+    private static final double HALF_GAP = (CarBody.PITCH - CarBody.LENGTH) / 2.0;
 
     private final HatchMode mode;
 
@@ -65,23 +71,50 @@ public final class HatchItem extends BlockItem implements PlansPlacement {
     }
 
     /**
-     * The blocks near {@code pos} where a hatch could go now: beside a car spot of the platform of a
-     * Station near, and empty enough to place in. What a held hatch draws.
+     * Where a hatch could go near {@code pos}, as a held hatch draws it, car spot by car spot: the
+     * free blocks beside a spot of the platform of a Station near, empty enough to place in, the two
+     * on one side of the Rail as one box, or the one of them still free, each falling half a car gap
+     * short of its spot's ends, so the spots read as the cars that will stand there.
      */
-    public static List<BlockPos> freeBlocks(Level level, BlockPos pos) {
+    public static List<AABB> freeSpots(Level level, BlockPos pos) {
         RailNetwork network = StationItem.networkOf(level);
-        List<BlockPos> free = new ArrayList<>();
+        List<AABB> boxes = new ArrayList<>();
         for (Station station : StationItem.stationsNear(level, pos)) {
-            Platform.of(network, station).ifPresent(platform -> {
-                for (Platform.Beside beside : platform.besideBlocks(network)) {
-                    BlockPos at = new BlockPos(beside.x(), beside.y(), beside.z());
-                    if (level.getBlockState(at).canBeReplaced()) {
-                        free.add(at);
+            Platform.of(network, station).filter(platform -> !platform.spots().isEmpty()).ifPresent(platform -> {
+                List<Platform.Beside> beside = platform.besideBlocks(network);
+                // A Straight leg runs along x or z: the spots run that way.
+                Span leg = platform.spots().getFirst().middle().span();
+                boolean alongX = Math.abs(leg.b().x() - leg.a().x()) >= Math.abs(leg.b().z() - leg.a().z());
+                List<Platform.Beside> paired = new ArrayList<>();
+                for (Platform.Beside one : beside) {
+                    if (paired.contains(one)) {
+                        continue;
+                    }
+                    // Its pair: the other block beside the same spot, on the same side of the Rail.
+                    Platform.Beside other = beside.stream()
+                            .filter(b -> b != one && b.spot() == one.spot() && b.y() == one.y()
+                                    && Math.abs(b.x() - one.x()) + Math.abs(b.z() - one.z()) == 1)
+                            .findFirst().orElse(one);
+                    paired.add(one);
+                    paired.add(other);
+                    // Along the Line, half a car gap short of each end of the spot.
+                    AABB spot = new AABB(block(one)).minmax(new AABB(block(other)));
+                    spot = alongX ? spot.deflate(HALF_GAP, 0, 0) : spot.deflate(0, 0, HALF_GAP);
+                    boolean oneFree = level.getBlockState(block(one)).canBeReplaced();
+                    boolean otherFree = level.getBlockState(block(other)).canBeReplaced();
+                    if (oneFree && otherFree) {
+                        boxes.add(spot);
+                    } else if (oneFree || otherFree) {
+                        boxes.add(new AABB(block(oneFree ? one : other)).intersect(spot));
                     }
                 }
             });
         }
-        return free;
+        return boxes;
+    }
+
+    private static BlockPos block(Platform.Beside beside) {
+        return new BlockPos(beside.x(), beside.y(), beside.z());
     }
 
     @Override

@@ -114,4 +114,68 @@ class StationsTest {
         assertTrue(stations.at(network, train.placeOf(network, train.cars().getFirst())).contains(mine));
         assertTrue(stations.stoppedAt(network, train).isEmpty());
     }
+
+    /** Settles {@code train} until it stops moving, at most a hundred ticks; how many ticks it moved. */
+    private int settled(Train train) {
+        int ticks = 0;
+        while (ticks < 100 && stations.settle(network, train, span -> false)) {
+            ticks++;
+        }
+        return ticks;
+    }
+
+    /** How far from A its first car's centre is. */
+    private double headFromA(Train train) {
+        return AB.length() - train.head().toFront();
+    }
+
+    @Test
+    void aTrainAtRestShortOfItsMarkEasesOntoIt() {
+        Train train = train(9.0);
+        int ticks = settled(train);
+        assertEquals(9.5, headFromA(train), 1e-9);
+        assertEquals(Math.round(0.5 / Stations.SETTLE_STEP), ticks, "a step a tick");
+        assertTrue(train.atRest());
+    }
+
+    @Test
+    void aTrainAtRestPastItsMarkEasesBack() {
+        Train train = train(10.3);
+        settled(train);
+        assertEquals(9.5, headFromA(train), 1e-9);
+    }
+
+    @Test
+    void aTrainBackedInEasesItsLeadingLastCarOntoTheMark() {
+        Station yard = new Station(10, 6, -1, "Yard");
+        stations.remove(mine.x(), mine.y(), mine.z());
+        stations.put(yard);
+        // Its last car leads toward A: at rest at 10.0, it eases to the Yard's mark at 10.5.
+        Train train = train(10.0 + 2 * PITCH);
+        settled(train);
+        assertEquals(10.5 + 2 * PITCH, headFromA(train), 1e-9);
+    }
+
+    @Test
+    void aMovingTrainOrOneAtNoStationDoesNotSettle() {
+        Train moving = train(9.0);
+        ((Locomotive) moving.cars().getFirst()).fuel().light(1_000_000_000L);
+        moving.tick(network, Throttle.FORWARD, locomotive -> 0L);
+        assertTrue(!stations.settle(network, moving, span -> false));
+        Train away = train(16.0);
+        assertEquals(0, settled(away));
+        assertEquals(16.0, headFromA(away), 1e-9);
+    }
+
+    @Test
+    void aTrainBetweenTwoStationsSettlesAtOneAndStays() {
+        // Its Locomotive half a block past the Mine's mark, its last car half a block short of the Smelter's.
+        Station smelter = new Station(10 - (int) Math.round(2 * PITCH), 6, -1, "Smelter");
+        stations.put(smelter);
+        Train train = train(10.0);
+        int ticks = settled(train);
+        assertTrue(ticks < 100, "it settles once, not back and forth");
+        assertEquals(9.5, headFromA(train), 1e-9);
+        assertEquals(List.of(mine, smelter), stations.stoppedAt(network, train));
+    }
 }
