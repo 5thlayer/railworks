@@ -38,9 +38,12 @@ public final class RailworksGameTests {
 
     private static final DeferredRegister<MapCodec<? extends GameTestInstance>> TEST_TYPES =
             DeferredRegister.create(Registries.TEST_INSTANCE_TYPE, Railworks.MOD_ID);
+    private static final DeferredRegister<MapCodec<? extends TestEnvironmentDefinition<?>>> ENVIRONMENT_TYPES =
+            DeferredRegister.create(Registries.TEST_ENVIRONMENT_DEFINITION_TYPE, Railworks.MOD_ID);
 
     static {
         TEST_TYPES.register("code", () -> CodeGameTest.CODEC);
+        ENVIRONMENT_TYPES.register("left_drive", () -> LeftDrive.CODEC);
     }
 
     private RailworksGameTests() {
@@ -53,6 +56,7 @@ public final class RailworksGameTests {
 
     public static void register(IEventBus modBus) {
         TEST_TYPES.register(modBus);
+        ENVIRONMENT_TYPES.register(modBus);
         // Posted only when game tests are enabled, which a production game never is.
         modBus.addListener(RailworksGameTests::registerTests);
     }
@@ -60,7 +64,8 @@ public final class RailworksGameTests {
     private static void registerTests(RegisterGameTestsEvent event) {
         // Registered rather than borrowed, since the event hands out no lookup for vanilla's.
         var environment = event.registerEnvironment(id("default"), new TestEnvironmentDefinition.AllOf(List.of()));
-        var tests = new Registrar(event, environment);
+        var leftDrive = event.registerEnvironment(id("left_drive"), new LeftDrive());
+        var tests = new Registrar(event, environment, leftDrive);
         HeardSounds.listen();
         LoadTests.register(tests);
         GameTestPackTests.register(tests);
@@ -74,6 +79,7 @@ public final class RailworksGameTests {
         CurveTests.register(tests);
         CargoAccessTests.register(tests);
         CarSoundTests.register(tests);
+        StationFacingTests.register(tests);
     }
 
     private static Identifier id(String path) {
@@ -81,12 +87,22 @@ public final class RailworksGameTests {
     }
 
     /** What a test class is handed: a name, a tick budget and a body per test. */
-    record Registrar(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
+    record Registrar(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment,
+                     Holder<TestEnvironmentDefinition<?>> leftDrive) {
 
         void test(String name, int maxTicks, Consumer<GameTestHelper> body) {
+            test(environment, name, maxTicks, body);
+        }
+
+        /** A test run driving on the left ({@link LeftDrive}), in a batch of its own. */
+        void testDrivingLeft(String name, int maxTicks, Consumer<GameTestHelper> body) {
+            test(leftDrive, name, maxTicks, body);
+        }
+
+        private void test(Holder<TestEnvironmentDefinition<?>> in, String name, int maxTicks, Consumer<GameTestHelper> body) {
             var id = id(name);
             CodeGameTest.define(id, body);
-            event.registerTest(id, new CodeGameTest(id, new TestData<>(environment, PLATFORM, maxTicks, 0, true, Rotation.NONE)));
+            event.registerTest(id, new CodeGameTest(id, new TestData<>(in, PLATFORM, maxTicks, 0, true, Rotation.NONE)));
         }
     }
 }

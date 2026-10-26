@@ -73,6 +73,23 @@ public final class StationBlockEntity extends BlockEntity {
     public void onLoad() {
         super.onLoad();
         register();
+        if (level instanceof ServerLevel server) {
+            // Not while its chunk loads: a tick on, the block turns its arrow if it must, and again every so often.
+            server.scheduleTick(worldPosition, getBlockState().getBlock(), 1);
+        }
+    }
+
+    /**
+     * Turns the block's arrow to the way it serves now, on a server: a Span strung or cut since, or
+     * the drive side changed, may have turned it. Jade asks afresh each time, so it is never behind.
+     */
+    void face() {
+        if (level instanceof ServerLevel server && getBlockState().hasProperty(StationBlock.FACING)) {
+            StationBlock.serving(LevelRails.of(server).network(), worldPosition)
+                    .filter(way -> getBlockState().getValue(StationBlock.FACING) != way)
+                    .ifPresent(way -> server.setBlock(worldPosition,
+                            getBlockState().setValue(StationBlock.FACING, way), Block.UPDATE_CLIENTS));
+        }
     }
 
     @Override

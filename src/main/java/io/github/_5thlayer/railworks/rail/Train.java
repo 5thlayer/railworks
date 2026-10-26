@@ -185,6 +185,14 @@ public final class Train {
     }
 
     /**
+     * Its leading car running {@code way}, +1 its heading and -1 against it: its first car, or its
+     * last turned round, facing the way it runs.
+     */
+    Place lead(RailNetwork network, int way) {
+        return way > 0 ? placeOf(network, cars.getFirst()) : placeOf(network, cars.getLast()).turned();
+    }
+
+    /**
      * The Spans its cars stand on, from its first car's front to its last car's back, the head's
      * first: one Train holds a Span at a time.
      */

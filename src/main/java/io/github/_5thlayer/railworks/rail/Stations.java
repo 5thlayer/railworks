@@ -57,18 +57,24 @@ public final class Stations {
     }
 
     /**
-     * The Stations {@code train} is stopped at: while it is at rest, those any of its cars is
-     * {@link #at}, and none while it moves. A Train is at a Station as a whole, as in Factorio, so
-     * every Cargo car of it is loaded and unloaded there, wherever along the Train it stands.
+     * The Stations {@code train} is stopped at: while it is at rest, those its leading car is at
+     * arriving their serving way, within a Station's {@link Station#STRETCH} of its
+     * {@link Platform#leadMark}, the rest of it back along the platform; none while it moves. Either end
+     * of a Train may lead, but a Train of one car leads only the way it faces, so a Locomotive that
+     * came in the other way is not stopped at a Station it stands by.
      */
     public List<Station> stoppedAt(RailNetwork network, Train train) {
         if (!train.atRest()) {
             return List.of();
         }
-        // Each Station once, in the order placed, however many cars are by it.
-        List<Place> places = train.cars().stream().map(car -> train.placeOf(network, car)).toList();
+        List<Place> leads = train.cars().size() == 1
+                ? List.of(train.facing(network, train.cars().getFirst()))
+                : List.of(train.lead(network, 1), train.lead(network, -1));
         return stations.values().stream()
-                .filter(station -> places.stream().anyMatch(place -> station.serves(network, place)))
+                .filter(station -> Platform.of(network, station)
+                        .map(platform -> leads.stream().anyMatch(lead ->
+                                Math.abs(platform.toLeadMark(network, lead, Station.STRETCH)) <= Station.STRETCH))
+                        .orElse(false))
                 .toList();
     }
 

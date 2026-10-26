@@ -12,7 +12,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Which Stations a Train is stopped at, the question loading its Cargo cars asks (#25). */
+/**
+ * Which Stations a Train is stopped at: those its leading car is at, arriving their serving way, the
+ * question its hatches will ask (ADR 0008).
+ */
 class StationsTest {
 
     /** A level Span along x, its Arms' tops at y 5. */
@@ -24,7 +27,7 @@ class StationsTest {
 
     private final RailNetwork network = new RailNetwork();
     private final Stations stations = new Stations();
-    /** Beside the Rail, ten blocks from A. */
+    /** Beside the Rail ten blocks from A, on its south side: on the right of a Train heading for B. */
     private final Station mine = new Station(10, 6, 1, "Mine");
 
     @BeforeEach
@@ -38,6 +41,7 @@ class StationsTest {
     void resetSpec() {
         LocomotiveSpec.configure(LocomotiveSpec.DEFAULT_MAX_SPEED, LocomotiveSpec.DEFAULT_ACCELERATION,
                 LocomotiveSpec.DEFAULT_BRAKING, LocomotiveSpec.DEFAULT_FRICTION);
+        DriveSide.configure(DriveSide.DEFAULT);
     }
 
     /** A Locomotive with two Cargo cars behind it, the Locomotive's centre {@code fromA} blocks from A, heading for B. */
@@ -46,17 +50,46 @@ class StationsTest {
                 List.of(Locomotive.burner(), CargoCar.create(), CargoCar.create()));
     }
 
+    /** The same, heading for A, its first car {@code fromA} blocks from A and the rest behind it toward B. */
+    private static Train westbound(double fromA) {
+        return Train.of(new Place(AB, A, fromA),
+                List.of(Locomotive.burner(), CargoCar.create(), CargoCar.create()));
+    }
+
     @Test
-    void aTrainWhoseLocomotiveIsByAStationIsStoppedAtIt() {
-        // The Locomotive is at the Mine; its Cargo cars, one and two cars back, are not by it.
-        Train train = train(10.0);
+    void aTrainWhoseLeadingCarIsAtAStationIsStoppedAtIt() {
+        // The Locomotive is at the Mine's stop, half a block short of it; its Cargo cars stand behind it.
+        Train train = train(9.5);
         assertTrue(stations.at(network, train.placeOf(network, train.cars().getLast())).isEmpty());
         assertEquals(List.of(mine), stations.stoppedAt(network, train));
     }
 
     @Test
-    void aTrainWhoseLastCarIsByAStationIsStoppedAtIt() {
-        assertEquals(List.of(mine), stations.stoppedAt(network, train(10.0 + 2 * PITCH)));
+    void aTrainBackedInWithItsLastCarLeadingIsStoppedAtAStationServingThatWay() {
+        // On the north side: it serves Trains heading for A, and this one's last car leads that way.
+        Station yard = new Station(10, 6, -1, "Yard");
+        stations.put(yard);
+        assertEquals(List.of(yard), stations.stoppedAt(network, train(10.5 + 2 * PITCH)));
+    }
+
+    @Test
+    void aTrainThatCameInTheOtherWayIsNotStoppedAtTheStation() {
+        // Its Locomotive at the Mine, heading for A, its cars past the Station on the side it serves from.
+        assertTrue(stations.stoppedAt(network, westbound(10.0)).isEmpty());
+        assertTrue(stations.stoppedAt(network, westbound(10.5)).isEmpty());
+    }
+
+    @Test
+    void aLoneLocomotiveIsStoppedAtAStationOnlyFacingItsServingWay() {
+        assertEquals(List.of(mine), stations.stoppedAt(network, Train.of(new Place(AB, B, 10.5), Locomotive.burner())));
+        assertTrue(stations.stoppedAt(network, Train.of(new Place(AB, A, 9.5), Locomotive.burner())).isEmpty());
+    }
+
+    @Test
+    void drivingOnTheLeftTheSameStationServesTheOtherWay() {
+        DriveSide.configure(DriveSide.LEFT);
+        assertTrue(stations.stoppedAt(network, train(9.5)).isEmpty());
+        assertEquals(List.of(mine), stations.stoppedAt(network, westbound(10.5)));
     }
 
     @Test
@@ -66,6 +99,7 @@ class StationsTest {
 
     @Test
     void aTrainBetweenTwoStationsIsStoppedAtBoth() {
+        // The Smelter on the north side by its last car, which leads toward A.
         Station smelter = new Station(10 - (int) Math.round(2 * PITCH), 6, -1, "Smelter");
         stations.put(smelter);
         assertEquals(List.of(mine, smelter), stations.stoppedAt(network, train(10.0)));

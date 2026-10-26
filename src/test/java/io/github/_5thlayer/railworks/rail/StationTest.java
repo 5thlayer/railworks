@@ -51,6 +51,39 @@ class StationTest {
     }
 
     @Test
+    void aStationServesTheTrainsWithItOnTheirRight() {
+        try {
+            // South of a Rail along x: the right of a Train heading east, for B; north, of one heading for A.
+            assertEquals(Optional.of(B), beside(4).servingEnd(network));
+            assertEquals(Optional.of(A), new Station(4, 6, -1, "Mine").servingEnd(network));
+            // A block lower beside the Rail is still on that side.
+            assertEquals(Optional.of(B), new Station(4, 5, 1, "Mine").servingEnd(network));
+            DriveSide.configure(DriveSide.LEFT);
+            assertEquals(Optional.of(A), beside(4).servingEnd(network));
+            assertEquals(Optional.of(B), new Station(4, 6, -1, "Mine").servingEnd(network));
+        } finally {
+            DriveSide.configure(DriveSide.DEFAULT);
+        }
+    }
+
+    @Test
+    void aStationAlongZServesByTheSameRule() {
+        RailNetwork alongZ = new RailNetwork();
+        Arm north = new Arm(0, 5, 0);
+        Arm south = new Arm(0, 5, 10);
+        alongZ.add(Span.of(north, south, 10));
+        // East of a Rail along z: the right of a Train heading north.
+        assertEquals(Optional.of(north), new Station(1, 6, 4, "Mine").servingEnd(alongZ));
+        assertEquals(Optional.of(south), new Station(-1, 6, 4, "Mine").servingEnd(alongZ));
+    }
+
+    @Test
+    void aStationUnderTheRailOrByNoneServesNeitherWay() {
+        assertEquals(Optional.empty(), new Station(4, 5, 0, "Mine").servingEnd(network));
+        assertEquals(Optional.empty(), new Station(4, 6, 5, "Mine").servingEnd(network));
+    }
+
+    @Test
     void aStationTwoBlocksOffOrAboveTheRailIsByNoRail() {
         assertTrue(new Station(4, 6, 2, "Mine").foot(network).isEmpty());
         assertTrue(new Station(4, 7, 0, "Mine").foot(network).isEmpty());
