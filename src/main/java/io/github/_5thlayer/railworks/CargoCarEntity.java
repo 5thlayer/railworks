@@ -14,12 +14,17 @@ import io.github._5thlayer.railworks.rail.StraightLeg;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -28,6 +33,7 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.ContainerUser;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
@@ -36,6 +42,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.BlockHitResult;
@@ -67,6 +75,16 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         public boolean stillValid(Player player) {
             return isAlive() && player.distanceToSqr(CargoCarEntity.this) < REACH * REACH;
         }
+
+        @Override
+        public void startOpen(ContainerUser user) {
+            opened(user);
+        }
+
+        @Override
+        public void stopOpen(ContainerUser user) {
+            closed(user);
+        }
     };
 
     /** Whether it loads where it stands, for a client: the overlay draws by it. */
@@ -79,6 +97,9 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     /** The game time {@link #loading()} last asked the Stations and the Rail at, and what they said. */
     private long loadingAskedAt = Long.MIN_VALUE;
     private boolean loadingWhenAsked;
+
+    /** How many have its menu open, on the server: a chest sounds for the first to open it and the last to close it. */
+    private int openers;
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -174,7 +195,9 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     /**
      * Sets a hopper in the filling spot on the player's side, pointing at the car, while its Train is
      * stopped at a Station and the car stands on a Straight leg: the spots are where it stands, so
-     * a hopper set while it passes, or where it does not load, would load nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
+     * a hopper set while it passes, or where it does not load, would load nothing. It stands in the
+     * air, however high the Train is, and is refused where the spot is taken. Its place sound reaches
+     * the placer too.
      */
     private void placeHopper(Player player, InteractionHand hand) {
         if (stoppedAt().isEmpty()) {
@@ -198,7 +221,26 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
         BlockHitResult click = new BlockHitResult(Vec3.atCenterOf(pos), toward.getOpposite(), pos, false);
         if (!player.getItemInHand(hand).useOn(new UseOnContext(player, hand, click)).consumesAction()) {
             refuse(player, "message.railworks.hopper_spot_taken");
+            return;
         }
+        if (player instanceof ServerPlayer server) {
+            sendPlaceSound(server, pos);
+        }
+    }
+
+    /**
+     * The place sound of the block just placed at {@code pos}, to its placer alone, as vanilla's
+     * {@code BlockItem} plays it to everyone else: its client plays its own for a click it predicted,
+     * and it predicted none of this one. The sound is its sound type's, as {@code BlockItem}'s
+     * protected hook gives for a hopper.
+     */
+    private void sendPlaceSound(ServerPlayer placer, BlockPos pos) {
+        SoundType type = level().getBlockState(pos).getSoundType(level(), pos, placer);
+        // BlockItem's volume and pitch for a placed block.
+        float volume = (type.getVolume() + 1.0F) / 2.0F;
+        float pitch = type.getPitch() * 0.8F;
+        placer.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(type.getPlaceSound()),
+                SoundSource.BLOCKS, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, volume, pitch, random.nextLong()));
     }
 
     private static void refuse(Player player, String message) {
@@ -279,6 +321,27 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     @Override
     public void clearContent() {
         cargo.clearContent();
+    }
+
+    /** Someone opened its menu: a chest's open sound for the first, and a chest boat's game event. */
+    private void opened(ContainerUser user) {
+        if (openers++ == 0) {
+            chestSound(SoundEvents.CHEST_OPEN);
+        }
+        level().gameEvent(GameEvent.CONTAINER_OPEN, position(), GameEvent.Context.of(user.getLivingEntity()));
+    }
+
+    /** Someone closed its menu: a chest's close sound for the last, and a chest boat's game event. */
+    private void closed(ContainerUser user) {
+        if (openers > 0 && --openers == 0) {
+            chestSound(SoundEvents.CHEST_CLOSE);
+        }
+        level().gameEvent(GameEvent.CONTAINER_CLOSE, position(), GameEvent.Context.of(user.getLivingEntity()));
+    }
+
+    /** As a chest plays it: a little quiet, its pitch a little varied. */
+    private void chestSound(SoundEvent sound) {
+        level().playSound(null, getX(), getY(), getZ(), sound, SoundSource.BLOCKS, 0.5F, random.nextFloat() * 0.1F + 0.9F);
     }
 
     /** The menu, from using the car. */
