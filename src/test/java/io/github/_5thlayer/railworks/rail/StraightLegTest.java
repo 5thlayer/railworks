@@ -113,4 +113,53 @@ class StraightLegTest {
         assertFalse(StraightLeg.under(network, train, train.cars().getFirst()));
         assertTrue(StraightLeg.under(network, train, train.cars().getLast()));
     }
+
+    /** A Station beside the Rail at ride height, {@code x} blocks along it, on the side z is 1. */
+    private static Station beside(int x, int y) {
+        return new Station(x, y, 1, "Mine");
+    }
+
+    @Test
+    void aStationByAStraightLegIsAtOne() {
+        string(A, B);
+        assertTrue(StraightLeg.at(network, beside(5, 6)));
+    }
+
+    @Test
+    void aStationByASpanBentThroughAnArmIsNot() {
+        string(A, B);
+        string(B, OFF_LINE);
+        assertFalse(StraightLeg.at(network, beside(5, 6)));
+    }
+
+    @Test
+    void aStationNearAPylonIsNotWhereItsStretchReachesABentSpanBeyond() {
+        // A to B straight; B on to IN_LINE in line, but bent at IN_LINE.
+        string(A, B);
+        string(B, IN_LINE);
+        string(IN_LINE, new Arm(26, 5, 6));
+        // By B the stretch reaches a block on over it; a block short, it ends at B.
+        assertFalse(StraightLeg.at(network, beside(10, 6)));
+        assertTrue(StraightLeg.at(network, beside(9, 6)));
+    }
+
+    @Test
+    void aStationByADiagonalIsNot() {
+        Span diagonal = string(A, new Arm(8, 5, 8));
+        Station station = new Station(4, 6, 3, "Mine");
+        assertTrue(station.foot(network).isPresent());
+        assertFalse(StraightLeg.at(network, station));
+        assertTrue(StraightLeg.straight(network, diagonal));
+    }
+
+    @Test
+    void aStationByAClimbingLegIsAtOne() {
+        string(A, new Arm(10, 7, 0));
+        assertTrue(StraightLeg.at(network, beside(5, 7)));
+    }
+
+    @Test
+    void aStationByNoRailIsNot() {
+        assertFalse(StraightLeg.at(network, beside(5, 6)));
+    }
 }

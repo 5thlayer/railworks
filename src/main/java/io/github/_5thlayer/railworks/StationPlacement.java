@@ -8,12 +8,14 @@ import java.util.Optional;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Station;
+import io.github._5thlayer.railworks.rail.StraightLeg;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
 /**
- * Where a Station block may go: by the Rail, as {@link Station#stop} says, and not in the Clearance
- * of the Span it would serve, where a car passing would run into it. The Placement Preview and the
+ * Where a Station block may go: by the Rail, as {@link Station#foot} says, by a Straight leg, as
+ * {@link StraightLeg#at} says, and not in the Clearance of the Span it would serve, where a car
+ * passing would run into it. The Placement Preview and the
  * click both ask this, of the client's Spans and the level's.
  */
 public final class StationPlacement {
@@ -29,9 +31,13 @@ public final class StationPlacement {
      * along the whole stretch, since on a slope a car short of the foot can sit lower than at it.
      */
     public static Optional<RailworksRefusal> refusal(RailNetwork network, BlockPos pos) {
-        var foot = new Station(pos.getX(), pos.getY(), pos.getZ(), Station.DEFAULT_NAME).foot(network);
+        Station station = new Station(pos.getX(), pos.getY(), pos.getZ(), Station.DEFAULT_NAME);
+        var foot = station.foot(network);
         if (foot.isEmpty()) {
             return Optional.of(RailworksRefusal.STATION_OFF_RAIL);
+        }
+        if (!StraightLeg.at(network, station)) {
+            return Optional.of(RailworksRefusal.STATION_NOT_STRAIGHT);
         }
         AABB block = new AABB(pos);
         Place at = foot.get().place();

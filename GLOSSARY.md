@@ -69,11 +69,11 @@ A car that carries items, loaded and unloaded only while its Train is stopped at
 _Avoid_: wagon, freight car
 
 **Straight leg**:
-Rail without a bend, square to the blocks: Spans each in line through both their Arms, or ending there, running along x or z. A Cargo car loads only on one (ADR 0007).
+Rail without a bend, square to the blocks: Spans each in line through both their Arms, or ending there, running along x or z. A Cargo car loads only on one, and a Station is placed only by one (ADR 0007).
 _Avoid_: straight track
 
 **Station**:
-A named block beside the Rail or under it, serving the nearest Span in reach: a Train at rest with any car within a block either way of the point of the Span nearest it is at the Station, every car of it (ADR 0007). A Schedule names Stations, and several may share a name.
+A named block beside the Rail or under it, by a Straight leg, serving the nearest Span in reach: a Train at rest with any car within a block either way of the point of the Span nearest it is at the Station, every car of it (ADR 0007). A Schedule names Stations, and several may share a name.
 _Avoid_: stop (Voidworks' Stop), train stop, depot, platform
 
 **Schedule**:

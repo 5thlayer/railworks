@@ -58,12 +58,14 @@ public final class StraightLeg {
     }
 
     /**
-     * Whether a Cargo car stopped by {@code station} stands on a Straight leg: its stretch, and a car's
-     * body over either end of it, all on Rail a Cargo car loads on. False for a Station by no Rail.
+     * Whether {@code station} stands by a Straight leg: every Span its stretch touches, a block either
+     * way of its foot and over an Arm onto the Span beyond, one a Cargo car loads on. A Station is
+     * placed only there, and Jade warns of one a Span strung later has bent. False for a Station by no
+     * Rail.
      */
     public static boolean at(RailNetwork network, Station station) {
         return station.foot(network)
-                .map(foot -> under(network, foot.place(), 2.0 * Station.STRETCH + CargoCar.LENGTH))
+                .map(foot -> under(network, foot.place(), 2.0 * Station.STRETCH))
                 .orElse(false);
     }
 }
