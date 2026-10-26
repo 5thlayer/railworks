@@ -56,6 +56,7 @@ public final class Platform {
      */
     public record Side(List<Beside> blocks, boolean alongX) {
 
+        /** A side has at least one block, which says its spot. */
         public Side {
             if (blocks.isEmpty()) {
                 throw new IllegalArgumentException("a side with no blocks");

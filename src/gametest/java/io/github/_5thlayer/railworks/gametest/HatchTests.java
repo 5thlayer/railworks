@@ -400,11 +400,15 @@ final class HatchTests {
         insert(helper, FIRST, new ItemStack(Items.COAL, 5));
         BlockPos at = helper.absolutePos(FIRST);
         helper.getLevel().setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS);
+        if (LevelHatches.of(helper.getLevel()).at(at).isEmpty() || dropped(helper, at, Items.COAL) != 0) {
+            helper.fail("the command ran the hatch's side effects: its record is gone or its coal dropped", FIRST);
+        }
         if (station(helper).hatches() != 1 || LevelHatches.of(helper.getLevel()).at(at).isPresent()) {
             helper.fail("the Station counts " + station(helper).hatches() + " hatches after a command removed one", FIRST);
         }
-        if (dropped(helper, at, Items.COAL) != 5) {
-            helper.fail("the stale record's coal was not dropped at its block: " + dropped(helper, at, Items.COAL), FIRST);
+        int coal = dropped(helper, at, Items.COAL);
+        if (coal != 5) {
+            helper.fail("the stale record's coal was not dropped at its block: " + coal, FIRST);
         }
         helper.succeed();
     }

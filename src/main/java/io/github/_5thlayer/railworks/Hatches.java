@@ -103,14 +103,15 @@ public final class Hatches {
     /**
      * Takes out the record at {@code pos} if it is stale, its block loaded but no longer a hatch, as
      * after a command replaced it with no side effects, and drops what it held there. Returns whether
-     * it was.
+     * a stale record was taken out.
      */
     public boolean dropIfStale(Level level, BlockPos pos) {
         if (!level.isLoaded(pos) || level.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
             return false;
         }
-        remove(pos).ifPresent(stale -> stale.drop(level));
-        return true;
+        Optional<Hatch> stale = remove(pos);
+        stale.ifPresent(hatch -> hatch.drop(level));
+        return stale.isPresent();
     }
 
     /** Every hatch, in the order they were placed. */

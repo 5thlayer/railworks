@@ -4,6 +4,7 @@
 package io.github._5thlayer.railworks.gametest;
 
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
@@ -18,6 +19,8 @@ import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.StationItem;
 import io.github._5thlayer.railworks.StationPlacement;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.Platform;
+import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -147,9 +150,7 @@ final class StationFacingTests {
             }
         }
         var start = train.head();
-        var held = new Object() {
-            Place at;
-        };
+        AtomicReference<Place> held = new AtomicReference<>();
         CargoAccessTests.station(helper, NORTH);
         var sequence = helper.startSequence().thenIdle(40);
         if (seated) {
@@ -164,12 +165,21 @@ final class StationFacingTests {
                     if (train.head().equals(start)) {
                         helper.fail("a Train at rest by the Station, nobody aboard, did not settle from " + start, NORTH);
                     }
-                    held.at = train.head();
+                    held.set(train.head());
                 })
                 .thenIdle(5)
                 .thenExecute(() -> {
-                    if (!train.head().equals(held.at)) {
+                    if (!train.head().equals(held.get())) {
                         helper.fail("a settled Train went on moving, to " + train.head(), NORTH);
+                    }
+                    // Its Cargo car leads west: its middle on the Station's mark, the cars on the car spots.
+                    var network = LevelRails.of(helper.getLevel()).network();
+                    BlockPos at = helper.absolutePos(NORTH);
+                    var platform = Platform.of(network, LevelStations.of(helper.getLevel()).stations().get(at.getX(), at.getY(), at.getZ()))
+                            .orElseThrow();
+                    double off = platform.toLeadMark(network, train.placeOf(network, cargo.car()).turned(), Station.STRETCH);
+                    if (Math.abs(off) > 1e-6) {
+                        helper.fail("the Train settled " + off + " off the Station's mark", NORTH);
                     }
                 })
                 .thenSucceed();
