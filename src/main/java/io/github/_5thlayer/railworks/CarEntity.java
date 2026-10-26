@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailCurve;
@@ -423,10 +424,13 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return rideable() && getPassengers().isEmpty();
     }
 
-    /** The seat stands square to the car's floor, so a rider leans back on a climb and forward on a descent. */
+    /**
+     * The seat, in the cab forward of the car's middle, stands square to the car's floor, so a rider
+     * leans back on a climb and forward on a descent.
+     */
     @Override
     protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
-        Vec3 seat = getDefaultPassengerAttachmentPoint(this, passenger, dimensions.attachments()).yRot(getYRot() * Mth.DEG_TO_RAD);
+        Vec3 seat = new Vec3(0.0, CarBody.SEAT_Y, CarBody.SEAT_Z);
         return seat.xRot(-getXRot() * Mth.DEG_TO_RAD).yRot(-getYRot() * Mth.DEG_TO_RAD);
     }
 

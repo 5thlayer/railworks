@@ -20,7 +20,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.EntityAttachment;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -119,11 +118,13 @@ final class CurveTests {
         if (car.getXRot() > -10.0F) {
             helper.fail("a car climbing a quarter is pitched " + car.getXRot(), STAND);
         }
-        // Square to the floor, the seat leans back down the climb: west of the car, which faces east.
+        // Square to the floor, the seat (1.2 up, 0.3 forward in the cab) leans back down the climb and
+        // its forward offset rises with it; the car faces east. A seated player's feet are 0.6 below it.
         Vec3 seat = rider.position().subtract(car.position());
-        double height = car.getDimensions(car.getPose()).attachments().get(EntityAttachment.PASSENGER, 0, 0.0F).y;
-        double lean = Math.sin(Math.toRadians(-car.getXRot())) * height;
-        if (Math.abs(seat.x + lean) > 0.01 || Math.abs(seat.z) > 0.01) {
+        double climb = Math.toRadians(-car.getXRot());
+        double east = 0.3 * Math.cos(climb) - 1.2 * Math.sin(climb);
+        double up = 1.2 * Math.cos(climb) + 0.3 * Math.sin(climb) - 0.6;
+        if (Math.abs(seat.x - east) > 0.01 || Math.abs(seat.y - up) > 0.01 || Math.abs(seat.z) > 0.01) {
             helper.fail("the rider sits " + seat + " from a car pitched " + car.getXRot(), STAND);
         }
         helper.succeed();

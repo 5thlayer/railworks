@@ -48,7 +48,6 @@ public final class RailworksRegistries {
     public static final DeferredHolder<EntityType<?>, EntityType<LocomotiveEntity>> LOCOMOTIVE_ENTITY =
             ENTITIES.registerEntityType("burner_locomotive", LocomotiveEntity::new, MobCategory.MISC, builder -> builder
                     .sized(CarEntity.WIDTH, CarEntity.HEIGHT)
-                    .passengerAttachments(1.2F)
                     .clientTrackingRange(10)
                     .updateInterval(1)
                     .noSummon());
@@ -59,7 +58,6 @@ public final class RailworksRegistries {
     public static final DeferredHolder<EntityType<?>, EntityType<CargoCarEntity>> CARGO_CAR_ENTITY =
             ENTITIES.registerEntityType("cargo_car", CargoCarEntity::new, MobCategory.MISC, builder -> builder
                     .sized(CarEntity.WIDTH, CarEntity.HEIGHT)
-                    .passengerAttachments(1.3F)
                     .clientTrackingRange(10)
                     .updateInterval(1)
                     .noSummon());
