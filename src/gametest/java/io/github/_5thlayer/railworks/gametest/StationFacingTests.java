@@ -178,7 +178,7 @@ final class StationFacingTests {
                     var platform = Platform.of(network, LevelStations.of(helper.getLevel()).stations().get(at.getX(), at.getY(), at.getZ()))
                             .orElseThrow();
                     double off = platform.toLeadMark(network, train.placeOf(network, cargo.car()).turned(), Station.STRETCH);
-                    // NaN, too, when it stands out of reach of the mark or faces away.
+                    // NaN, too, when the mark is out of its reach or it would arrive against the serving way.
                     if (!(Math.abs(off) <= 1e-6)) {
                         helper.fail("the Train settled " + off + " off the Station's mark", NORTH);
                     }
