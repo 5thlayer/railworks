@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/** How far along the Line a point is from a Place, the walk a Schedule measures to a Station by. */
+/** How far along the Line a point is from a Place, the walk the Driver measures to a Station by. */
 class PlaceTest {
 
     private static final Arm A = new Arm(0, 5, 0);

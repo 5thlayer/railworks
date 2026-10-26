@@ -25,8 +25,14 @@ public record CarBody(List<Part> parts, List<Box> chests) {
     public static final double WIDTH = 1.0;
     /** A car's box up from the floor's underside. */
     public static final double HEIGHT = 2.75;
-    /** A car's length along the Line. */
+    /** A car's body along the Line, shorter than its {@link #PITCH} by a gap at each coupling. */
     public static final double LENGTH = 1.8;
+    /**
+     * A car's length along the Line, coupler to coupler: exactly two blocks, so coupled cars stand
+     * two blocks apart, middle to middle, and a stopped Train's cars line up with the blocks. Its
+     * body is {@link #LENGTH}, leaving 0.2 between two coupled bodies.
+     */
+    public static final double PITCH = 2.0;
 
     /** What colour a part is drawn in, red, green and blue. */
     public enum Paint {

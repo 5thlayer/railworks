@@ -14,7 +14,7 @@ import com.mojang.serialization.Codec;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Every Station in a level, one to a block, so a Schedule can find each Station of a name and a car
+ * Every Station in a level, one to a block, so a Train can be driven to one and a car
  * can ask which it is at without the Stations' chunks being loaded. Several may share a name.
  *
  * <p>Pure: DataFixerUpper's codec, no Minecraft types.

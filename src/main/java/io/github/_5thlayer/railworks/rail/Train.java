@@ -6,7 +6,6 @@ package io.github._5thlayer.railworks.rail;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -29,10 +28,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * car meets a line's end ahead or its last car one behind, or at the Arm of a Span another Train
  * holds.
  *
- * <p>It carries its {@link Schedule}, which drives it unattended while it is automatic.
- *
- * <p>Its cars are fixed: coupling and uncoupling make new Trains, at rest. A Train coupled to
- * keeps its Schedule; the Trains it parts into each keep a copy that does not drive them.
+ * <p>Its cars are fixed: coupling and uncoupling make new Trains, at rest.
  *
  * <p>Pure: no Minecraft types.
  */
@@ -47,13 +43,8 @@ public final class Train {
             Place.MAP_CODEC.forGetter(Train::head),
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
             Car.CODEC.listOf(1, Integer.MAX_VALUE).fieldOf("cars").forGetter(Train::cars),
-            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed)),
-            Schedule.CODEC.optionalFieldOf("schedule").forGetter(t -> Optional.of(t.schedule))
-    ).apply(i, (head, speed, cars, reversed, schedule) -> {
-        Train train = restore(head, speed, cars, Set.copyOf(reversed));
-        schedule.ifPresent(s -> train.schedule = s);
-        return train;
-    }));
+            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed))
+    ).apply(i, (head, speed, cars, reversed) -> restore(head, speed, cars, Set.copyOf(reversed))));
 
     /**
      * What a Locomotive saved before Trains had cars looks like: the Locomotive was the whole Train,
@@ -72,7 +63,6 @@ public final class Train {
     private final Set<UUID> reversed;
     private Place head;
     private double speed;
-    private Schedule schedule = new Schedule();
 
     private Train(Place head, List<? extends Car> cars, Set<UUID> reversed) {
         if (cars.isEmpty()) {
@@ -123,11 +113,6 @@ public final class Train {
     /** Whether {@code car} faces against the Train's heading. */
     public boolean reversed(Car car) {
         return reversed.contains(car.id());
-    }
-
-    /** Its Schedule, which the Locomotive's menu edits. */
-    public Schedule schedule() {
-        return schedule;
     }
 
     /** Where its first car is, and the way the Train faces. */
@@ -268,9 +253,7 @@ public final class Train {
         if (reversed) {
             facing.add(car.id());
         }
-        Train coupled = new Train(end == End.FRONT ? slot : head, joined, facing);
-        coupled.schedule = schedule;
-        return coupled;
+        return new Train(end == End.FRONT ? slot : head, joined, facing);
     }
 
     /**
@@ -327,7 +310,6 @@ public final class Train {
     private Train part(RailNetwork network, int from, int to) {
         Train part = new Train(placeOf(network, cars.get(from)), cars.subList(from, to), reversed);
         part.speed = speed;
-        part.schedule = schedule.parted();
         return part;
     }
 
@@ -350,15 +332,6 @@ public final class Train {
     public void tick(RailNetwork network, Throttle throttle, Car driven, ToLongFunction<Locomotive> ignite,
                      Predicate<Span> taken) {
         tick(network, throttle.sign() * (reversed(driven) ? -1 : 1), true, ignite, taken);
-    }
-
-    /**
-     * One tick on its {@link Schedule}, unattended: the Schedule says which way to push, asking
-     * {@code cars} what only the cars' entities know, and only Locomotives facing that way pull.
-     */
-    public void tick(RailNetwork network, Stations stations, ToLongFunction<Locomotive> ignite, Schedule.Cars cars,
-                     Predicate<Span> taken) {
-        tick(network, schedule.drive(network, stations, this, cars), false, ignite, taken);
     }
 
     /**

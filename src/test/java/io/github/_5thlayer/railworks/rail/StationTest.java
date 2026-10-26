@@ -28,7 +28,7 @@ class StationTest {
         network.add(AB);
     }
 
-    /** At ride height, one block to the side of the Rail: where a hopper beside a stopped car would be. */
+    /** At ride height, one block to the side of the Rail: where a hatch beside a stopped car will be. */
     private static Station beside(int x) {
         return new Station(x, 6, 1, "Mine");
     }

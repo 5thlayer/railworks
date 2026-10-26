@@ -48,7 +48,7 @@ final class StationTests {
     /** Eight apart, one segment tall, with a Span strung between the tops at y 1. */
     private static final BlockPos A = new BlockPos(1, 1, 3);
     private static final BlockPos B = new BlockPos(9, 1, 3);
-    /** Beside the Rail, a block down from the car: where a Station goes and leaves the car's side free for a hopper. */
+    /** Beside the Rail, a block down from the car: where a Station goes and leaves the car's side free for a hatch. */
     private static final BlockPos BESIDE = new BlockPos(5, 1, 2);
     /** Under the Rail, between the Pylons. */
     private static final BlockPos UNDER = new BlockPos(5, 1, 3);

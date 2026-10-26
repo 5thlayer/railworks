@@ -72,9 +72,8 @@ public final class RailworksGameTests {
         AutoStringTests.register(tests);
         StationTests.register(tests);
         CurveTests.register(tests);
-        CargoLoadingTests.register(tests);
+        CargoAccessTests.register(tests);
         CarSoundTests.register(tests);
-        ScheduleTests.register(tests);
     }
 
     private static Identifier id(String path) {

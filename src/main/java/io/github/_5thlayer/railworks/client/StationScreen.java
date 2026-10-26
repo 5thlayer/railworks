@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 /**
  * A Station's menu: its name in a text box, sent to the server on Done or Enter, which cleans it and
- * checks the player can reach the Station. Placeholder; the Schedule (#26) lists Stations by these names.
+ * checks the player can reach the Station. Placeholder; the Locomotive's status line (#26) names Stations by these names.
  */
 public final class StationScreen extends Screen {
 

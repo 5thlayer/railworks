@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.ToLongFunction;
 import java.util.stream.Stream;
 
 import com.mojang.serialization.Codec;
@@ -18,11 +17,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
-import io.github._5thlayer.railworks.rail.CargoCar;
-import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
-import io.github._5thlayer.railworks.rail.Schedule;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Stringing;
 import io.github._5thlayer.railworks.rail.Throttle;
@@ -116,9 +112,8 @@ public final class LevelRails extends SavedData {
 
     /**
      * One tick of {@code train}, from its first car's view: the keys of the first player driving one
-     * of its Locomotives, or, with no driver, its Schedule while that is automatic; each Locomotive's
-     * fuel slot; and every car it has in view set where the model now puts it. A driver's keys take
-     * the Train off its Schedule, as in Factorio.
+     * of its Locomotives, each Locomotive's fuel slot, and every car it has in view set where the
+     * model now puts it.
      */
     void tick(ServerLevel level, Train train) {
         Car driven = train.cars().getFirst();
@@ -130,21 +125,11 @@ public final class LevelRails extends SavedData {
                 break;
             }
         }
-        Schedule schedule = train.schedule();
-        if (throttle != Throttle.NONE && schedule.automatic()) {
-            schedule.manual();
-            setDirty();
-        }
         double speed = train.speed();
         Place head = train.head();
-        ToLongFunction<Locomotive> ignite = locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L;
-        if (schedule.automatic()) {
-            train.tick(network, LevelStations.of(level).stations(), ignite, scheduleCars, trains.takenFrom(network, train));
-            // Its progress through the Schedule moves on as it waits, too.
-            setDirty();
-        } else {
-            train.tick(network, throttle, driven, ignite, trains.takenFrom(network, train));
-        }
+        train.tick(network, throttle, driven,
+                locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L,
+                trains.takenFrom(network, train));
         if (train.speed() != speed || !train.head().equals(head)) {
             setDirty();
         }
@@ -156,19 +141,6 @@ public final class LevelRails extends SavedData {
             }
         }
     }
-
-    /** What a Schedule asks of the cars, from their views: a car out of view has no fuel waiting and is neither full nor empty. */
-    private final Schedule.Cars scheduleCars = new Schedule.Cars() {
-        @Override
-        public boolean hasFuel(Locomotive locomotive) {
-            return view(locomotive) instanceof LocomotiveEntity view && view.hasFuel();
-        }
-
-        @Override
-        public Schedule.Load load(CargoCar car) {
-            return view(car) instanceof CargoCarEntity view ? view.load() : Schedule.Load.PARTLY;
-        }
-    };
 
     /** {@code train} fell off the Rail: it is gone, and each of its cars in view breaks, dropping itself and what it holds. */
     void derail(ServerLevel level, Train train) {

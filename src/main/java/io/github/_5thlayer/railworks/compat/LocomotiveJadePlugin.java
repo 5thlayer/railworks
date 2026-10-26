@@ -20,7 +20,7 @@ import snownee.jade.api.WailaPlugin;
 import snownee.jade.api.config.IPluginConfig;
 
 /**
- * A Burner Locomotive in Jade: its fuel, its speed and its Train's next Station, read from the entity's synched data, which
+ * A Burner Locomotive in Jade: its fuel and its speed, read from the entity's synched data, which
  * the server fills every tick, so no server data provider is needed. Found by Jade's annotation scan
  * and named nowhere else, so Jade stays a soft dependency.
  */
@@ -52,12 +52,6 @@ public class LocomotiveJadePlugin implements IWailaPlugin {
             tooltip.add(Component.translatable("tooltip.railworks.locomotive.jade.fuel",
                     String.format(Locale.ROOT, "%.1f", joules / 1_000_000.0),
                     String.format(Locale.ROOT, "%.1f", seconds)));
-            if (!car.headingSeen().isEmpty()) {
-                tooltip.add(Component.translatable("tooltip.railworks.locomotive.jade.next_station", car.headingSeen()));
-            } else if (!car.waitingAtSeen().isEmpty()) {
-                tooltip.add(Component.translatable("tooltip.railworks.locomotive.jade.waiting_at",
-                        car.waitingAtSeen(), car.afterSeen()));
-            }
             ItemStack slot = car.fuelItem();
             tooltip.add(slot.isEmpty()
                     ? Component.translatable("tooltip.railworks.locomotive.jade.slot_empty")

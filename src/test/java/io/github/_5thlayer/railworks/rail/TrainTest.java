@@ -463,7 +463,7 @@ class TrainTest {
         CargoCar cargo = CargoCar.create();
         Train coupled = mid.coupled(network, Train.End.FRONT, cargo, false);
         assertEquals(cargo, coupled.cars().getFirst());
-        assertEquals(10.0 - 1.8, coupled.head().toFront(), EPS);
+        assertEquals(10.0 - 2.0, coupled.head().toFront(), EPS);
         assertEquals(10.0, coupled.placeOf(network, mid.cars().getFirst()).toFront(), EPS, "the old first car stays put");
     }
 
@@ -535,7 +535,7 @@ class TrainTest {
 
     @Test
     void itHoldsTheSpansItsCarsBodiesReachInto() {
-        // Its middle 0.5 from B, its front half 0.9 long: over B and into the Span beyond.
+        // Its middle 0.5 from B, its front half a block long: over B and into the Span beyond.
         Train train = train(network.get(A, B), B, 0.5);
         assertEquals(List.of(network.get(B, C), network.get(A, B)), train.spans(network));
     }
@@ -579,9 +579,9 @@ class TrainTest {
 
     @Test
     void aCarCouplesOnlyWhereItsWholeBodyIsOnTheLine() {
-        // Its back 1.8 + 0.9 from A: a 1.8-block car fits behind it, a hair more does not.
-        Train train = train(network.get(A, B), B, 20.0 - 2.7);
-        assertTrue(train.slot(network, Train.End.BACK, 1.8) != null);
-        assertEquals(null, train.slot(network, Train.End.BACK, 1.81));
+        // Its back 2 + 1 from A: a 2-block car fits behind it, a hair more does not.
+        Train train = train(network.get(A, B), B, 20.0 - 3.0);
+        assertTrue(train.slot(network, Train.End.BACK, 2.0) != null);
+        assertEquals(null, train.slot(network, Train.End.BACK, 2.01));
     }
 }

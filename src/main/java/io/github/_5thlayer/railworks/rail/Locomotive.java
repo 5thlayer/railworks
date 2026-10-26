@@ -21,8 +21,8 @@ public final class Locomotive implements Car {
 
     public static final String KIND = "locomotive";
 
-    /** Blocks along the Line: the length of its {@link CarBody}. */
-    public static final double LENGTH = CarBody.LENGTH;
+    /** Blocks along the Line, coupler to coupler: a car's {@link CarBody#PITCH}. */
+    public static final double LENGTH = CarBody.PITCH;
 
     static final MapCodec<Locomotive> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             ID_FIELD.forGetter(Locomotive::id),
