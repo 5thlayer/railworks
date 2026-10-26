@@ -394,6 +394,7 @@ public final class Train {
         speed = towardZero(speed, LocomotiveSpec.friction());
     }
 
+    /** Slows it by {@link #brakingRate()}, to a stop and no further. */
     private void brake() {
         speed = towardZero(speed, brakingRate());
     }

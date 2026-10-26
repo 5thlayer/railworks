@@ -16,6 +16,7 @@ import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.network.SchedulePacket;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
@@ -28,6 +29,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
@@ -42,13 +44,18 @@ import net.minecraft.world.level.block.Blocks;
  */
 final class ScheduleTests {
 
-    /** Eight Pylons round a square with its corners cut, so the Rail bends 45 degrees through each. */
-    private static final BlockPos[] LOOP = {new BlockPos(4, 1, 1), new BlockPos(9, 1, 1), new BlockPos(12, 1, 4),
-            new BlockPos(12, 1, 9), new BlockPos(9, 1, 12), new BlockPos(4, 1, 12), new BlockPos(1, 1, 9),
-            new BlockPos(1, 1, 4)};
-    /** Inside the loop, beside its south and its north sides. */
-    private static final BlockPos SOUTH = new BlockPos(6, 1, 2);
-    private static final BlockPos NORTH = new BlockPos(6, 1, 11);
+    /**
+     * Eight Pylons round a square with its corners cut, so the Rail bends 45 degrees through each,
+     * within the test's own plot: a test whose cars stray into the next plot loses them when that
+     * test is cleared away.
+     */
+    private static final BlockPos[] LOOP = {new BlockPos(2, 1, 0), new BlockPos(6, 1, 0), new BlockPos(8, 1, 2),
+            new BlockPos(8, 1, 6), new BlockPos(6, 1, 8), new BlockPos(2, 1, 8), new BlockPos(0, 1, 6),
+            new BlockPos(0, 1, 2)};
+    /** Inside the loop, beside its south, north and west sides. */
+    private static final BlockPos SOUTH = new BlockPos(4, 1, 1);
+    private static final BlockPos NORTH = new BlockPos(4, 1, 7);
+    private static final BlockPos WEST_SIDE = new BlockPos(1, 1, 4);
     /** Beside {@link LocomotiveTests}' Span, a block in from each end. */
     private static final BlockPos WEST = new BlockPos(2, 1, 2);
     private static final BlockPos EAST = new BlockPos(8, 1, 2);
@@ -62,7 +69,7 @@ final class ScheduleTests {
         tests.test("schedule_is_kept_across_a_save_and_reload", 20, ScheduleTests::saved);
         tests.test("schedule_a_driver_takes_the_train_off_it", 20, ScheduleTests::driverTakesOver);
         tests.test("schedule_a_cargo_car_says_how_full_it_is", 20, ScheduleTests::cargoLoad);
-        tests.test("schedule_runs_a_train_unattended_around_a_loop", 1_200, ScheduleTests::roundALoop);
+        tests.test("schedule_runs_a_train_unattended_around_a_loop_with_each_wait", 2_000, ScheduleTests::roundALoop);
         tests.test("schedule_runs_a_train_with_a_locomotive_at_each_end_back_and_forth", 1_200, ScheduleTests::backAndForth);
     }
 
@@ -165,22 +172,45 @@ final class ScheduleTests {
         }
         CargoLoadingTests.station(helper, SOUTH);
         CargoLoadingTests.station(helper, NORTH);
-        // East along the south side, a little short of the South Station's foot.
+        CargoLoadingTests.station(helper, WEST_SIDE);
+        // East along the south side, a little short of the South Station's foot, a Cargo car behind.
         Span south = network.get(arm(helper, LOOP[0]), arm(helper, LOOP[1]));
         Locomotive model = Locomotive.burner();
-        LocomotiveEntity locomotive = spawn(helper, Train.of(new Place(south, south.b(), 3.5), List.of(model)), model);
+        CargoCar wagon = CargoCar.create();
+        Train train = Train.of(new Place(south, south.b(), 1.0), List.of(model, wagon));
+        LocomotiveEntity locomotive = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, model);
+        CargoCarEntity cargo = spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
         LocomotiveTests.fill(helper, locomotive, new ItemStack(Items.COAL, 8));
         helper.startSequence()
-                .thenWaitUntil(() -> CargoLoadingTests.registered(helper, SOUTH, NORTH))
+                .thenWaitUntil(() -> CargoLoadingTests.registered(helper, SOUTH, NORTH, WEST_SIDE))
                 .thenExecute(() -> {
                     name(helper, SOUTH, "South");
                     name(helper, NORTH, "North");
-                    new SchedulePacket(locomotive.getId(), List.of(new Schedule.Entry("South", Schedule.Wait.TIME, 1),
-                            new Schedule.Entry("North", Schedule.Wait.TIME, 1)), true).apply(near(locomotive, helper));
+                    name(helper, WEST_SIDE, "West");
+                    new SchedulePacket(locomotive.getId(), List.of(
+                            new Schedule.Entry("South", Schedule.Wait.CARGO_FULL, 1),
+                            new Schedule.Entry("North", Schedule.Wait.CARGO_EMPTY, 1),
+                            new Schedule.Entry("West", Schedule.Wait.TIME, 1)), true).apply(near(locomotive, helper));
                 })
                 .thenWaitUntil(() -> waitingAt(helper, locomotive, "South"))
+                // Not full, it waits on, well past a timed wait.
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    waitingAt(helper, locomotive, "South");
+                    for (int slot = 0; slot < CargoCarEntity.SLOTS; slot++) {
+                        cargo.setItem(slot, new ItemStack(Items.COBBLESTONE, 64));
+                    }
+                })
                 .thenWaitUntil(() -> heading(helper, locomotive, "North"))
                 .thenWaitUntil(() -> waitingAt(helper, locomotive, "North"))
+                // Not empty, it waits on.
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    waitingAt(helper, locomotive, "North");
+                    cargo.clearContent();
+                })
+                .thenWaitUntil(() -> heading(helper, locomotive, "West"))
+                .thenWaitUntil(() -> waitingAt(helper, locomotive, "West"))
                 .thenWaitUntil(() -> heading(helper, locomotive, "South"))
                 .thenWaitUntil(() -> waitingAt(helper, locomotive, "South"))
                 .thenExecute(() -> {
@@ -200,8 +230,8 @@ final class ScheduleTests {
         Locomotive west = Locomotive.burner();
         Train train = Train.of(new Place(span, span.b(), span.length() - 4.0), List.of(east))
                 .coupled(LevelRails.of(helper.getLevel()).network(), Train.End.BACK, west, true);
-        LocomotiveEntity leading = spawn(helper, train, east);
-        LocomotiveEntity trailing = spawn(helper, train, west);
+        LocomotiveEntity leading = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
+        LocomotiveEntity trailing = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, west);
         LocomotiveTests.fill(helper, leading, new ItemStack(Items.COAL, 4));
         LocomotiveTests.fill(helper, trailing, new ItemStack(Items.COAL, 4));
         CargoLoadingTests.station(helper, WEST);
@@ -274,13 +304,13 @@ final class ScheduleTests {
         }
     }
 
-    /** {@code train} on the Rail, and a Locomotive's entity viewing {@code car} of it. */
-    private static LocomotiveEntity spawn(GameTestHelper helper, Train train, Car car) {
+    /** {@code train} on the Rail, if it is not yet, and an entity of {@code type} viewing {@code car} of it. */
+    private static <T extends CarEntity> T spawn(GameTestHelper helper, EntityType<T> type, Train train, Car car) {
         LevelRails rails = LevelRails.of(helper.getLevel());
         if (rails.trains().of(car.id()) == null) {
             rails.add(train);
         }
-        LocomotiveEntity view = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
+        T view = type.create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
         view.setCar(train, car);
         helper.getLevel().addFreshEntity(view);
         return view;
@@ -292,8 +322,8 @@ final class ScheduleTests {
 
     /** The structure's roof is a barrier layer the cars would ride up into. */
     private static void clearRoof(GameTestHelper helper) {
-        for (int x = 0; x <= 13; x++) {
-            for (int z = 0; z <= 13; z++) {
+        for (int x = 0; x <= 8; x++) {
+            for (int z = 0; z <= 8; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
             }
         }

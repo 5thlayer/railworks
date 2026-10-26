@@ -66,7 +66,7 @@ public final class Schedule {
     }
 
     /**
-     * One stop: the name of the Station, and when to leave it, {@code until}; {@code seconds} counts for a
+     * One entry: the name of the Station, and when to leave it, {@code until}; {@code seconds} counts for a
      * {@link Wait#TIME} wait only, and is kept for the others so switching back finds it.
      */
     public record Entry(String station, Wait until, int seconds) {
@@ -242,7 +242,7 @@ public final class Schedule {
             restart();
         }
         Entry entry = entries.get(index);
-        Station station = target == null ? null : stations.get(target.x(), target.y(), target.z());
+        Station station = targeted(stations);
         if (station == null || !station.name().equals(entry.station())) {
             target = null;
             // Set going at rest at a Station of its entry, it is there already.
@@ -252,7 +252,7 @@ public final class Schedule {
                 return 0;
             }
             target = pick(network, stations, train, cars, entry.station());
-            station = target == null ? null : stations.get(target.x(), target.y(), target.z());
+            station = targeted(stations);
         }
         if (station == null) {
             return hold(train);
@@ -282,6 +282,11 @@ public final class Schedule {
             return -way;
         }
         return way;
+    }
+
+    /** The Station it runs to, or null for none, or one no longer there. */
+    private @Nullable Station targeted(Stations stations) {
+        return target == null ? null : stations.get(target.x(), target.y(), target.z());
     }
 
     /** Whether the wait at {@code entry}'s Station is over. */
