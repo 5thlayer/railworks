@@ -50,6 +50,13 @@ public final class Platform {
     public record Beside(int spot, int x, int y, int z) {
     }
 
+    /**
+     * The blocks beside one car spot on one side of the Rail, the two a hatch may stand in there,
+     * and whether the Line runs along x there, rather than z.
+     */
+    public record Side(int spot, List<Beside> blocks, boolean alongX) {
+    }
+
     /** Some of one Span the platform covers, as how far along it from its first end, low to high. */
     private record Piece(Span span, double low, double high) {
 
@@ -224,6 +231,39 @@ public final class Platform {
         return List.copyOf(beside);
     }
 
+    /** Its {@link #besideBlocks} side by side: for each car spot, the blocks beside it on each side of the Rail. */
+    public List<Side> sides(RailNetwork network) {
+        List<Side> sides = new ArrayList<>();
+        if (spots.isEmpty()) {
+            return sides;
+        }
+        // A Straight leg runs along x or z, so every spot runs the way the first does.
+        Span leg = spots.getFirst().middle().span();
+        boolean alongX = Math.abs(leg.b().x() - leg.a().x()) >= Math.abs(leg.b().z() - leg.a().z());
+        List<Beside> left = new ArrayList<>(besideBlocks(network));
+        while (!left.isEmpty()) {
+            Beside one = left.removeFirst();
+            List<Beside> side = new ArrayList<>(List.of(one));
+            // Its pair: the next block along the Line beside the same spot.
+            left.stream()
+                    .filter(b -> b.spot() == one.spot() && b.y() == one.y()
+                            && (alongX ? b.z() == one.z() && Math.abs(b.x() - one.x()) == 1
+                                       : b.x() == one.x() && Math.abs(b.z() - one.z()) == 1))
+                    .findFirst()
+                    .ifPresent(pair -> {
+                        left.remove(pair);
+                        side.add(pair);
+                    });
+            sides.add(new Side(one.spot(), List.copyOf(side), alongX));
+        }
+        return sides;
+    }
+
+    /** Whether a block at {@code x}, {@code y}, {@code z} is near enough {@code station} to stand beside its platform. */
+    public static boolean near(Station station, int x, int y, int z) {
+        return Math.abs(station.x() - x) <= REACH && Math.abs(station.y() - y) <= REACH && Math.abs(station.z() - z) <= REACH;
+    }
+
     /**
      * Which of {@code stations} a hatch at {@code x}, {@code y}, {@code z} joins, and at which car spot:
      * the one whose platform it stands beside, of which there is at most one, since no two platforms
@@ -232,7 +272,7 @@ public final class Platform {
      */
     public static Optional<Joined> joined(RailNetwork network, Iterable<Station> stations, int x, int y, int z) {
         for (Station station : stations) {
-            if (Math.abs(station.x() - x) > REACH || Math.abs(station.z() - z) > REACH || Math.abs(station.y() - y) > REACH) {
+            if (!near(station, x, y, z)) {
                 continue;
             }
             Optional<Platform> platform = of(network, station);

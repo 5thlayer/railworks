@@ -117,8 +117,13 @@ class StationsTest {
 
     /** Settles {@code train} until it stops moving, at most a hundred ticks; how many ticks it moved. */
     private int settled(Train train) {
+        return settled(train, span -> false);
+    }
+
+    /** The same, with the Spans {@code taken} says another Train holds. */
+    private int settled(Train train, java.util.function.Predicate<Span> taken) {
         int ticks = 0;
-        while (ticks < 100 && stations.settle(network, train, span -> false)) {
+        while (ticks < 100 && stations.settle(network, train, taken)) {
             ticks++;
         }
         return ticks;
@@ -177,5 +182,34 @@ class StationsTest {
         assertTrue(ticks < 100, "it settles once, not back and forth");
         assertEquals(9.5, headFromA(train), 1e-9);
         assertEquals(List.of(mine, smelter), stations.stoppedAt(network, train));
+    }
+
+    @Test
+    void aLoneLocomotiveSettlesOnlyArrivingTheWayItFaces() {
+        Train east = Train.of(new Place(AB, B, AB.length() - 9.0), Locomotive.burner());
+        settled(east);
+        assertEquals(9.5, headFromA(east), 1e-9);
+        // Facing A, the Mine does not serve it: it stays.
+        Train west = Train.of(new Place(AB, A, 9.0), Locomotive.burner());
+        assertEquals(0, settled(west));
+        assertEquals(9.0, west.head().toFront(), 1e-9);
+    }
+
+    @Test
+    void aTrainBlockedByAnotherDoesNotSettleOntoItsSpan() {
+        // A Train holding the next Span ahead: this one's mark is over its Arm.
+        Arm c = new Arm(30, 5, 0);
+        Span bc = Span.of(B, c, 10);
+        network.add(bc);
+        Station end = new Station(20, 6, 1, "End");
+        stations.put(end);
+        Train train = train(19.0);
+        int ticks = settled(train, span -> span.equals(bc));
+        // It eases only as far as its front face may go, short of the taken Span.
+        assertTrue(ticks < 100);
+        assertTrue(headFromA(train) < 19.5 - 1e-6, "it did not run onto the taken Span");
+        Train free = train(19.0);
+        settled(free);
+        assertEquals(19.5, headFromA(free), 1e-9, "with the Span free it settles onto the mark");
     }
 }

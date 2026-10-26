@@ -32,24 +32,36 @@ public final class HatchBlockEntity extends BlockEntity {
     }
 
     /** Its record in the level's {@link LevelHatches}, put there if it has none; empty for a watcher, which has none. */
-    public Optional<LevelHatches.Hatch> hatch() {
+    public Optional<Hatches.Hatch> hatch() {
         if (!(level instanceof ServerLevel server)) {
             return Optional.empty();
         }
-        LevelHatches hatches = LevelHatches.of(server);
+        Hatches hatches = LevelHatches.of(server);
         return Optional.of(hatches.at(worldPosition)
                 .orElseGet(() -> hatches.put(worldPosition, getBlockState().getValue(HatchBlock.MODE))));
     }
 
     /** What it holds, on every side: hoppers and pipes fill and empty it. For a watcher, a handler holding nothing. */
     public ResourceHandler<ItemResource> items() {
-        return hatch().<ResourceHandler<ItemResource>>map(LevelHatches.Hatch::contents).orElse(EMPTY);
+        return hatch().<ResourceHandler<ItemResource>>map(Hatches.Hatch::contents).orElse(EMPTY);
     }
 
-    /** Puts itself in the level's hatches as it loads, if it is not there yet, as after a command placed it. */
+    /**
+     * Puts itself in the level's hatches as it loads, if it is not there yet, as after a command placed
+     * it. A record there of the other mode is a stale one, left by a hatch a command removed with no
+     * side effects: what it held is dropped, and a fresh record of this block's mode takes its place.
+     */
     @Override
     public void onLoad() {
         super.onLoad();
+        if (level instanceof ServerLevel server) {
+            Hatches hatches = LevelHatches.of(server);
+            HatchMode mode = getBlockState().getValue(HatchBlock.MODE);
+            hatches.at(worldPosition).filter(stale -> stale.mode() != mode).ifPresent(stale -> {
+                hatches.remove(worldPosition);
+                Hatches.drop(server, stale);
+            });
+        }
         hatch();
     }
 
@@ -57,7 +69,7 @@ public final class HatchBlockEntity extends BlockEntity {
     @Override
     public void preRemoveSideEffects(BlockPos pos, BlockState state) {
         if (level instanceof ServerLevel server) {
-            LevelHatches.of(server).remove(pos).ifPresent(hatch -> LevelHatches.drop(server, hatch));
+            LevelHatches.of(server).remove(pos).ifPresent(hatch -> Hatches.drop(server, hatch));
         }
     }
 }

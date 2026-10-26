@@ -11,10 +11,12 @@ import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.railworks.HatchBlock;
 import io.github._5thlayer.railworks.HatchBlockEntity;
 import io.github._5thlayer.railworks.HatchItem;
+import io.github._5thlayer.railworks.Hatches;
 import io.github._5thlayer.railworks.HatchMode;
 import io.github._5thlayer.railworks.HatchReport;
 import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
+import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
@@ -174,7 +176,7 @@ final class HatchTests {
     /** The free car spots drawn in this test's own plot: a server asks every Station of the level. */
     private static List<AABB> ownSpots(GameTestHelper helper) {
         Vec3 station = Vec3.atCenterOf(helper.absolutePos(STATION));
-        return HatchItem.freeSpots(helper.getLevel(), helper.absolutePos(STATION)).stream()
+        return PlatformsNear.freeSpots(helper.getLevel(), helper.absolutePos(STATION)).stream()
                 .filter(box -> box.getCenter().distanceTo(station) < 7.0)
                 .toList();
     }
@@ -221,10 +223,10 @@ final class HatchTests {
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL));
         use(helper, player, FIRST);
         expectRequest(helper, Optional.of(new HatchRequest<>(Items.COAL, 1)));
-        for (int i = 0; i < LevelHatches.slots() + 3; i++) {
+        for (int i = 0; i < Hatches.slots() + 3; i++) {
             use(helper, player, FIRST);
         }
-        expectRequest(helper, Optional.of(new HatchRequest<>(Items.COAL, LevelHatches.slots())));
+        expectRequest(helper, Optional.of(new HatchRequest<>(Items.COAL, Hatches.slots())));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         use(helper, player, FIRST);
         expectRequest(helper, Optional.empty());
@@ -255,9 +257,9 @@ final class HatchTests {
         record(helper, FIRST).ask(Items.IRON_INGOT);
         insert(helper, FIRST, new ItemStack(Items.COAL, 9));
         var ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
-        LevelHatches hatches = LevelHatches.of(helper.getLevel());
-        var saved = LevelHatches.TYPE.codec().encodeStart(ops, hatches).getOrThrow();
-        LevelHatches loaded = LevelHatches.TYPE.codec().parse(ops, saved).getOrThrow();
+        Hatches hatches = LevelHatches.of(helper.getLevel());
+        var saved = Hatches.CODEC.encodeStart(ops, hatches).getOrThrow();
+        Hatches loaded = Hatches.CODEC.parse(ops, saved).getOrThrow();
         var hatch = loaded.at(helper.absolutePos(FIRST)).orElse(null);
         if (hatch == null) {
             helper.fail("the hatch was not saved", FIRST);
@@ -265,7 +267,7 @@ final class HatchTests {
         }
         if (hatch.mode() != HatchMode.REQUESTER || !hatch.request().equals(Optional.of(new HatchRequest<>(Items.IRON_INGOT, 1)))
                 || count(hatch.contents()) != 9 || !hatch.contents().getResource(0).is(Items.COAL)
-                || hatch.contents().size() != LevelHatches.slots()) {
+                || hatch.contents().size() != Hatches.slots()) {
             helper.fail("the hatch loaded as " + hatch.mode() + " asking for " + hatch.request() + " holding "
                     + count(hatch.contents()) + " in " + hatch.contents().size() + " slots", FIRST);
         }
@@ -281,7 +283,7 @@ final class HatchTests {
         helper.getLevel().setBlockAndUpdate(over, Blocks.HOPPER.defaultBlockState().setValue(HopperBlock.FACING, Direction.DOWN));
         ((HopperBlockEntity) helper.getLevel().getBlockEntity(over)).setItem(0, new ItemStack(Items.IRON_INGOT, 2));
         var handler = helper.getLevel().getCapability(Capabilities.Item.BLOCK, helper.absolutePos(FIRST), Direction.UP);
-        if (handler == null || handler.size() != LevelHatches.slots()) {
+        if (handler == null || handler.size() != Hatches.slots()) {
             helper.fail("the hatch gives no item handler of its slots: " + handler, FIRST);
             return;
         }
@@ -338,7 +340,7 @@ final class HatchTests {
                 .thenExecute(() -> {
                     var hatch = LevelHatches.of(helper.getLevel()).at(at);
                     if (hatch.isEmpty() || hatch.get().mode() != HatchMode.REQUESTER) {
-                        helper.fail("a hatch set by a command is in the level's hatches as " + hatch.map(LevelHatches.Hatch::mode), FIRST);
+                        helper.fail("a hatch set by a command is in the level's hatches as " + hatch.map(Hatches.Hatch::mode), FIRST);
                     }
                     expectJoined(helper, FIRST, 0);
                 })
@@ -436,7 +438,7 @@ final class HatchTests {
         return helper.getBlockEntity(STATION, StationBlockEntity.class);
     }
 
-    private static LevelHatches.Hatch record(GameTestHelper helper, BlockPos pos) {
+    private static Hatches.Hatch record(GameTestHelper helper, BlockPos pos) {
         return LevelHatches.of(helper.getLevel()).at(helper.absolutePos(pos))
                 .orElseThrow(() -> helper.assertionException(pos, Component.literal("no hatch in the level's hatches")));
     }
@@ -466,7 +468,7 @@ final class HatchTests {
 
     /** The hatch at {@code pos} joins the Station at car spot {@code spot}, or none for -1. */
     private static void expectJoined(GameTestHelper helper, BlockPos pos, int spot) {
-        Optional<Platform.Joined> joined = LevelHatches.joined(helper.getLevel(), helper.absolutePos(pos));
+        Optional<Platform.Joined> joined = PlatformsNear.joined(helper.getLevel(), helper.absolutePos(pos));
         BlockPos station = helper.absolutePos(STATION);
         boolean right = spot < 0 ? joined.isEmpty()
                 : joined.isPresent() && joined.get().spot() == spot && joined.get().station().x() == station.getX()

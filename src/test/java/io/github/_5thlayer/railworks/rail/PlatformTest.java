@@ -259,4 +259,20 @@ class PlatformTest {
         line();
         assertEquals(4, platform(south(4)).besideBlocks(network).size());
     }
+
+    @Test
+    void eachCarSpotHasASideEachSideOfTheRailRunningAlongTheLine() {
+        line();
+        List<Platform.Side> sides = platform(south(10)).sides(network);
+        assertEquals(8, sides.size());
+        assertTrue(sides.stream().allMatch(side -> side.blocks().size() == 2 && side.alongX()));
+        assertEquals(Set.of(List.of(8, 6, -1), List.of(7, 6, -1)), sides.getFirst().blocks().stream()
+                .map(b -> List.of(b.x(), b.y(), b.z())).collect(Collectors.toSet()));
+        // A line along z: its sides run along z.
+        RailNetwork alongZ = new RailNetwork();
+        alongZ.add(Span.of(new Arm(0, 5, 0), new Arm(0, 5, 40), 40));
+        Platform byZ = Platform.of(alongZ, new Station(1, 6, 10, "Z")).orElseThrow();
+        assertTrue(byZ.sides(alongZ).stream().noneMatch(Platform.Side::alongX));
+        assertEquals(8, byZ.sides(alongZ).size());
+    }
 }

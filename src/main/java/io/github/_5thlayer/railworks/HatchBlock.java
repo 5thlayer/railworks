@@ -84,8 +84,8 @@ public final class HatchBlock extends Block implements EntityBlock {
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (level instanceof ServerLevel server) {
-            LevelHatches hatches = LevelHatches.of(server);
-            hatches.remove(pos).ifPresent(stale -> LevelHatches.drop(server, stale));
+            Hatches hatches = LevelHatches.of(server);
+            hatches.remove(pos).ifPresent(stale -> Hatches.drop(server, stale));
             hatches.put(pos, state.getValue(MODE));
         }
     }
@@ -137,7 +137,7 @@ public final class HatchBlock extends Block implements EntityBlock {
         return InteractionResult.SUCCESS;
     }
 
-    private static void giveFirstStack(LevelHatches.Hatch hatch, Player player) {
+    private static void giveFirstStack(Hatches.Hatch hatch, Player player) {
         var contents = hatch.contents();
         for (int slot = 0; slot < contents.size(); slot++) {
             var resource = contents.getResource(slot);

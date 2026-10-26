@@ -103,7 +103,7 @@ public final class Stations {
                 ? List.of(train.reversed(train.cars().getFirst()) ? -1 : 1)
                 : List.of(1, -1);
         int bestWay = 0;
-        double best = Double.NaN;
+        double best = 0.0;
         for (int way : ways) {
             Place lead = train.lead(network, way);
             Place.Point at = lead.point(network);
@@ -119,7 +119,7 @@ public final class Stations {
                 if (Math.abs(ahead) <= SETTLED) {
                     return false;
                 }
-                if (Math.abs(ahead) <= Station.STRETCH && !(Math.abs(ahead) >= Math.abs(best))) {
+                if (Math.abs(ahead) <= Station.STRETCH && (bestWay == 0 || Math.abs(ahead) < Math.abs(best))) {
                     best = ahead;
                     bestWay = way;
                 }

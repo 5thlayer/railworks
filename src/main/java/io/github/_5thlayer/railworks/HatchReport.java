@@ -9,12 +9,10 @@ import java.util.Optional;
 
 import io.github._5thlayer.railworks.rail.HatchRequest;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -30,17 +28,9 @@ import net.minecraft.world.item.ItemStack;
  */
 public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, Optional<StationSpot> joined) {
 
-    /** The Station a hatch joins, by name, and its car spot's index, 0 the leading car's. */
+    /** The Station a hatch joins, by name, and its car spot's index, 0 the one behind the leading car's. */
     public record StationSpot(String station, int spot) {
     }
-
-    private static final StreamCodec<ByteBuf, HatchMode> MODE_CODEC =
-            ByteBufCodecs.idMapper(ordinal -> HatchMode.values()[ordinal], HatchMode::ordinal);
-
-    private static final StreamCodec<RegistryFriendlyByteBuf, HatchRequest<Item>> REQUEST_CODEC = StreamCodec.composite(
-            ByteBufCodecs.registry(Registries.ITEM), HatchRequest::item,
-            ByteBufCodecs.VAR_INT, HatchRequest::stacks,
-            HatchRequest::new);
 
     private static final StreamCodec<ByteBuf, StationSpot> JOINED_CODEC = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, StationSpot::station,
@@ -48,15 +38,15 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, 
             StationSpot::new);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, HatchReport> STREAM_CODEC = StreamCodec.composite(
-            MODE_CODEC, HatchReport::mode,
-            ByteBufCodecs.optional(REQUEST_CODEC), HatchReport::request,
+            HatchMode.STREAM_CODEC, HatchReport::mode,
+            ByteBufCodecs.optional(Hatches.REQUEST_STREAM_CODEC), HatchReport::request,
             ByteBufCodecs.optional(JOINED_CODEC), HatchReport::joined,
             HatchReport::new);
 
     /** What {@code entity}'s hatch shows, on the server. */
     public static HatchReport of(HatchBlockEntity entity) {
-        LevelHatches.Hatch hatch = entity.hatch().orElseThrow();
-        Optional<StationSpot> joined = LevelHatches.joined((ServerLevel) entity.getLevel(), entity.getBlockPos())
+        Hatches.Hatch hatch = entity.hatch().orElseThrow();
+        Optional<StationSpot> joined = PlatformsNear.joined(entity.getLevel(), entity.getBlockPos())
                 .map(at -> new StationSpot(at.station().name(), at.spot()));
         return new HatchReport(hatch.mode(), hatch.request(), joined);
     }
@@ -68,6 +58,7 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, 
                 .orElseGet(() -> Component.translatable("message.railworks.hatch.requesting_nothing"));
     }
 
+    /** Its lines in Jade: provider or requester, a requester's request, and the Station it joins or that it joins none. */
     public List<Component> lines() {
         List<Component> lines = new ArrayList<>();
         if (mode == HatchMode.PROVIDER) {
