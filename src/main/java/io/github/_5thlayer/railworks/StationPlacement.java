@@ -28,6 +28,8 @@ public final class StationPlacement {
 
     /** How finely the Clearance is checked along the stretch, in blocks. */
     private static final double SWEEP_STEP = 0.25;
+    /** Slack for a block that only touches the car's box. */
+    private static final double TOUCH = 1e-6;
 
     /** Why a Station was refused, and for an overlap, the other Station. */
     public record Refused(RailworksRefusal reason, Optional<Station> other) {
@@ -52,7 +54,9 @@ public final class StationPlacement {
         if (!StraightLeg.at(network, station)) {
             return Optional.of(Refused.because(RailworksRefusal.STATION_NOT_STRAIGHT));
         }
-        AABB block = new AABB(pos);
+        // A block beside the Rail at the car's floor only touches the car's box; far from the origin the
+        // floating point could tip that touch into an overlap.
+        AABB block = new AABB(pos).deflate(TOUCH);
         Place at = foot.get().place();
         for (double by = -Station.STRETCH; by <= Station.STRETCH + 1e-9; by += SWEEP_STEP) {
             Place car = at.move(network, by).place();

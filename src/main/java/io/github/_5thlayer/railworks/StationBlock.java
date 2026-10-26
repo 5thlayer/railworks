@@ -36,7 +36,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * A Station: a named block beside the Rail, which a Train arriving its serving way stops at (ADRs
  * 0007, 0008). Its {@link #FACING} is that way, which the arrow on its top shows: set as it is
- * placed and again as it loads, from the Rail by it and the drive side. Using it opens its menu,
+ * placed and looked at again as it loads and every couple of seconds after, from the Rail by it and
+ * the drive side. Using it opens its menu,
  * where it is named. Breaking it takes it out of the level's Stations.
  */
 public final class StationBlock extends Block implements EntityBlock {
@@ -98,11 +99,18 @@ public final class StationBlock extends Block implements EntityBlock {
         return InteractionResult.SUCCESS;
     }
 
-    /** A tick after its block entity loads: turns its arrow to the way it serves now. */
+    /** How often a loaded Station looks again at the way it serves, in ticks. */
+    private static final int FACE_TICKS = 40;
+
+    /**
+     * A tick after its block entity loads, and every {@link #FACE_TICKS} after: turns its arrow to the
+     * way it serves now.
+     */
     @Override
     protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         if (level.getBlockEntity(pos) instanceof StationBlockEntity station) {
             station.face();
+            level.scheduleTick(pos, this, FACE_TICKS);
         }
     }
 

@@ -51,18 +51,18 @@ public final class Platform {
 
     private final Station station;
     private final Place front;
-    private final Place stop;
+    private final Place leadMark;
     private final List<CarSpot> spots;
     /** Each spot's pieces of the Line, by index. */
     private final List<List<Piece>> spotPieces;
     /** What it covers of the Line: its spots, or at least the Station's own block's length. */
     private final List<Piece> covered;
 
-    private Platform(Station station, Place front, Place stop, List<CarSpot> spots,
+    private Platform(Station station, Place front, Place leadMark, List<CarSpot> spots,
                      List<List<Piece>> spotPieces, List<Piece> covered) {
         this.station = station;
         this.front = front;
-        this.stop = stop;
+        this.leadMark = leadMark;
         this.spots = spots;
         this.spotPieces = spotPieces;
         this.covered = covered;
@@ -98,7 +98,7 @@ public final class Platform {
         Place at = foot.get().facing(end.get());
         // The Station block's front edge, half a block on from its centre.
         Place.Moved front = at.move(network, 0.5);
-        Place stop = front.place().move(network, -SPOT / 2.0).place();
+        Place leadMark = front.place().move(network, -SPOT / 2.0).place();
         List<CarSpot> spots = new ArrayList<>();
         List<List<Piece>> spotPieces = new ArrayList<>();
         // A line's end within half a block ahead leaves no room for the leading car: no spots.
@@ -112,7 +112,7 @@ public final class Platform {
             spotPieces.add(cover(network, front.place().move(network, -SPOT * i).place(), SPOT));
         }
         List<Piece> covered = cover(network, front.place(), Math.max(SPOT * spots.size(), 1.0));
-        return Optional.of(new Platform(station, front.place(), stop, List.copyOf(spots),
+        return Optional.of(new Platform(station, front.place(), leadMark, List.copyOf(spots),
                 List.copyOf(spotPieces), covered));
     }
 
@@ -125,9 +125,9 @@ public final class Platform {
         return front;
     }
 
-    /** Where the leading car's middle stops, facing the serving way: the middle of the first car spot. */
-    public Place stop() {
-        return stop;
+    /** Where the leading car's middle stands at rest, facing the serving way: the middle of the first car spot. */
+    public Place leadMark() {
+        return leadMark;
     }
 
     /** Its car spots, the leading car's first; none where the Straight leg ends at the Station. */
@@ -136,13 +136,13 @@ public final class Platform {
     }
 
     /**
-     * How far ahead of {@code lead}, a car running the way it faces, the {@link #stop} is, along the
+     * How far ahead of {@code lead}, a car running the way it faces, the {@link #leadMark} is, along the
      * Line through the Arms: negative when the car has run past it by up to {@code past}, and NaN when
      * it is out of reach or the car would arrive against the serving way.
      */
-    public double toStop(RailNetwork network, Place lead, double past) {
-        Span span = stop.span();
-        double fromA = fromA(stop);
+    public double toLeadMark(RailNetwork network, Place lead, double past) {
+        Span span = leadMark.span();
+        double fromA = fromA(leadMark);
         double behind = lead.turned().distanceTo(network, span, fromA);
         if (behind >= 0.0 && behind <= past) {
             return arriving(network, lead, -behind) ? -behind : Double.NaN;
@@ -151,10 +151,10 @@ public final class Platform {
         return ahead >= 0.0 && arriving(network, lead, ahead) ? ahead : Double.NaN;
     }
 
-    /** Whether {@code lead}, run on {@code by}, stands at the stop facing its way. */
+    /** Whether {@code lead}, run on {@code by}, stands at the lead mark facing its way. */
     private boolean arriving(RailNetwork network, Place lead, double by) {
         Place there = lead.move(network, by).place();
-        return sameSpan(there.span(), stop.span()) && there.front().equals(stop.front());
+        return sameSpan(there.span(), leadMark.span()) && there.front().equals(leadMark.front());
     }
 
     /**
@@ -177,15 +177,10 @@ public final class Platform {
 
     /** Whether {@code block}, footed at {@code foot}, stands a block to the side of the Rail at a car's floor. */
     private static boolean beside(Station block, Station.Foot foot) {
-        Span span = foot.span();
-        Arm a = span.a();
-        Arm b = span.b();
-        double t = foot.fromA() / span.length();
-        double dx = block.x() + 0.5 - RailGeometry.ATTACH_X - (a.x() + (b.x() - a.x()) * t);
-        double dy = block.y() + 0.5 - RailGeometry.ATTACH_Y - (a.y() + (b.y() - a.y()) * t);
-        double dz = block.z() + 0.5 - RailGeometry.ATTACH_Z - (a.z() + (b.z() - a.z()) * t);
+        Place.Point off = block.fromFoot(foot);
         // A whole block off the line seen from above, and the Rail's underside within the block's height.
-        return Math.abs(Math.sqrt(dx * dx + dz * dz) - 1.0) < EPSILON && dy >= 0.0 && dy < 1.0;
+        return Math.abs(Math.sqrt(off.x() * off.x() + off.z() * off.z()) - 1.0) < EPSILON
+                && off.y() >= 0.0 && off.y() < 1.0;
     }
 
     /**

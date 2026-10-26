@@ -3,12 +3,13 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
-import java.util.ArrayList;
-import java.util.List;
-
 import io.github._5thlayer.railworks.client.ClientRails;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.RailNetwork;
@@ -51,8 +52,8 @@ public final class StationItem extends BlockItem implements PlansPlacement {
         if (level instanceof ServerLevel server) {
             return LevelStations.of(server).stations().all();
         }
-        // A platform runs back at most its spots, and its Station stands within a block or two of the Rail.
-        int reach = (int) Math.ceil(Platform.MAX_CARS * Platform.SPOT) + 3;
+        // Two platforms overlap from as far apart as both their lengths, each Station a block or two off the Rail.
+        int reach = (int) Math.ceil(2 * Platform.MAX_CARS * Platform.SPOT) + 3;
         List<Station> near = new ArrayList<>();
         for (int cx = SectionPos.blockToSectionCoord(pos.getX() - reach); cx <= SectionPos.blockToSectionCoord(pos.getX() + reach); cx++) {
             for (int cz = SectionPos.blockToSectionCoord(pos.getZ() - reach); cz <= SectionPos.blockToSectionCoord(pos.getZ() + reach); cz++) {
@@ -69,7 +70,7 @@ public final class StationItem extends BlockItem implements PlansPlacement {
         return near;
     }
 
-    private static java.util.Optional<StationPlacement.Refused> refusal(BlockPlaceContext context) {
+    private static Optional<StationPlacement.Refused> refusal(BlockPlaceContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
         return StationPlacement.refusal(networkOf(level), stationsNear(level, pos), pos);

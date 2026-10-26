@@ -59,7 +59,7 @@ public final class Stations {
     /**
      * The Stations {@code train} is stopped at: while it is at rest, those its leading car is at
      * arriving their serving way, within a Station's {@link Station#STRETCH} of its
-     * {@link Platform#stop}, the rest of it back along the platform; none while it moves. Either end
+     * {@link Platform#leadMark}, the rest of it back along the platform; none while it moves. Either end
      * of a Train may lead, but a Train of one car leads only the way it faces, so a Locomotive that
      * came in the other way is not stopped at a Station it stands by.
      */
@@ -73,7 +73,7 @@ public final class Stations {
         return stations.values().stream()
                 .filter(station -> Platform.of(network, station)
                         .map(platform -> leads.stream().anyMatch(lead ->
-                                Math.abs(platform.toStop(network, lead, Station.STRETCH)) <= Station.STRETCH))
+                                Math.abs(platform.toLeadMark(network, lead, Station.STRETCH)) <= Station.STRETCH))
                         .orElse(false))
                 .toList();
     }

@@ -3,6 +3,8 @@
 
 package io.github._5thlayer.railworks.gametest;
 
+import java.util.Locale;
+
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.railworks.CargoCarEntity;
@@ -20,12 +22,8 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * A Station faces the way it serves (ADR 0008): placed by a real player beside {@link LocomotiveTests}'
@@ -71,7 +69,7 @@ final class StationFacingTests {
 
     private static void refusedOverlapping(GameTestHelper helper) {
         ServerPlayer player = player(helper);
-        place(helper, player, NORTH);
+        StationTests.place(helper, player, NORTH);
         if (!(helper.getLevel().getBlockEntity(helper.absolutePos(NORTH)) instanceof StationBlockEntity first)) {
             helper.fail("the first Station was not placed", NORTH);
             return;
@@ -99,7 +97,7 @@ final class StationFacingTests {
     private static void serves(GameTestHelper helper, BlockPos pos, Direction facing, boolean stopped) {
         CargoCarEntity cargo = CargoAccessTests.cargoBehindLocomotive(helper);
         ServerPlayer player = player(helper);
-        if (!place(helper, player, pos).consumesAction()) {
+        if (!StationTests.place(helper, player, pos).consumesAction()) {
             helper.fail("a Station beside the Rail was refused", pos);
             return;
         }
@@ -136,29 +134,18 @@ final class StationFacingTests {
     }
 
     private static void refused(GameTestHelper helper, ServerPlayer player, BlockPos pos, RailworksRefusal expected) {
-        PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, pos));
+        PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), StationTests.context(helper, player, pos));
         if (plan == null || !plan.isRefused() || plan.refusal() != expected) {
             helper.fail("a Station at " + pos + " planned " + plan + ", not refused " + expected, pos);
             return;
         }
         int held = player.getMainHandItem().getCount();
-        if (place(helper, player, pos).consumesAction() || !helper.getBlockState(pos).isAir()
+        if (StationTests.place(helper, player, pos).consumesAction() || !helper.getBlockState(pos).isAir()
                 || player.getMainHandItem().getCount() != held) {
             helper.fail("a refused Station was placed or spent", pos);
         }
-        if (!StationItem.messageKey(expected).equals("message.railworks." + expected.name().toLowerCase(java.util.Locale.ROOT))) {
+        if (!StationItem.messageKey(expected).equals("message.railworks." + expected.name().toLowerCase(Locale.ROOT))) {
             helper.fail("a Station refused for " + expected + " says " + StationItem.messageKey(expected), pos);
         }
-    }
-
-    /** A click on the top of the block under {@code pos}, which places at {@code pos}. */
-    private static BlockPlaceContext context(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
-        BlockPos below = helper.absolutePos(pos.below());
-        return new BlockPlaceContext(player, InteractionHand.MAIN_HAND, player.getMainHandItem(),
-                new BlockHitResult(Vec3.upFromBottomCenterOf(below, 1.0), Direction.UP, below, false));
-    }
-
-    private static InteractionResult place(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
-        return player.getMainHandItem().useOn(context(helper, player, pos));
     }
 }

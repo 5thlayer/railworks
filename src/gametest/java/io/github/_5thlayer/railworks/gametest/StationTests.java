@@ -299,13 +299,13 @@ final class StationTests {
     }
 
     /** A click on the top of the block under {@code pos}, which places at {@code pos}. */
-    private static BlockPlaceContext context(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
+    static BlockPlaceContext context(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
         BlockPos below = helper.absolutePos(pos.below());
         return new BlockPlaceContext(player, InteractionHand.MAIN_HAND, player.getMainHandItem(),
                 new BlockHitResult(Vec3.upFromBottomCenterOf(below, 1.0), Direction.UP, below, false));
     }
 
-    private static InteractionResult place(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
+    static InteractionResult place(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
         return player.getMainHandItem().useOn(context(helper, player, pos));
     }
 

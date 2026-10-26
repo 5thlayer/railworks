@@ -9,7 +9,7 @@ import java.util.function.ToLongFunction;
 /**
  * Drives a Train to one Station and stops it there, as an automatic Train is taken to its job's
  * Stations (ADR 0008): it runs on, brakes in time and stops with its leading car, its
- * first car the way it runs, within {@link #ARRIVE} of the Station's {@link Platform#stop}, the
+ * first car the way it runs, within {@link #ARRIVE} of the Station's {@link Platform#leadMark}, the
  * middle of its first car spot, well within the Station's {@link Station#STRETCH}.
  *
  * <p>With no Junctions a Train reaches a Station only along its own Line, either way: round a
@@ -25,7 +25,7 @@ import java.util.function.ToLongFunction;
  */
 public final class Driver {
 
-    /** How near the Station's stop its leading car's middle stops, in blocks. */
+    /** How near the Station's lead mark its leading car's middle stops, in blocks. */
     public static final double ARRIVE = 0.25;
 
     private final Station station;
@@ -60,7 +60,7 @@ public final class Driver {
 
     /**
      * Whether it stands at rest with its leading car at the Station: within {@link #ARRIVE} short of
-     * its stop, or past it by no more than the Station's stretch, where a Train that braked late
+     * its lead mark, or past it by no more than the Station's stretch, where a Train that braked late
      * stops. The leading car is the first the way it runs; set going with no way yet, either way it
      * can pull.
      */
@@ -114,7 +114,7 @@ public final class Driver {
         return train.speed() > 0.0 ? -1 : train.speed() < 0.0 ? 1 : 0;
     }
 
-    /** The nearer way it can pull to the Station's stop ahead of its leading car, past where it stands; 0 for neither. */
+    /** The nearer way it can pull to the Station's lead mark ahead of its leading car, past where it stands; 0 for neither. */
     private int pick(RailNetwork network, Train train, Predicate<Locomotive> slotFuelled) {
         int best = 0;
         double nearest = Double.POSITIVE_INFINITY;
@@ -132,14 +132,14 @@ public final class Driver {
     }
 
     /**
-     * How far ahead of its leading car the Station's {@link Platform#stop} is, running {@code way},
+     * How far ahead of its leading car the Station's {@link Platform#leadMark} is, running {@code way},
      * along the Line through the Arms: negative when the car has run past it by up to a Station's
      * stretch, and NaN when it is out of reach or would arrive against the Station's serving way.
      */
     private double distance(RailNetwork network, Train train, int way) {
         Place lead = train.lead(network, way);
         return Platform.of(network, station)
-                .map(platform -> platform.toStop(network, lead, Station.STRETCH))
+                .map(platform -> platform.toLeadMark(network, lead, Station.STRETCH))
                 .orElse(Double.NaN);
     }
 

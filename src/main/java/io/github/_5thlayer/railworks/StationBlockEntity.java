@@ -74,14 +74,14 @@ public final class StationBlockEntity extends BlockEntity {
         super.onLoad();
         register();
         if (level instanceof ServerLevel server) {
-            // Not while its chunk loads: a tick on, the block turns its arrow if it must.
+            // Not while its chunk loads: a tick on, the block turns its arrow if it must, and again every so often.
             server.scheduleTick(worldPosition, getBlockState().getBlock(), 1);
         }
     }
 
     /**
-     * Turns the block's arrow to the way it serves now, on a server: a Span strung since, or the
-     * drive side changed, may have turned it.
+     * Turns the block's arrow to the way it serves now, on a server: a Span strung or cut since, or
+     * the drive side changed, may have turned it. Jade asks afresh each time, so it is never behind.
      */
     void face() {
         if (level instanceof ServerLevel server && getBlockState().hasProperty(StationBlock.FACING)) {

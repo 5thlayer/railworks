@@ -63,7 +63,7 @@ class PlatformTest {
         assertEquals(List.of(9.5, 7.5, 5.5, 3.5), middles(platform));
         assertEquals(List.of(0, 1, 2, 3), platform.spots().stream().map(Platform.CarSpot::index).toList());
         assertEquals(B, platform.front().front());
-        assertEquals(platform.spots().getFirst().middle(), platform.stop());
+        assertEquals(platform.spots().getFirst().middle(), platform.leadMark());
     }
 
     @Test
@@ -171,10 +171,10 @@ class PlatformTest {
         Platform platform = platform(south(10));
         Place eastbound = new Place(network.get(A, B), B, 40.0 - 2.0);
         Place westbound = new Place(network.get(A, B), A, 2.0);
-        assertEquals(7.5, platform.toStop(network, eastbound, Station.STRETCH), 1e-9);
-        assertTrue(Double.isNaN(platform.toStop(network, westbound, Station.STRETCH)));
+        assertEquals(7.5, platform.toLeadMark(network, eastbound, Station.STRETCH), 1e-9);
+        assertTrue(Double.isNaN(platform.toLeadMark(network, westbound, Station.STRETCH)));
         // Just past it, within the stretch.
-        assertEquals(-0.5, platform.toStop(network, new Place(network.get(A, B), B, 30.0), Station.STRETCH), 1e-9);
+        assertEquals(-0.5, platform.toLeadMark(network, new Place(network.get(A, B), B, 30.0), Station.STRETCH), 1e-9);
     }
 
     @Test

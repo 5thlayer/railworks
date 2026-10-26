@@ -60,7 +60,7 @@ public record Station(int x, int y, int z, String name) {
      * How far off the Rail's line a Station's centre may be, seen from above, and still count as under
      * it: a block under the Rail is right under its line, and one beside it a whole block off.
      */
-    static final double UNDER = 0.5;
+    static final double UNDER_REACH = 0.5;
 
     /**
      * What a typed name becomes: trimmed, with formatting codes and control characters taken out and
@@ -112,13 +112,11 @@ public record Station(int x, int y, int z, String name) {
 
     /** {@link #servingEnd} on the Span of {@code foot}, driving on {@code side}. */
     Optional<Arm> servingEnd(Foot foot, DriveSide side) {
-        Span span = foot.span();
-        Arm a = span.a();
-        Arm b = span.b();
-        double t = foot.fromA() / span.length();
-        // From the foot to the Station's centre, seen from above, in Arm coordinates.
-        double sx = x + 0.5 - RailGeometry.ATTACH_X - (a.x() + (b.x() - a.x()) * t);
-        double sz = z + 0.5 - RailGeometry.ATTACH_Z - (a.z() + (b.z() - a.z()) * t);
+        Arm a = foot.span().a();
+        Arm b = foot.span().b();
+        Place.Point off = fromFoot(foot);
+        double sx = off.x();
+        double sz = off.z();
         double hx = b.x() - a.x();
         double hz = b.z() - a.z();
         double run = Math.sqrt(hx * hx + hz * hz);
@@ -128,10 +126,24 @@ public record Station(int x, int y, int z, String name) {
         // How far to the right of a Train heading for b the Station stands: right of (hx, hz) is (-hz, hx),
         // x running east and z south.
         double right = (sz * hx - sx * hz) / run;
-        if (Math.abs(right) < UNDER) {
+        if (Math.abs(right) < UNDER_REACH) {
             return Optional.empty();
         }
         return Optional.of((right > 0.0) == (side == DriveSide.RIGHT) ? b : a);
+    }
+
+    /**
+     * From {@code foot}, on the line from Arm to Arm, to the block's centre, in Arm coordinates: how
+     * far off the Rail the block stands.
+     */
+    Place.Point fromFoot(Foot foot) {
+        Arm a = foot.span().a();
+        Arm b = foot.span().b();
+        double t = foot.fromA() / foot.span().length();
+        return new Place.Point(
+                x + 0.5 - RailGeometry.ATTACH_X - (a.x() + (b.x() - a.x()) * t),
+                y + 0.5 - RailGeometry.ATTACH_Y - (a.y() + (b.y() - a.y()) * t),
+                z + 0.5 - RailGeometry.ATTACH_Z - (a.z() + (b.z() - a.z()) * t));
     }
 
     /** Whether a car at {@code place} is at this Station: on the Span it serves, within its stretch. */
