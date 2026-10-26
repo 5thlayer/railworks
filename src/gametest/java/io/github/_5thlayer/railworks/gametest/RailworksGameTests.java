@@ -61,6 +61,7 @@ public final class RailworksGameTests {
         // Registered rather than borrowed, since the event hands out no lookup for vanilla's.
         var environment = event.registerEnvironment(id("default"), new TestEnvironmentDefinition.AllOf(List.of()));
         var tests = new Registrar(event, environment);
+        HeardSounds.listen();
         LoadTests.register(tests);
         GameTestPackTests.register(tests);
         CreativeTabTests.register(tests);
@@ -72,6 +73,7 @@ public final class RailworksGameTests {
         StationTests.register(tests);
         CurveTests.register(tests);
         CargoLoadingTests.register(tests);
+        CarSoundTests.register(tests);
     }
 
     private static Identifier id(String path) {

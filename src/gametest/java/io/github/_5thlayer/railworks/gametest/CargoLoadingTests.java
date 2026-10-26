@@ -50,7 +50,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 final class CargoLoadingTests {
 
     /** Beside the Rail a block down, by the coupled Cargo car. */
-    private static final BlockPos LOADING = new BlockPos(5, 1, 2);
+    static final BlockPos LOADING = new BlockPos(5, 1, 2);
     /**
      * Beside the second Pylon a block down, by where the Locomotive stops at the line's end and by no
      * car of the Train where it starts.
@@ -59,7 +59,7 @@ final class CargoLoadingTests {
     /** Beside the Rail a block down, by the Locomotive and not by the Cargo cars behind it. */
     private static final BlockPos BY_LOCOMOTIVE = new BlockPos(7, 1, 2);
     /** The row beside the Span a player stands in, on the near side and the far side of the Rail. */
-    private static final int SIDE_Z = 1;
+    static final int SIDE_Z = 1;
     private static final int FAR_SIDE_Z = 5;
     /** Beside the Rail far from the Cargo car. */
     private static final BlockPos FAR = new BlockPos(2, 1, 2);
@@ -464,7 +464,7 @@ final class CargoLoadingTests {
     }
 
     /** A survival player sneaking with four hoppers in hand, beside the Span on the side at {@code z}. */
-    private static ServerPlayer sneaker(GameTestHelper helper, int z) {
+    static ServerPlayer sneaker(GameTestHelper helper, int z) {
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         BlockPos stand = helper.absolutePos(new BlockPos(5, 1, z));
@@ -478,7 +478,7 @@ final class CargoLoadingTests {
      * {@code player} sneak-uses their hopper at {@code cargo}: it must stand in the car's filling spot
      * on their side, pointing {@code facing}, at the car. Its position.
      */
-    private static BlockPos sneakHopper(GameTestHelper helper, CargoCarEntity cargo, ServerPlayer player, Direction facing) {
+    static BlockPos sneakHopper(GameTestHelper helper, CargoCarEntity cargo, ServerPlayer player, Direction facing) {
         BlockPos expected = spot(cargo.hopperSpots().fillingNearest(player.getX(), player.getZ()).spot());
         cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
         BlockState placed = helper.getLevel().getBlockState(expected);
@@ -519,7 +519,7 @@ final class CargoLoadingTests {
      * sequence to wait on. It reads the server's entity data, which vanilla's entity tracking sends on; no
      * client runs here to receive it.
      */
-    private static void synced(GameTestHelper helper, CargoCarEntity cargo, boolean expected) {
+    static void synced(GameTestHelper helper, CargoCarEntity cargo, boolean expected) {
         if (cargo.loadingSeen() != expected || cargo.loading() != expected) {
             helper.fail("the Cargo car flags " + cargo.loadingSeen() + " for loading and works out " + cargo.loading()
                     + ", with its capability "
@@ -559,7 +559,7 @@ final class CargoLoadingTests {
     // ---- setup ----
 
     /** The Cargo car of a Locomotive on the Span with it coupled behind. */
-    private static CargoCarEntity cargoBehindLocomotive(GameTestHelper helper) {
+    static CargoCarEntity cargoBehindLocomotive(GameTestHelper helper) {
         return CargoCarTests.placeCargoBeside(helper, LocomotiveTests.placed(helper), -1);
     }
 
@@ -572,12 +572,12 @@ final class CargoLoadingTests {
     }
 
     /** A Station block, which puts itself in the level's Stations a tick after it is set. */
-    private static void station(GameTestHelper helper, BlockPos pos) {
+    static void station(GameTestHelper helper, BlockPos pos) {
         helper.setBlock(pos, RailworksRegistries.STATION.get().defaultBlockState());
     }
 
     /** Fails until each Station is in the level's Stations, for a sequence to wait on. */
-    private static void registered(GameTestHelper helper, BlockPos... stations) {
+    static void registered(GameTestHelper helper, BlockPos... stations) {
         for (BlockPos pos : stations) {
             BlockPos at = helper.absolutePos(pos);
             if (LevelStations.of(helper.getLevel()).stations().get(at.getX(), at.getY(), at.getZ()) == null) {
