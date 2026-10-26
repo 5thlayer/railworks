@@ -22,7 +22,7 @@ public final class CargoCar implements Car {
     public static final double MASS_KG = 1_000.0;
 
     /** Blocks along the Line: as long as a Locomotive, as Factorio's wagon is. */
-    public static final double LENGTH = 1.8;
+    public static final double LENGTH = Locomotive.LENGTH;
 
     static final MapCodec<CargoCar> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             ID_FIELD.forGetter(CargoCar::id)

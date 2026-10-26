@@ -3,9 +3,6 @@
 
 package io.github._5thlayer.railworks.client;
 
-import java.util.EnumMap;
-import java.util.Map;
-
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
@@ -39,13 +36,6 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         float xRot;
     }
 
-    /** Each paint's colour, red, green and blue. */
-    private static final Map<CarBody.Paint, float[]> COLOURS = new EnumMap<>(Map.of(
-            CarBody.Paint.SHELL, new float[] {0.62F, 0.27F, 0.18F},
-            CarBody.Paint.DARK_RUST, new float[] {0.40F, 0.17F, 0.12F},
-            CarBody.Paint.TRIM, new float[] {0.13F, 0.08F, 0.07F},
-            CarBody.Paint.DEEP_RED, new float[] {0.30F, 0.10F, 0.08F},
-            CarBody.Paint.LAMP, new float[] {0.95F, 0.90F, 0.62F}));
 
     /** The six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
@@ -93,9 +83,9 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
             for (CarBody.Part part : body.parts()) {
                 CarBody.Box b = part.box();
-                float[] rgb = COLOURS.get(part.paint());
+                CarBody.Paint paint = part.paint();
                 box(pose.pose(), buffer, (float) b.minX(), (float) b.minY(), (float) b.minZ(),
-                        (float) b.maxX(), (float) b.maxY(), (float) b.maxZ(), rgb[0], rgb[1], rgb[2], light);
+                        (float) b.maxX(), (float) b.maxY(), (float) b.maxZ(), paint.red, paint.green, paint.blue, light);
             }
         });
         for (CarBody.Box chest : body.chests()) {
