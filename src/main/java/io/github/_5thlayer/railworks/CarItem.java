@@ -34,7 +34,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class CarItem extends Item implements PlansPlacement {
 
-    /** An iron block's place sound pitched down, for a heavier thing set on the Rail. */
+    /** An iron block's place sound pitched down, as vanilla's {@code BlockItem} pitches a block's, for a heavy thing set on the Rail. */
     private static final float PLACE_PITCH = 0.8F;
 
     private final CarKind kind;

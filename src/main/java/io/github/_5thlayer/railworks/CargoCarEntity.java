@@ -43,7 +43,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -196,7 +195,9 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
     /**
      * Sets a hopper in the filling spot on the player's side, pointing at the car, while its Train is
      * stopped at a Station and the car stands on a Straight leg: the spots are where it stands, so
-     * a hopper set while it passes, or where it does not load, would load nothing. It stands in the air, however high the Train is, and is refused where the spot is taken.
+     * a hopper set while it passes, or where it does not load, would load nothing. It stands in the
+     * air, however high the Train is, and is refused where the spot is taken. Its place sound reaches
+     * the placer too.
      */
     private void placeHopper(Player player, InteractionHand hand) {
         if (stoppedAt().isEmpty()) {
@@ -222,15 +223,22 @@ public final class CargoCarEntity extends CarEntity implements WorldlyContainer 
             refuse(player, "message.railworks.hopper_spot_taken");
             return;
         }
-        // Vanilla plays the place sound to all but the placer, whose client would have played its own
-        // on a click it predicted; this click was not, so the placer is sent it alone.
         if (player instanceof ServerPlayer server) {
-            BlockState placed = level().getBlockState(pos);
-            SoundType sound = placed.getSoundType(level(), pos, player);
-            server.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound.getPlaceSound()),
-                    SoundSource.BLOCKS, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
-                    (sound.getVolume() + 1.0F) / 2.0F, sound.getPitch() * 0.8F, random.nextLong()));
+            sendPlaceSound(server, pos);
         }
+    }
+
+    /**
+     * The place sound of the block just placed at {@code pos}, to its placer alone, as vanilla's
+     * {@code BlockItem} plays it to everyone else: its client plays its own for a click it predicted,
+     * and it predicted none of this one. The sound is its sound type's, as {@code BlockItem}'s
+     * protected hook gives for a hopper.
+     */
+    private void sendPlaceSound(ServerPlayer placer, BlockPos pos) {
+        SoundType type = level().getBlockState(pos).getSoundType(level(), pos, placer);
+        placer.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(type.getPlaceSound()), SoundSource.BLOCKS,
+                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                (type.getVolume() + 1.0F) / 2.0F, type.getPitch() * 0.8F, random.nextLong()));
     }
 
     private static void refuse(Player player, String message) {
