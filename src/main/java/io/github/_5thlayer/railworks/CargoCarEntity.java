@@ -26,8 +26,8 @@ import net.minecraft.world.level.storage.ValueOutput;
 /**
  * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
  * which its menu, vanilla's three-row chest, shows when the car is used. It is no {@link Container}
- * and gives no item capability, so no hopper, feeder or pipe reaches its cargo: unattended, items
- * go in and out through a Station's hatches (ADR 0008). Nobody rides it; coupling and the rest are
+ * and gives no item capability, so no hopper, feeder or pipe reaches its cargo: with no player
+ * there, items go in and out through a Station's hatches (ADR 0008). Nobody rides it; coupling and the rest are
  * {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {

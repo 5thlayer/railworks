@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.mojang.serialization.JsonOps;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -158,6 +157,32 @@ class DriverTest {
     }
 
     @Test
+    void aTrainWhoseFuelRunsOutAsItBrakesInStillGetsThere() {
+        line();
+        Train train = lone(5.0);
+        Driver driver = new Driver(DEPOT);
+        for (int i = 0; i < BUDGET && alongLine(train, train.cars().getFirst()) < 34.0; i++) {
+            tick(driver, train);
+        }
+        assertTrue(train.speed() > 0.0, "it should still be braking in: " + train);
+        ((Locomotive) train.cars().getFirst()).fuel().load(0L, 0L);
+        runFor(driver, train, 20);
+        assertTrue(train.atRest());
+        assertTrue(tick(driver, train), "it stopped at the Station, dry: " + train);
+    }
+
+    @Test
+    void aCarAtTheStationBehindTheWayItRunsIsNotItsLeadingCar() {
+        line();
+        // A Locomotive facing C at 37, its Cargo car behind it at 35 by the Depot: it cannot back,
+        // so its leading car is the Locomotive, two blocks past the Station.
+        Span span = network.get(B, C);
+        Train train = Train.of(new Place(span, C, 3.0), List.of(fuelled(), CargoCar.create()));
+        assertEquals(35.0, alongLine(train, train.cars().getLast()), 1e-9);
+        assertFalse(tick(new Driver(DEPOT), train));
+    }
+
+    @Test
     void aLocomotiveWithFuelOnlyInItsSlotStillPullsItThere() {
         line();
         Locomotive locomotive = Locomotive.burner();
@@ -255,25 +280,5 @@ class DriverTest {
         int ticks = drive(driver, train);
         // Round the loop's 90-odd blocks, never faster than a block a tick.
         assertTrue(ticks > 80, "it arrived in " + ticks + " ticks");
-    }
-
-    // ---- what a Train saved with a Schedule loads as ----
-
-    @Test
-    void aTrainSavedWithAScheduleLoadsWithoutIt() {
-        line();
-        Train train = lone(10.0);
-        var saved = Train.CODEC.encodeStart(JsonOps.INSTANCE, train).getOrThrow().getAsJsonObject();
-        // What #26's Schedule saved with a Train, mid-way to its second entry.
-        saved.add("schedule", com.google.gson.JsonParser.parseString("""
-                {"entries": [{"station": "Mine", "until": "time", "seconds": 5},
-                             {"station": "Depot", "until": "cargo_full"}],
-                 "automatic": true, "index": 1, "waiting": false, "waited": 0,
-                 "target": {"x": 35, "y": 6, "z": 1, "way": 1}}
-                """));
-        Train loaded = Train.CODEC.parse(JsonOps.INSTANCE, saved).getOrThrow();
-        assertEquals(train.head(), loaded.head());
-        assertEquals(train.cars().size(), loaded.cars().size());
-        assertFalse(Train.CODEC.encodeStart(JsonOps.INSTANCE, loaded).getOrThrow().getAsJsonObject().has("schedule"));
     }
 }

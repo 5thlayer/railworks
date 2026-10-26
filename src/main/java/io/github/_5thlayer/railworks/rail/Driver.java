@@ -8,8 +8,8 @@ import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 
 /**
- * Drives a Train unattended to one Station and stops it there, as an automatic Train is taken to
- * its job's Stations (ADR 0008): it runs on, brakes in time and stops with its leading car, its
+ * Drives a Train to one Station and stops it there, as an automatic Train is taken to its job's
+ * Stations (ADR 0008): it runs on, brakes in time and stops with its leading car, its
  * first car the way it runs, within {@link #ARRIVE} of the Station's foot, well within the
  * Station's {@link Station#STRETCH}.
  *
@@ -17,7 +17,8 @@ import java.util.function.ToLongFunction;
  * closed loop, or back the way it came when it carries a Locomotive facing that way. It runs only
  * the way a Locomotive able to pull faces, one with fuel in its buffer or its slot, so a Train with
  * one Locomotive never backs to a Station; of the ways it can, it takes the nearer, and keeps to it
- * until it is there. Where the Station is out of reach either way it holds where it is.
+ * until it is there, even should its fuel run out on the way in. Where the Station is out of reach
+ * either way it holds where it is.
  *
  * <p>Pure: no Minecraft types.
  */
@@ -57,17 +58,21 @@ public final class Driver {
     }
 
     /**
-     * Whether it stands at rest with its leading car at the Station, either way it can run: within
-     * {@link #ARRIVE} short of the foot, or past it by no more than the Station's stretch, where a
-     * Train that braked late stops.
+     * Whether it stands at rest with its leading car at the Station: within {@link #ARRIVE} short of
+     * the foot, or past it by no more than the Station's stretch, where a Train that braked late
+     * stops. The leading car is the first the way it runs; set going with no way yet, either way it
+     * can pull.
      */
     private boolean there(RailNetwork network, Train train, Predicate<Locomotive> slotFuelled) {
         if (!train.atRest()) {
             return false;
         }
+        // NaN, out of reach, compares false.
+        if (way != 0) {
+            return distance(network, train, way) <= ARRIVE;
+        }
         for (int way : new int[] {1, -1}) {
-            // NaN, out of reach, compares false.
-            if (pulls(train, slotFuelled, way) && distance(network, train, station, way) <= ARRIVE) {
+            if (train.pulls(way, slotFuelled) && distance(network, train, way) <= ARRIVE) {
                 return true;
             }
         }
@@ -76,13 +81,14 @@ public final class Driver {
 
     /** The way to push it this tick, +1 the Train's heading, -1 against it and 0 for neither. */
     private int push(RailNetwork network, Train train, Predicate<Locomotive> slotFuelled) {
-        if (way == 0 || !pulls(train, slotFuelled, way)) {
+        // At rest unable to pull its way, it looks for the other; moving, it runs on, out of fuel or not.
+        if (way == 0 || train.atRest() && !train.pulls(way, slotFuelled)) {
             way = pick(network, train, slotFuelled);
         }
         if (way == 0) {
             return hold(train);
         }
-        double d = distance(network, train, station, way);
+        double d = distance(network, train, way);
         if (Double.isNaN(d)) {
             // Cut off from it, or left too far behind: the next tick looks again.
             way = 0;
@@ -112,27 +118,16 @@ public final class Driver {
         int best = 0;
         double nearest = Double.POSITIVE_INFINITY;
         for (int way : new int[] {1, -1}) {
-            if (!pulls(train, slotFuelled, way)) {
+            if (!train.pulls(way, slotFuelled)) {
                 continue;
             }
-            double d = distance(network, train, station, way);
+            double d = distance(network, train, way);
             if (d > ARRIVE && d < nearest) {
                 nearest = d;
                 best = way;
             }
         }
         return best;
-    }
-
-    /** Whether a Locomotive facing {@code way} has fuel to pull with, in its buffer or its slot. */
-    private static boolean pulls(Train train, Predicate<Locomotive> slotFuelled, int way) {
-        for (Car car : train.cars()) {
-            if (car instanceof Locomotive locomotive && (train.reversed(car) ? -1 : 1) == way
-                    && (locomotive.fuelled() || slotFuelled.test(locomotive))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Its first car the way it runs, facing that way. */
@@ -142,11 +137,11 @@ public final class Driver {
     }
 
     /**
-     * How far ahead of its leading car {@code station}'s foot is, running {@code way}, along the
+     * How far ahead of its leading car the Station's foot is, running {@code way}, along the
      * Line through the Arms ({@link Place#distanceTo}): negative when the car has run past it by up
      * to a Station's stretch, and NaN when it is out of reach.
      */
-    private static double distance(RailNetwork network, Train train, Station station, int way) {
+    private double distance(RailNetwork network, Train train, int way) {
         Optional<Station.Foot> foot = station.foot(network);
         if (foot.isEmpty()) {
             return Double.NaN;

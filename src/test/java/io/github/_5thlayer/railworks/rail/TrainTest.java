@@ -348,6 +348,23 @@ class TrainTest {
     }
 
     @Test
+    void aTrainSavedWithAScheduleLoadsWithoutIt() {
+        Train train = train(network.get(A, B), B, 10.0);
+        var saved = Train.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, train).getOrThrow().getAsJsonObject();
+        // What #26's Schedule saved with a Train, mid-way to its second entry and driving it.
+        saved.add("schedule", com.google.gson.JsonParser.parseString("""
+                {"entries": [{"station": "Mine", "until": "time", "seconds": 5},
+                             {"station": "Depot", "until": "cargo_full"}],
+                 "automatic": true, "index": 1, "waiting": false, "waited": 0,
+                 "target": {"x": 35, "y": 6, "z": 1, "way": 1}}"""));
+        Train back = Train.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, saved).getOrThrow();
+        assertEquals(train.head(), back.head());
+        assertEquals(train.cars().getFirst().id(), back.cars().getFirst().id());
+        assertFalse(Train.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, back).getOrThrow()
+                .getAsJsonObject().has("schedule"));
+    }
+
+    @Test
     void aLocomotiveSavedBeforeTrainsHadCarsLoadsAsATrainOfIt() {
         var json = com.google.gson.JsonParser.parseString("""
                 {"span": {"a": [0, 5, 0], "b": [20, 5, 0], "cost": 20}, "front": [20, 5, 0],

@@ -408,6 +408,20 @@ public final class Train {
         return pulling;
     }
 
+    /**
+     * Whether a Locomotive facing {@code way}, +1 the Train's heading and -1 against it, has fuel to
+     * pull with, in its buffer or, as {@code slotFuelled} says, waiting in its slot.
+     */
+    boolean pulls(int way, Predicate<Locomotive> slotFuelled) {
+        for (Car car : cars) {
+            if (car instanceof Locomotive locomotive && facingSign(car) == way
+                    && (locomotive.fuelled() || slotFuelled.test(locomotive))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private int facingSign(Car car) {
         return reversed(car) ? -1 : 1;
     }
