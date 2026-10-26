@@ -57,8 +57,14 @@ public record CarBody(List<Part> parts) {
     private static final double EYE_ABOVE_SEAT = 1.62 - 0.6;
 
     /** The window bands, running unbroken from car to car. */
-    private static final double BAND_Y0 = 1.8;
-    private static final double BAND_Y1 = 2.3;
+    private static final double BAND_Y0 = 1.64;
+    private static final double BAND_Y1 = 2.5;
+
+    /** The Locomotive's open side windows, along the cab inside the band's frame. */
+    private static final double WINDOW_Y0 = 1.7;
+    private static final double WINDOW_Y1 = 2.44;
+    private static final double WINDOW_Z0 = -0.25;
+    private static final double WINDOW_Z1 = 0.74;
 
     public static final CarBody LOCOMOTIVE = locomotive();
     public static final CarBody CARGO = cargo();
@@ -68,23 +74,32 @@ public record CarBody(List<Part> parts) {
         return new double[] {0.0, SEAT_Y + EYE_ABOVE_SEAT, SEAT_Z};
     }
 
-    /** What both cars share: the skirts, the floor, the roof and the window bands, end to end. */
+    /** What both cars share: the skirts, the floor and the roof. */
     private static List<Part> shell() {
         List<Part> parts = new ArrayList<>();
         sides(parts, new Part(Paint.UNDER, 0.17, 0.0, -0.89, 0.49, 0.62, 0.89));
         parts.add(new Part(Paint.SHELL, -0.5, 0.55, -0.9, 0.5, 0.7, 0.9));
         parts.add(new Part(Paint.SHELL, -0.5, 2.6, -0.9, 0.5, 2.75, 0.9));
-        sides(parts, new Part(Paint.TRIM, 0.47, BAND_Y0, -0.9, 0.5, BAND_Y1, 0.9));
         return parts;
     }
 
     /**
-     * The Locomotive: closed sides and back, and an open cab at the front, framed in dark by the
-     * roof's edge, two corner pillars and a low dash, with a deep red nose and two headlights under it.
+     * The Locomotive: a closed back, an open cab at the front, framed in dark by the roof's edge, two
+     * corner pillars and a low dash, with a deep red nose and two headlights under it, and an open
+     * window in each side of the cab, framed by the band.
      */
     private static CarBody locomotive() {
         List<Part> parts = shell();
-        sides(parts, new Part(Paint.SHELL, 0.42, 0.68, -0.885, 0.49, 2.62, 0.84));
+        // The side wall below and above the window, then behind and ahead of it; the band runs on
+        // behind and ahead of the window and frames it above and below.
+        sides(parts, new Part(Paint.SHELL, 0.42, 0.68, -0.885, 0.49, WINDOW_Y0 - 0.005, 0.84));
+        sides(parts, new Part(Paint.SHELL, 0.42, WINDOW_Y1 + 0.005, -0.885, 0.49, 2.62, 0.84));
+        sides(parts, new Part(Paint.SHELL, 0.425, BAND_Y0 + 0.05, -0.88, 0.485, BAND_Y1 - 0.05, WINDOW_Z0 + 0.005));
+        sides(parts, new Part(Paint.SHELL, 0.425, BAND_Y0 + 0.05, WINDOW_Z1 - 0.005, 0.485, BAND_Y1 - 0.05, 0.835));
+        sides(parts, new Part(Paint.TRIM, 0.47, BAND_Y0, -0.9, 0.5, BAND_Y1, WINDOW_Z0));
+        sides(parts, new Part(Paint.TRIM, 0.47, BAND_Y0, WINDOW_Z1, 0.5, BAND_Y1, 0.9));
+        sides(parts, new Part(Paint.TRIM, 0.472, BAND_Y0 + 0.005, WINDOW_Z0 - 0.005, 0.498, WINDOW_Y0, WINDOW_Z1 + 0.005));
+        sides(parts, new Part(Paint.TRIM, 0.472, WINDOW_Y1, WINDOW_Z0 - 0.005, 0.498, BAND_Y1 - 0.005, WINDOW_Z1 + 0.005));
         parts.add(new Part(Paint.SHELL, -0.45, 0.67, -0.89, 0.45, 2.63, -0.82));
         parts.add(new Part(Paint.UNDER, -0.25, 0.75, -0.9, 0.25, 2.35, -0.87));
         sides(parts, new Part(Paint.TRIM, 0.3, 0.66, 0.76, 0.495, 2.64, 0.885));
@@ -101,6 +116,7 @@ public record CarBody(List<Part> parts) {
      */
     private static CarBody cargo() {
         List<Part> parts = shell();
+        sides(parts, new Part(Paint.TRIM, 0.47, BAND_Y0, -0.9, 0.5, BAND_Y1, 0.9));
         for (int end : new int[] {1, -1}) {
             parts.add(along(end, new Part(Paint.SHELL, -0.45, 0.67, 0.82, 0.45, 2.63, 0.89)));
             parts.add(along(end, new Part(Paint.UNDER, -0.25, 0.75, 0.87, 0.25, 2.35, 0.9)));

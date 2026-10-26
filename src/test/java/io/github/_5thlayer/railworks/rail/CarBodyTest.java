@@ -105,9 +105,23 @@ class CarBodyTest {
     }
 
     @Test
-    void theRiderDoesNotSeeThroughTheRoofOrTheSides() {
+    void theRiderSeesOutOfTheCabsSideWindowsLookingAcrossOrALittleUpOrDown() {
+        for (int pitch = -20; pitch <= 15; pitch++) {
+            for (int yaw = 60; yaw <= 120; yaw++) {
+                for (int side : new int[] {1, -1}) {
+                    CarBody.Part hit = firstHit(pitch, side * yaw);
+                    if (hit != null) {
+                        fail("looking " + pitch + " up and " + side * yaw + " across, the rider sees " + hit);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void theRiderDoesNotSeeThroughTheRoofOrTheSidesBehindThem() {
         assertTrue(firstHit(60, 0) != null, "the roof does not cover the rider");
-        assertTrue(firstHit(0, 80) != null, "the side does not close the cab");
+        assertTrue(firstHit(0, 150) != null && firstHit(0, -150) != null, "the sides behind the cab are open");
     }
 
     /** The first part a ray from the rider's eye meets before it leaves the car's front, or null. */
