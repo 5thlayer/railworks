@@ -27,6 +27,8 @@ public final class Platform {
     public static final int MAX_CARS = 4;
     /** How long a car spot is along the Line, in blocks: a car's pitch, coupling to coupling. */
     public static final double SPOT = 2.0;
+    /** How far a block beside a platform's car spots may be from its Station along x, y or z, in blocks. */
+    public static final double REACH = MAX_CARS * SPOT + 3.0;
     /** Slack for the floating point, so pieces that only touch end to end do not overlap. */
     private static final double EPSILON = 1e-6;
 
@@ -34,6 +36,14 @@ public final class Platform {
 
     /** A car spot: its place in the platform, 0 the leading car's, and its middle, facing the serving way. */
     public record CarSpot(int index, Place middle) {
+    }
+
+    /** A hatch's place: the Station whose platform it stands beside, and the car spot it is beside. */
+    public record Joined(Station station, int spot) {
+    }
+
+    /** A block beside a car spot, where a hatch may stand: the spot's index and the block's position. */
+    public record Beside(int spot, int x, int y, int z) {
     }
 
     /** Some of one Span the platform covers, as how far along it from its first end, low to high. */
@@ -173,6 +183,53 @@ public final class Platform {
             }
         }
         return OptionalInt.empty();
+    }
+
+    /**
+     * Every block beside one of its car spots, where a hatch may stand: two each side of the Rail for
+     * each spot, the Station's own block among them, spot by spot.
+     */
+    public List<Beside> besideBlocks(RailNetwork network) {
+        List<Beside> beside = new ArrayList<>();
+        for (CarSpot spot : spots) {
+            // The middle of the spot as a block position; the blocks beside it are within two of it.
+            Place.Point middle = spot.middle().point(network);
+            int mx = (int) Math.floor(middle.x() + RailGeometry.ATTACH_X);
+            int my = (int) Math.floor(middle.y() + RailGeometry.ATTACH_Y);
+            int mz = (int) Math.floor(middle.z() + RailGeometry.ATTACH_Z);
+            for (int x = mx - 2; x <= mx + 2; x++) {
+                for (int y = my - 1; y <= my + 1; y++) {
+                    for (int z = mz - 2; z <= mz + 2; z++) {
+                        if (spotBeside(x, y, z).equals(OptionalInt.of(spot.index()))) {
+                            beside.add(new Beside(spot.index(), x, y, z));
+                        }
+                    }
+                }
+            }
+        }
+        return List.copyOf(beside);
+    }
+
+    /**
+     * Which of {@code stations} a hatch at {@code x}, {@code y}, {@code z} joins, and at which car spot:
+     * the one whose platform it stands beside, of which there is at most one, since no two platforms
+     * overlap. Empty beside no platform's car spot. Asked afresh, so a Station broken or a platform
+     * bent away leaves it joining nothing until a platform covers it again.
+     */
+    public static Optional<Joined> joined(RailNetwork network, Iterable<Station> stations, int x, int y, int z) {
+        for (Station station : stations) {
+            if (Math.abs(station.x() - x) > REACH || Math.abs(station.z() - z) > REACH || Math.abs(station.y() - y) > REACH) {
+                continue;
+            }
+            Optional<Platform> platform = of(network, station);
+            if (platform.isPresent()) {
+                OptionalInt spot = platform.get().spotBeside(x, y, z);
+                if (spot.isPresent()) {
+                    return Optional.of(new Joined(station, spot.getAsInt()));
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     /** Whether {@code block}, footed at {@code foot}, stands a block to the side of the Rail at a car's floor. */

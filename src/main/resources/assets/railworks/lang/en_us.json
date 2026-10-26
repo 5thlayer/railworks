@@ -39,5 +39,21 @@
   "tooltip.railworks.station.jade.not_straight": "The Rail here now bends or runs diagonally: a Cargo car standing here won't load",
   "config.jade.plugin_railworks.pylon": "Pylon",
   "config.jade.plugin_railworks.station": "Station",
-  "config.jade.plugin_railworks.burner_locomotive": "Burner Locomotive"
+  "config.jade.plugin_railworks.burner_locomotive": "Burner Locomotive",
+  "block.railworks.hatch": "Hatch",
+  "item.railworks.hatch": "Provider Hatch",
+  "item.railworks.requester_hatch": "Requester Hatch",
+  "message.railworks.hatch_off_platform": "A hatch goes beside a Station's platform, at a car's floor beside a car spot",
+  "message.railworks.hatch.requesting": "Requesting %s stacks of %s",
+  "message.railworks.hatch.requesting_nothing": "Requesting nothing",
+  "message.railworks.hatch.provider_by_hoppers": "A provider hatch is filled by hoppers and pipes, not by hand",
+  "message.railworks.hatch.now_provider": "Now a provider",
+  "message.railworks.hatch.now_requester": "Now a requester",
+  "tooltip.railworks.hatch.jade.provider": "Provider",
+  "tooltip.railworks.hatch.jade.requester": "Requester",
+  "tooltip.railworks.hatch.jade.station": "Station: %s, car spot %s",
+  "tooltip.railworks.hatch.jade.no_station": "Joined to no Station: a plain container",
+  "tooltip.railworks.station.jade.hatches": "Hatches: %s",
+  "config.jade.plugin_railworks.hatch": "Hatch",
+  "config.jade.plugin_railworks.station_hatches": "Station hatches"
 }

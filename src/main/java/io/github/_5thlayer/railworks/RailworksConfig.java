@@ -15,7 +15,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, the Burner
- * Locomotive's drive and fuel, the drive side and how many car spots a Station's platform has. A server config, so the client measures the same limits the server
+ * Locomotive's drive and fuel, the drive side, how many car spots a Station's platform has and how
+ * many slots a hatch holds. A server config, so the client measures the same limits the server
  * strings by.
  */
 public final class RailworksConfig {
@@ -31,6 +32,7 @@ public final class RailworksConfig {
     private static final ModConfigSpec.LongValue LOCOMOTIVE_JOULES_PER_BURN_TICK;
     private static final ModConfigSpec.EnumValue<DriveSide> DRIVE_SIDE;
     private static final ModConfigSpec.IntValue PLATFORM_CARS;
+    private static final ModConfigSpec.IntValue HATCH_SLOTS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -44,6 +46,8 @@ public final class RailworksConfig {
                 .defineEnum("driveSide", DriveSide.DEFAULT);
         PLATFORM_CARS = builder.comment("How many car spots of two blocks a Station's platform has at most, back from the Station along its straight leg. 4 at most.")
                 .defineInRange("platformCars", Platform.MAX_CARS, 1, Platform.MAX_CARS);
+        HATCH_SLOTS = builder.comment("How many slots a hatch holds, a chest's 27 by default. A hatch keeps the slots it was placed with.")
+                .defineInRange("hatchSlots", LevelHatches.DEFAULT_SLOTS, 1, 54);
         builder.push("burner_locomotive");
         LOCOMOTIVE_MAX_SPEED = builder.comment("Top speed either way, in blocks a second. Factorio's locomotive does 72, which outruns chunk loading.")
                 .defineInRange("maxSpeed", LocomotiveSpec.DEFAULT_MAX_SPEED, 1.0, 200.0);
@@ -76,6 +80,7 @@ public final class RailworksConfig {
                 LocomotiveSpec.configureFuel(LocomotiveSpec.DEFAULT_JOULES_PER_BURN_TICK);
                 DriveSide.configure(DriveSide.DEFAULT);
                 Platform.configure(Platform.MAX_CARS);
+                LevelHatches.configure(LevelHatches.DEFAULT_SLOTS);
             }
         });
     }
@@ -90,6 +95,7 @@ public final class RailworksConfig {
             LocomotiveSpec.configureFuel(LOCOMOTIVE_JOULES_PER_BURN_TICK.get());
             DriveSide.configure(DRIVE_SIDE.get());
             Platform.configure(PLATFORM_CARS.get());
+            LevelHatches.configure(HATCH_SLOTS.get());
         }
     }
 }

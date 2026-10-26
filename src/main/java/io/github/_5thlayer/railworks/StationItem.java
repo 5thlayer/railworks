@@ -48,7 +48,7 @@ public final class StationItem extends BlockItem implements PlansPlacement {
      * The Stations whose platform a Station at {@code pos} could overlap: the level's, on a server,
      * and on a client the Station blocks in the chunks loaded within a platform's reach.
      */
-    private static Iterable<Station> stationsNear(Level level, BlockPos pos) {
+    static Iterable<Station> stationsNear(Level level, BlockPos pos) {
         if (level instanceof ServerLevel server) {
             return LevelStations.of(server).stations().all();
         }

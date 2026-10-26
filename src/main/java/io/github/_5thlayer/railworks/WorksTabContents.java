@@ -24,5 +24,7 @@ final class WorksTabContents {
         event.accept(RailworksRegistries.LOCOMOTIVE.get());
         event.accept(RailworksRegistries.CARGO_CAR.get());
         event.accept(RailworksRegistries.STATION_ITEM.get());
+        event.accept(RailworksRegistries.HATCH_ITEM.get());
+        event.accept(RailworksRegistries.REQUESTER_HATCH_ITEM.get());
     }
 }

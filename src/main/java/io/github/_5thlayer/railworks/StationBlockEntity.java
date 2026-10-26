@@ -58,6 +58,14 @@ public final class StationBlockEntity extends BlockEntity {
         return true;
     }
 
+    /** How many hatches joined it, asked afresh of the level's hatches, on a server; 0 on a client. */
+    public int hatches() {
+        if (!(level instanceof ServerLevel server)) {
+            return 0;
+        }
+        return LevelHatches.of(server).joinedTo(server, station()).size();
+    }
+
     /** Puts itself in the level's Stations under its name, on a server. */
     void register() {
         if (level instanceof ServerLevel server) {

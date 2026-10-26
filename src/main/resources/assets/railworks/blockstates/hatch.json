@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "mode=provider": {
+      "model": "railworks:block/hatch_provider"
+    },
+    "mode=requester": {
+      "model": "railworks:block/hatch_requester"
+    }
+  }
+}

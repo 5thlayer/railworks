@@ -80,6 +80,7 @@ public final class RailworksGameTests {
         CargoAccessTests.register(tests);
         CarSoundTests.register(tests);
         StationFacingTests.register(tests);
+        HatchTests.register(tests);
     }
 
     private static Identifier id(String path) {

@@ -14,12 +14,14 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** The Module's blocks, items, entity and block entity types, and the held Span end. */
+/** The Module's blocks, items, entity and block entity types, the held Span end and the hatch's item handler. */
 public final class RailworksRegistries {
 
     private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Railworks.MOD_ID);
@@ -70,6 +72,21 @@ public final class RailworksRegistries {
             BLOCK_ENTITIES.register(StationBlock.BLOCK_NAME,
                     () -> new BlockEntityType<>(StationBlockEntity::new, STATION.get()));
 
+    /** A container beside a Station's platform, joining that Station: a provider or a requester. */
+    public static final DeferredBlock<HatchBlock> HATCH = BLOCKS.registerBlock(HatchBlock.BLOCK_NAME, HatchBlock::new);
+    /**
+     * A provider hatch in hand, the block's own item, which its recipe makes. Each mode's item has its
+     * own name, so Jade names a hatch by the item it is picked as.
+     */
+    public static final DeferredItem<HatchItem> HATCH_ITEM = ITEMS.registerItem(HatchBlock.BLOCK_NAME,
+            props -> new HatchItem(HATCH.get(), HatchMode.PROVIDER, props), Item.Properties::useItemDescriptionPrefix);
+    /** A requester hatch in hand, which a provider's turns into, sneak-used in the air, and back. */
+    public static final DeferredItem<HatchItem> REQUESTER_HATCH_ITEM = ITEMS.registerItem("requester_hatch",
+            props -> new HatchItem(HATCH.get(), HatchMode.REQUESTER, props), Item.Properties::useItemDescriptionPrefix);
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HatchBlockEntity>> HATCH_ENTITY =
+            BLOCK_ENTITIES.register(HatchBlock.BLOCK_NAME,
+                    () -> new BlockEntityType<>(HatchBlockEntity::new, HATCH.get()));
+
     /** The Locomotive's menu. */
     public static final DeferredHolder<MenuType<?>, MenuType<LocomotiveMenu>> LOCOMOTIVE_MENU =
             MENUS.register("burner_locomotive", () -> new MenuType<>(LocomotiveMenu::new, FeatureFlags.VANILLA_SET));
@@ -91,5 +108,11 @@ public final class RailworksRegistries {
         MENUS.register(modBus);
         BLOCK_ENTITIES.register(modBus);
         DATA_COMPONENTS.register(modBus);
+        modBus.addListener(RailworksRegistries::registerCapabilities);
+    }
+
+    /** A hatch's item handler, on every side: its record's slots. */
+    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(Capabilities.Item.BLOCK, HATCH_ENTITY.get(), (hatch, side) -> hatch.items());
     }
 }

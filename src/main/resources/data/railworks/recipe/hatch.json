@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "III",
+    "ICI",
+    "IHI"
+  ],
+  "key": {
+    "I": "#c:ingots/iron",
+    "C": "#c:chests/wooden",
+    "H": "minecraft:hopper"
+  },
+  "result": {
+    "id": "railworks:hatch",
+    "count": 1
+  }
+}

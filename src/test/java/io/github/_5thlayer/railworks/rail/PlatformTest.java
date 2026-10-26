@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -182,5 +184,44 @@ class PlatformTest {
         line();
         DriveSide.configure(DriveSide.LEFT);
         assertEquals(List.of(10.5, 12.5, 14.5, 16.5), middles(platform(south(10))));
+    }
+
+    @Test
+    void aBlockBesideACarSpotJoinsThatStationAtThatSpot() {
+        line();
+        Station mine = south(10);
+        Station smelter = north(30);
+        List<Station> stations = List.of(smelter, mine);
+        assertEquals(Optional.of(new Platform.Joined(mine, 1)), Platform.joined(network, stations, 8, 6, -1));
+        assertEquals(Optional.of(new Platform.Joined(smelter, 0)), Platform.joined(network, stations, 30, 6, 1));
+        assertEquals(Optional.empty(), Platform.joined(network, stations, 20, 6, 1), "between the two platforms");
+        assertEquals(Optional.empty(), Platform.joined(network, List.of(), 8, 6, -1), "with no Station");
+    }
+
+    @Test
+    void aStationOffTheRailJoinsNothing() {
+        line();
+        assertEquals(Optional.empty(), Platform.joined(network, List.of(new Station(10, 6, 5, "Away")), 10, 6, 4));
+    }
+
+    @Test
+    void eachCarSpotHasFourBlocksBesideItTwoEachSideOfTheRail() {
+        line();
+        Platform platform = platform(south(10));
+        List<Platform.Beside> beside = platform.besideBlocks(network);
+        assertEquals(16, beside.size());
+        Set<List<Integer>> first = beside.stream().filter(b -> b.spot() == 0)
+                .map(b -> List.of(b.x(), b.y(), b.z())).collect(Collectors.toSet());
+        assertEquals(Set.of(List.of(10, 6, -1), List.of(9, 6, -1), List.of(10, 6, 1), List.of(9, 6, 1)), first);
+        for (Platform.Beside b : beside) {
+            assertEquals(OptionalInt.of(b.spot()), platform.spotBeside(b.x(), b.y(), b.z()));
+        }
+    }
+
+    @Test
+    void aShortPlatformHasBlocksOnlyBesideItsSpots() {
+        line();
+        assertEquals(8, platform(south(4)).besideBlocks(network).size());
+        assertTrue(platform(south(40)).besideBlocks(network).isEmpty());
     }
 }
