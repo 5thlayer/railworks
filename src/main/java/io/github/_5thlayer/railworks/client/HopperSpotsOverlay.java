@@ -12,14 +12,15 @@ import io.github._5thlayer.railworks.CargoCarEntity;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.rail.HopperSpots;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.context.ContextKey;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.neoforged.neoforge.client.event.ExtractLevelRenderStateEvent;
@@ -29,9 +30,9 @@ import org.joml.Vector3f;
 /**
  * Where hoppers go by a Cargo car stopped at a Station, drawn in the world as Factorio draws where an
  * inserter reaches: a yellow box on either side of the car at its floor, where a hopper sneak-used
- * at the car fills it, and an amber one under the Rail where a hopper empties it. Every player sees them, whatever they hold, so
- * the boxes tell a player who has not met loading yet that hoppers are the way, and they go when the
- * Train leaves. The spots are {@link HopperSpots}', at the car's synced box; one a block already fills,
+ * at the car fills it, and an amber one under the Rail where a hopper empties it. They show for the
+ * one car under the crosshair, whatever the player holds, which is the car a sneak-used hopper would
+ * go beside, and they go when the Train leaves or the player looks away. The spots are {@link HopperSpots}', at the car's synced box; one a block already fills,
  * a Pylon or a Station under the Rail, is not drawn, since no hopper can go there.
  */
 final class HopperSpotsOverlay {
@@ -55,17 +56,16 @@ final class HopperSpotsOverlay {
     private HopperSpotsOverlay() {
     }
 
-    /** Takes the boxes from the Cargo cars a client sees stopped at a Station. */
+    /** Takes the boxes of the Cargo car under the crosshair, while it loads. */
     static void onExtract(ExtractLevelRenderStateEvent event) {
         List<Box> boxes = new ArrayList<>();
-        for (Entity entity : event.getLevel().entitiesForRendering()) {
-            if (entity instanceof CargoCarEntity car && car.loadingSeen()) {
-                HopperSpots spots = car.hopperSpots();
-                for (HopperSpots.Filling filling : spots.filling()) {
-                    add(boxes, event.getLevel(), filling.spot(), FILL);
-                }
-                add(boxes, event.getLevel(), spots.emptying(), EMPTY);
+        if (Minecraft.getInstance().hitResult instanceof EntityHitResult hit && hit.getEntity() instanceof CargoCarEntity car
+                && car.level() == event.getLevel() && car.loadingSeen()) {
+            HopperSpots spots = car.hopperSpots();
+            for (HopperSpots.Filling filling : spots.filling()) {
+                add(boxes, event.getLevel(), filling.spot(), FILL);
             }
+            add(boxes, event.getLevel(), spots.emptying(), EMPTY);
         }
         event.getRenderState().setRenderData(BOXES, boxes.isEmpty() ? null : List.copyOf(boxes));
     }
