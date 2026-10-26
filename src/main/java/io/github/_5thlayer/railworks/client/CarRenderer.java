@@ -36,7 +36,6 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         float xRot;
     }
 
-
     /** The six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
 

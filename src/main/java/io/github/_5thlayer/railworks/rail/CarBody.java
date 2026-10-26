@@ -21,9 +21,11 @@ import java.util.List;
  */
 public record CarBody(List<Part> parts, List<Box> chests) {
 
-    /** A car's box: a block across, its height over the floor's underside, and its length along the Line. */
+    /** A car's box across: a block. */
     public static final double WIDTH = 1.0;
+    /** A car's box up from the floor's underside. */
     public static final double HEIGHT = 2.75;
+    /** A car's length along the Line. */
     public static final double LENGTH = 1.8;
 
     /** What colour a part is drawn in, red, green and blue. */
