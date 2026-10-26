@@ -78,6 +78,9 @@ final class CargoLoadingTests {
         tests.test("cargo_loading_a_hopper_is_refused_where_its_spot_is_taken", 40, CargoLoadingTests::hopperRefusedWhereTaken);
         tests.test("cargo_loading_a_hopper_is_refused_by_a_car_at_no_station", 20, CargoLoadingTests::hopperRefusedAwayFromStation);
         tests.test("cargo_loading_a_car_at_a_station_on_a_bend_neither_loads_nor_takes_a_hopper", 40, CargoLoadingTests::bendRefuses);
+        tests.test("cargo_loading_a_car_opens_all_its_slots_to_every_side_only_at_a_station", 40, CargoLoadingTests::sidesAtStation);
+        tests.test("cargo_loading_hoppers_by_a_car_at_no_station_move_nothing", 60, CargoLoadingTests::hoppersIdleAway);
+        tests.test("cargo_loading_hoppers_by_a_car_at_a_station_on_a_bend_move_nothing", 60, CargoLoadingTests::hoppersIdleOnBend);
         tests.test("cargo_loading_using_a_car_opens_its_cargo_sneaking_or_not", 20, CargoLoadingTests::useOpensCargo);
         tests.test("cargo_loading_a_car_is_not_boarded_by_a_player_or_a_led_mob", 20, CargoLoadingTests::notBoarded);
         tests.test("cargo_loading_a_car_two_back_is_filled_when_the_locomotive_is_by_the_station", 200,
@@ -89,6 +92,7 @@ final class CargoLoadingTests {
         station(helper, LOADING);
         helper.startSequence()
                 .thenWaitUntil(() -> registered(helper, LOADING))
+                .thenWaitUntil(() -> synced(helper, cargo, true))
                 .thenExecute(() -> {
                     var handler = cargo.getCapability(Capabilities.Item.ENTITY_AUTOMATION, Direction.NORTH);
                     if (handler == null || handler.size() != CargoCarEntity.SLOTS) {
@@ -345,6 +349,69 @@ final class CargoLoadingTests {
                     cargo.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
                     if (!helper.getLevel().getBlockState(spot).isAir() || player.getMainHandItem().getCount() != 4) {
                         helper.fail("a hopper was set by a Cargo car on a bend", LOADING);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    private static void sidesAtStation(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        helper.startSequence()
+                .thenExecute(() -> sides(helper, cargo, 0))
+                .thenExecute(() -> station(helper, LOADING))
+                .thenWaitUntil(() -> registered(helper, LOADING))
+                .thenWaitUntil(() -> synced(helper, cargo, true))
+                .thenExecute(() -> sides(helper, cargo, CargoCarEntity.SLOTS))
+                .thenSucceed();
+    }
+
+    /** Fails unless every side of {@code cargo} opens {@code expected} slots, and placing and taking follow. */
+    private static void sides(GameTestHelper helper, CargoCarEntity cargo, int expected) {
+        ItemStack ore = new ItemStack(Items.IRON_ORE);
+        for (Direction side : Direction.values()) {
+            int open = cargo.getSlotsForFace(side).length;
+            if (open != expected || cargo.canPlaceItemThroughFace(0, ore, side) != (expected > 0)
+                    || cargo.canTakeItemThroughFace(0, ore, side) != (expected > 0)) {
+                helper.fail("the Cargo car opens " + open + " slots on its " + side + ", not " + expected, LOADING);
+            }
+        }
+    }
+
+    private static void hoppersIdleAway(GameTestHelper helper) {
+        hoppersIdle(helper, cargoBehindLocomotive(helper));
+    }
+
+    private static void hoppersIdleOnBend(GameTestHelper helper) {
+        CargoCarEntity cargo = cargoBehindLocomotive(helper);
+        station(helper, LOADING);
+        LevelRails.of(helper.getLevel()).network().add(Span.of(PylonColumn.arm(helper.absolutePos(LocomotiveTests.B)),
+                PylonColumn.arm(helper.absolutePos(new BlockPos(13, 1, 7))), 6));
+        hoppersIdle(helper, cargo);
+    }
+
+    /**
+     * A filling hopper beside {@code cargo} pointing in and an emptying one under the Rail pulling,
+     * both in the car's spots, with ore in each: after long enough for several moves, nothing moved.
+     */
+    private static void hoppersIdle(GameTestHelper helper, CargoCarEntity cargo) {
+        HopperSpots spots = cargo.hopperSpots();
+        BlockPos filling = spot(spots.fillingNearest(cargo.getX(), cargo.getZ() - 2.0).spot());
+        BlockPos emptying = spot(spots.emptying());
+        helper.getLevel().setBlockAndUpdate(filling, Blocks.HOPPER.defaultBlockState().setValue(HopperBlock.FACING, Direction.SOUTH));
+        helper.getLevel().setBlockAndUpdate(emptying, Blocks.HOPPER.defaultBlockState());
+        hopper(helper, filling).setItem(0, new ItemStack(Items.IRON_ORE, 4));
+        cargo.cargo().setItem(0, new ItemStack(Items.COAL, 4));
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    if (count(cargo) != 4 || !cargo.cargo().getItem(0).is(Items.COAL)
+                            || count(hopper(helper, filling)) != 4 || !hopper(helper, emptying).isEmpty()) {
+                        helper.fail("hoppers moved items with a Cargo car that does not load: the car holds " + count(cargo)
+                                + ", the filling hopper " + count(hopper(helper, filling)) + ", the emptying one "
+                                + count(hopper(helper, emptying)), LOADING);
+                    }
+                    if (cargo.getSlotsForFace(Direction.NORTH).length != 0) {
+                        helper.fail("a Cargo car that does not load opens its slots", LOADING);
                     }
                 })
                 .thenSucceed();

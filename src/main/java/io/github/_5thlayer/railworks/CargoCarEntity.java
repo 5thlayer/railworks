@@ -4,6 +4,7 @@
 package io.github._5thlayer.railworks;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
@@ -26,6 +27,7 @@ import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
@@ -45,13 +47,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
- * which its menu, vanilla's three-row chest, shows when the car is used; nobody rides it. It is not a {@link Container} itself, so a hopper
- * cannot reach into it wherever it is: only while it is stopped at a Station does it give hoppers,
- * feeders and pipes its cargo, through {@link #automation()}, and only on a straight leg of Rail
- * ({@link StraightLeg}); a client sees that it does, to draw
- * its {@link #hopperSpots()}. Nobody rides it; coupling and the rest are {@link CarEntity}'s.
+ * which its menu, vanilla's three-row chest, shows when the car is used. It is a {@link WorldlyContainer},
+ * as a chest boat is a {@link Container}, so hoppers and Jade find it as they find one, but its sides
+ * open only while it {@link #loading() loads}: its Train stopped at a Station and the car on a
+ * Straight leg ({@link StraightLeg}). It gives mods' feeders and pipes the same cargo through
+ * {@link #automation()} on the same rule, and a client sees the rule's bit to draw its
+ * {@link #hopperSpots()}. Nobody rides it; coupling and the rest are {@link CarEntity}'s.
  */
-public final class CargoCarEntity extends CarEntity {
+public final class CargoCarEntity extends CarEntity implements WorldlyContainer {
 
     /** A chest's worth, three rows of nine. */
     public static final int SLOTS = 27;
@@ -69,6 +72,9 @@ public final class CargoCarEntity extends CarEntity {
     /** Whether it loads where it stands: at a Station, on a straight leg. The overlay draws by it. */
     private static final EntityDataAccessor<Boolean> DATA_LOADING =
             SynchedEntityData.defineId(CargoCarEntity.class, EntityDataSerializers.BOOLEAN);
+
+    private static final int[] ALL_SLOTS = IntStream.range(0, SLOTS).toArray();
+    private static final int[] NO_SLOTS = new int[0];
 
     /** Its cargo as NeoForge's transfer sees it. */
     private final ResourceHandler<ItemResource> handler = VanillaContainerWrapper.of(cargo);
@@ -94,13 +100,9 @@ public final class CargoCarEntity extends CarEntity {
      * diagonal, or on a client.
      */
     public @Nullable ResourceHandler<ItemResource> automation() {
-        return loads(stoppedAt()) ? handler : null;
+        return loading() ? handler : null;
     }
 
-    /** Whether it loads, its Train stopped at the Stations {@code at}: at one, on a Straight leg. */
-    private boolean loads(List<Station> at) {
-        return !at.isEmpty() && onStraightLeg();
-    }
 
     /** Whether it stands wholly on a straight leg square to the blocks, on the server: where it loads. */
     private boolean onStraightLeg() {
@@ -118,7 +120,10 @@ public final class CargoCarEntity extends CarEntity {
         return LevelStations.of(server).stations().stoppedAt(LevelRails.of(server).network(), train);
     }
 
-    /** Whether it loads where it stands, as the server last synced it: what the overlay draws by. */
+    /**
+     * Whether it loads where it stands, as the server worked it out on its last tick: the one bit the
+     * capability, the hoppers' sides and the overlay all go by.
+     */
     public boolean loading() {
         return entityData.get(DATA_LOADING);
     }
@@ -185,13 +190,76 @@ public final class CargoCarEntity extends CarEntity {
 
     @Override
     protected void syncCar(Car car) {
-        entityData.set(DATA_LOADING, loads(stoppedAt()));
+        entityData.set(DATA_LOADING, !stoppedAt().isEmpty() && onStraightLeg());
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
         super.defineSynchedData(entityData);
         entityData.define(DATA_LOADING, false);
+    }
+
+    // ---- a Container, open to hoppers only while it loads ----
+
+    @Override
+    public int[] getSlotsForFace(Direction side) {
+        return loading() ? ALL_SLOTS : NO_SLOTS;
+    }
+
+    @Override
+    public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction side) {
+        return loading();
+    }
+
+    @Override
+    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction side) {
+        return loading();
+    }
+
+    @Override
+    public int getContainerSize() {
+        return SLOTS;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return cargo.isEmpty();
+    }
+
+    @Override
+    public ItemStack getItem(int slot) {
+        return cargo.getItem(slot);
+    }
+
+    @Override
+    public ItemStack removeItem(int slot, int count) {
+        return cargo.removeItem(slot, count);
+    }
+
+    @Override
+    public ItemStack removeItemNoUpdate(int slot) {
+        return cargo.removeItemNoUpdate(slot);
+    }
+
+    @Override
+    public void setItem(int slot, ItemStack stack) {
+        cargo.setItem(slot, stack);
+    }
+
+    @Override
+    public void setChanged() {
+        cargo.setChanged();
+    }
+
+    /** As a chest boat's: while it is whole and the player near it. */
+    @Override
+    public boolean stillValid(Player player) {
+        return cargo.stillValid(player);
+    }
+
+    @Override
+    public void clearContent() {
+        cargo.clearContent();
     }
 
     /** The menu, from using the car. */
