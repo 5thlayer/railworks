@@ -11,7 +11,8 @@ import java.util.List;
  * skirts down both sides of the web, and the chests set into a Cargo car's sides. Coordinates are
  * the car's own: x across, y up from the floor's underside on the flange's top, z along the car with
  * +z the end it faces. Placeholder art, so {@code CarRenderer} only paints these and nothing else
- * decides their sizes.
+ * decides their sizes. It also holds the car's size and where the Locomotive's rider sits in it, so
+ * the boxes, the seat and the rider's view out of the cab are checked together.
  *
  * <p>Where two boxes meet, one stops a little short of the other's faces or reaches into it, so no
  * two faces share a plane and the depth test never has to choose between them.
@@ -20,18 +21,33 @@ import java.util.List;
  */
 public record CarBody(List<Part> parts, List<Box> chests) {
 
-    /** What colour a part is drawn in; the renderer holds the colours. */
+    /** A car's box: a block across, its height over the floor's underside, and its length along the Line. */
+    public static final double WIDTH = 1.0;
+    public static final double HEIGHT = 2.75;
+    public static final double LENGTH = 1.8;
+
+    /** What colour a part is drawn in, red, green and blue. */
     public enum Paint {
         /** The shell, rust red as the Rail is. */
-        SHELL,
+        SHELL(0.62F, 0.27F, 0.18F),
         /** The skirts and the gangway doors, a darker rust than the shell. */
-        DARK_RUST,
+        DARK_RUST(0.40F, 0.17F, 0.12F),
         /** The window bands and the cab's frame, near black. */
-        TRIM,
+        TRIM(0.13F, 0.08F, 0.07F),
         /** The band across the Locomotive's front, deep red. */
-        DEEP_RED,
+        DEEP_RED(0.30F, 0.10F, 0.08F),
         /** A headlight. */
-        LAMP
+        LAMP(0.95F, 0.90F, 0.62F);
+
+        public final float red;
+        public final float green;
+        public final float blue;
+
+        Paint(float red, float green, float blue) {
+            this.red = red;
+            this.green = green;
+            this.blue = blue;
+        }
     }
 
     /**

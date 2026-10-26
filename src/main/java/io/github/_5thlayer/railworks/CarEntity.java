@@ -63,8 +63,8 @@ import org.jspecify.annotations.Nullable;
  */
 public abstract class CarEntity extends VehicleEntity implements HasCustomInventoryScreen {
 
-    public static final float WIDTH = 1.0F;
-    public static final float HEIGHT = 2.75F;
+    public static final float WIDTH = (float) CarBody.WIDTH;
+    public static final float HEIGHT = (float) CarBody.HEIGHT;
 
     /** Its own synched {@link #DATA_LINKS} bits. */
     private static final byte FIRST = 1;
