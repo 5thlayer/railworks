@@ -19,7 +19,8 @@ import snownee.jade.api.WailaPlugin;
 import snownee.jade.api.config.IPluginConfig;
 
 /**
- * A Station in Jade: its name and, when no Span is in reach of it, that it serves no Rail, or when
+ * A Station in Jade: its name, the way the Trains it serves head, from the client's Spans and the
+ * drive side the server sent, and, when no Span is in reach of it, that it serves no Rail, or when
  * its stretch of Rail is not a straight leg, that a Cargo car standing by it will not load, though cars of the same Train elsewhere may. The name
  * is the block entity's, which the server sends the client, and the Span is asked of the client's
  * Spans, so no server data provider is needed. Found by Jade's annotation scan and named nowhere
@@ -47,7 +48,13 @@ public class StationJadePlugin implements IWailaPlugin {
             var foot = station.station().foot(network);
             if (foot.isEmpty()) {
                 tooltip.add(Component.translatable("tooltip.railworks.station.jade.off_rail"));
-            } else if (!StraightLeg.at(network, station.station())) {
+                return;
+            }
+            StationBlock.serving(network, accessor.getPosition()).ifPresentOrElse(
+                    way -> tooltip.add(Component.translatable("tooltip.railworks.station.jade.serves",
+                            Component.translatable("tooltip.railworks.direction." + way.getSerializedName()))),
+                    () -> tooltip.add(Component.translatable("tooltip.railworks.station.jade.serves_neither")));
+            if (!StraightLeg.at(network, station.station())) {
                 tooltip.add(Component.translatable("tooltip.railworks.station.jade.not_straight"));
             }
         }

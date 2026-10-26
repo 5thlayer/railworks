@@ -50,8 +50,10 @@ final class StationTests {
     private static final BlockPos B = new BlockPos(9, 1, 3);
     /** Beside the Rail, a block down from the car: where a Station goes and leaves the car's side free for a hatch. */
     private static final BlockPos BESIDE = new BlockPos(5, 1, 2);
-    /** Under the Rail, between the Pylons. */
+    /** Under the Rail, between the Pylons, where a Station is refused, but a block can be clicked. */
     private static final BlockPos UNDER = new BlockPos(5, 1, 3);
+    /** Beside the Rail on its other side, far enough along for its platform to clear {@link #BESIDE}'s. */
+    private static final BlockPos ACROSS = new BlockPos(2, 1, 4);
     /** In the Rail's own block, where a car passes. */
     private static final BlockPos IN_CLEARANCE = new BlockPos(5, 2, 3);
     /** Three blocks off the Rail. */
@@ -61,7 +63,7 @@ final class StationTests {
     }
 
     static void register(RailworksGameTests.Registrar tests) {
-        tests.test("station_places_beside_the_rail_and_under_it", 20, StationTests::placesByTheRail);
+        tests.test("station_places_beside_the_rail", 20, StationTests::placesByTheRail);
         tests.test("station_is_refused_off_the_rail", 20, StationTests::refusedOffRail);
         tests.test("station_is_refused_in_the_clearance", 20, StationTests::refusedInClearance);
         tests.test("station_is_refused_beside_a_bend", 20, StationTests::refusedBesideBend);
@@ -78,11 +80,11 @@ final class StationTests {
 
     private static void placesByTheRail(GameTestHelper helper) {
         ServerPlayer player = player(helper);
-        if (!place(helper, player, BESIDE).consumesAction() || !place(helper, player, UNDER).consumesAction()) {
-            helper.fail("a Station beside the Rail or under it did not place", BESIDE);
+        if (!place(helper, player, BESIDE).consumesAction() || !place(helper, player, ACROSS).consumesAction()) {
+            helper.fail("a Station beside the Rail on either side did not place", BESIDE);
             return;
         }
-        for (BlockPos pos : new BlockPos[] {BESIDE, UNDER}) {
+        for (BlockPos pos : new BlockPos[] {BESIDE, ACROSS}) {
             if (!helper.getBlockState(pos).is(RailworksRegistries.STATION.get())) {
                 helper.fail("no Station block was placed", pos);
             }
@@ -147,8 +149,13 @@ final class StationTests {
         ServerPlayer player = player(helper);
         network(helper).remove(arm(helper, A), arm(helper, B));
         network(helper).add(Span.of(arm(helper, A), arm(helper, B.above()), 9));
-        if (!place(helper, player, UNDER).consumesAction() || !helper.getBlockState(UNDER).is(RailworksRegistries.STATION.get())) {
-            helper.fail("a Station under a straight climbing leg did not place", UNDER);
+        // Halfway up, the Rail is half a block higher: the block beside it at the car's floor, on
+        // something to click the top of.
+        BlockPos beside = BESIDE.above();
+        helper.setBlock(BESIDE, Blocks.STONE);
+        if (!place(helper, player, beside).consumesAction() || !helper.getBlockState(beside).is(RailworksRegistries.STATION.get())) {
+            helper.fail("a Station beside a straight climbing leg did not place: "
+                    + Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, beside)), beside);
         }
         helper.succeed();
     }
@@ -225,7 +232,7 @@ final class StationTests {
         ServerPlayer player = player(helper);
         String name = "Shared " + helper.absolutePos(BESIDE).toShortString();
         placed(helper, player, BESIDE).rename(player, name);
-        placed(helper, player, UNDER).rename(player, name);
+        placed(helper, player, ACROSS).rename(player, name);
         if (stations(helper).named(name).size() != 2) {
             helper.fail("two Stations named alike are " + stations(helper).named(name), BESIDE);
         }

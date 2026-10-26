@@ -1,6 +1,12 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "all": "railworks:block/station"
+    "particle": "railworks:block/station",
+    "down": "railworks:block/station",
+    "up": "railworks:block/station_top",
+    "north": "railworks:block/station",
+    "east": "railworks:block/station",
+    "south": "railworks:block/station",
+    "west": "railworks:block/station"
   }
 }

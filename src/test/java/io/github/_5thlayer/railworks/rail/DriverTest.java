@@ -23,8 +23,11 @@ class DriverTest {
     private static final Arm A = new Arm(0, 5, 0);
     private static final Arm B = new Arm(20, 5, 0);
     private static final Arm C = new Arm(40, 5, 0);
-    /** Beside the Rail five blocks from A, and five short of C. */
-    private static final Station MINE = new Station(5, 6, 1, "Mine");
+    /**
+     * Beside the Rail five blocks from A, on its north side, so it serves Trains heading for A, and
+     * five short of C on its south side, serving Trains heading for C: each a Train's right.
+     */
+    private static final Station MINE = new Station(5, 6, -1, "Mine");
     private static final Station DEPOT = new Station(35, 6, 1, "Depot");
     /** Far enough for any run here. */
     private static final int BUDGET = 2_000;
@@ -43,6 +46,7 @@ class DriverTest {
     void resetSpec() {
         LocomotiveSpec.configure(LocomotiveSpec.DEFAULT_MAX_SPEED, LocomotiveSpec.DEFAULT_ACCELERATION,
                 LocomotiveSpec.DEFAULT_BRAKING, LocomotiveSpec.DEFAULT_FRICTION);
+        DriveSide.configure(DriveSide.DEFAULT);
     }
 
     // ---- the line ----
@@ -107,7 +111,8 @@ class DriverTest {
         Train train = shuttle(5.0);
         drive(new Driver(DEPOT), train);
         assertTrue(train.atRest());
-        assertEquals(35.0, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
+        // Its middle half a block short of the Station's centre, its front at the block's front edge.
+        assertEquals(34.5, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
         assertEquals(List.of(DEPOT), stations.stoppedAt(network, train));
     }
 
@@ -127,7 +132,8 @@ class DriverTest {
     @Test
     void setGoingAtTheStationItIsThereAlready() {
         line();
-        Train train = shuttle(5.0);
+        // Its last car, leading toward A, at the Mine's stop.
+        Train train = shuttle(9.5);
         assertTrue(tick(new Driver(MINE), train));
         assertTrue(train.atRest());
     }
@@ -140,7 +146,7 @@ class DriverTest {
             drive(new Driver(DEPOT), train);
             drive(new Driver(MINE), train);
             // Back at the Mine with the last car, the Locomotive facing A, leading.
-            assertEquals(5.0, alongLine(train, train.cars().getLast()), Driver.ARRIVE);
+            assertEquals(5.5, alongLine(train, train.cars().getLast()), Driver.ARRIVE);
             assertEquals(List.of(MINE), stations.stoppedAt(network, train));
         }
     }
@@ -159,9 +165,10 @@ class DriverTest {
     @Test
     void aTrainWhoseFuelRunsOutAsItBrakesInStillGetsThere() {
         line();
-        Train train = lone(5.0);
+        // Thirty blocks short of the Depot's stop, a run of round numbers.
+        Train train = lone(4.5);
         Driver driver = new Driver(DEPOT);
-        for (int i = 0; i < BUDGET && alongLine(train, train.cars().getFirst()) < 34.0; i++) {
+        for (int i = 0; i < BUDGET && alongLine(train, train.cars().getFirst()) < 33.5; i++) {
             tick(driver, train);
         }
         assertTrue(train.speed() > 0.0, "it should still be braking in: " + train);
@@ -195,6 +202,33 @@ class DriverTest {
             there = driver.tick(network, train, slotFuelled::contains, l -> 1_000_000_000L, s -> false);
         }
         assertTrue(there, "never got there: " + train);
+    }
+
+    @Test
+    void aStationOnItsLeftIsOutOfReachTheWayItRuns() {
+        line();
+        Train train = lone(5.0);
+        // On the north side by C: it serves Trains heading for A, and this one can only head for C.
+        Driver driver = new Driver(new Station(35, 6, -1, "Yard"));
+        runFor(driver, train, 200);
+        assertTrue(train.atRest());
+        assertFalse(tick(driver, train));
+        assertEquals(5.0, alongLine(train, train.cars().getFirst()), 1e-9);
+    }
+
+    @Test
+    void drivingOnTheLeftItStopsAtTheStationsOnItsLeft() {
+        DriveSide.configure(DriveSide.LEFT);
+        line();
+        Train train = lone(5.0);
+        Driver toDepot = new Driver(DEPOT);
+        runFor(toDepot, train, 200);
+        assertFalse(tick(toDepot, train), "the Depot is on its right: " + train);
+        Station yard = new Station(35, 6, -1, "Yard");
+        stations.put(yard);
+        drive(new Driver(yard), train);
+        assertEquals(34.5, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
+        assertEquals(List.of(yard), stations.stoppedAt(network, train));
     }
 
     @Test

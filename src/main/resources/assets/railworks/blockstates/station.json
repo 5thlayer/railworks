@@ -1,1 +1,8 @@
-{"variants": {"": {"model": "railworks:block/station"}}}
+{
+  "variants": {
+    "facing=north": {"model": "railworks:block/station"},
+    "facing=east": {"model": "railworks:block/station", "y": 90},
+    "facing=south": {"model": "railworks:block/station", "y": 180},
+    "facing=west": {"model": "railworks:block/station", "y": 270}
+  }
+}

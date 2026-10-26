@@ -10,10 +10,12 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
- * A Station: a named block beside the Rail or under it (ADR 0007). It serves the one Span it is
- * nearest, and is reached from {@link #STRETCH} blocks either way of its foot, the point of the Span
- * nearest it: a car whose Place is in that stretch is at the Station. Nothing about it is stored but
- * its block and its name, so a Span strung, cut or moved after it was placed is asked about afresh.
+ * A Station: a named block beside the Rail (ADR 0007). It serves the one Span it is nearest, and is
+ * reached from {@link #STRETCH} blocks either way of its foot, the point of the Span nearest it: a
+ * car whose Place is in that stretch is at the Station. It serves only the Trains that have it on
+ * their {@link DriveSide}, those heading for its {@link #servingEnd} (ADR 0008); one under the Rail
+ * has no side and serves neither way. Nothing about it is stored but its block and its name, so a
+ * Span strung, cut or moved after it was placed is asked about afresh.
  *
  * <p>Pure: no Minecraft types.
  *
@@ -45,9 +47,20 @@ public record Station(int x, int y, int z, String name) {
 
         /** The foot as a Place, heading for the Span's second end. */
         public Place place() {
-            return new Place(span, span.b(), span.length() - fromA);
+            return facing(span.b());
+        }
+
+        /** The foot as a Place, heading for {@code end}, one of its Span's ends. */
+        public Place facing(Arm end) {
+            return new Place(span, end, end.equals(span.b()) ? span.length() - fromA : fromA);
         }
     }
+
+    /**
+     * How far off the Rail's line a Station's centre may be, seen from above, and still count as under
+     * it: a block under the Rail is right under its line, and one beside it a whole block off.
+     */
+    static final double UNDER = 0.5;
 
     /**
      * What a typed name becomes: trimmed, with formatting codes and control characters taken out and
@@ -86,6 +99,39 @@ public record Station(int x, int y, int z, String name) {
                 .min(Comparator.comparingDouble(Foot::distance)
                         .thenComparing(s -> s.span().a())
                         .thenComparing(s -> s.span().b()));
+    }
+
+    /**
+     * The end of its Span that a Train it serves heads for: the one that puts the Station on the
+     * Train's {@link DriveSide#current() drive side}. Empty under the Rail, where it has no side, and
+     * by no Rail.
+     */
+    public Optional<Arm> servingEnd(RailNetwork network) {
+        return foot(network).flatMap(foot -> servingEnd(foot, DriveSide.current()));
+    }
+
+    /** {@link #servingEnd} on the Span of {@code foot}, driving on {@code side}. */
+    Optional<Arm> servingEnd(Foot foot, DriveSide side) {
+        Span span = foot.span();
+        Arm a = span.a();
+        Arm b = span.b();
+        double t = foot.fromA() / span.length();
+        // From the foot to the Station's centre, seen from above, in Arm coordinates.
+        double sx = x + 0.5 - RailGeometry.ATTACH_X - (a.x() + (b.x() - a.x()) * t);
+        double sz = z + 0.5 - RailGeometry.ATTACH_Z - (a.z() + (b.z() - a.z()) * t);
+        double hx = b.x() - a.x();
+        double hz = b.z() - a.z();
+        double run = Math.sqrt(hx * hx + hz * hz);
+        if (run == 0.0) {
+            return Optional.empty();
+        }
+        // How far to the right of a Train heading for b the Station stands: right of (hx, hz) is (-hz, hx),
+        // x running east and z south.
+        double right = (sz * hx - sx * hz) / run;
+        if (Math.abs(right) < UNDER) {
+            return Optional.empty();
+        }
+        return Optional.of((right > 0.0) == (side == DriveSide.RIGHT) ? b : a);
     }
 
     /** Whether a car at {@code place} is at this Station: on the Span it serves, within its stretch. */

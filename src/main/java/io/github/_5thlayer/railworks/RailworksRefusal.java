@@ -15,10 +15,14 @@ public enum RailworksRefusal implements Refusal {
     SPAN_TAKEN,
     /** A car that would sit in a block, so the Span's Clearance is not clear. */
     BLOCKED_CAR,
-    /** A Station by no Rail: neither beside a Span nor under it. */
+    /** A Station by no Rail: not beside a Span. */
     STATION_OFF_RAIL,
+    /** A Station under the Rail, which has no side and so would serve neither way. */
+    STATION_UNDER_RAIL,
     /** A Station in the Clearance of the Span it would serve, where a passing car would hit it. */
     STATION_IN_CLEARANCE,
     /** A Station by Rail that bends or runs on a diagonal along its stretch, where no Cargo car would load. */
     STATION_NOT_STRAIGHT,
+    /** A Station whose block or platform would overlap another Station's, so a hatch beside it would belong to two. */
+    STATION_OVERLAPS,
 }
