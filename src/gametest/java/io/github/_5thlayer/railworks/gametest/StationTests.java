@@ -11,6 +11,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
+import io.github._5thlayer.railworks.StationItem;
 import io.github._5thlayer.railworks.network.NameStationPacket;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Place;
@@ -36,9 +37,10 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Stations through the item, the block and a real player: placing one by the Rail, refused off it,
- * in its Clearance and by a bend or a diagonal, naming it, and the level's Stations following the blocks. Which stretch of a
- * Span a Station serves is {@code StationTest}'s; what only a server shows is that the click asks
- * the level's Spans and that the name survives a save. All of these tests share the {@code station_}
+ * in its Clearance and by a bend or a diagonal, with the line it says why, naming it, and the
+ * level's Stations following the blocks. Which stretch of a Span a Station serves is
+ * {@code StationTest}'s, and where Rail is a Straight leg {@code StraightLegTest}'s; what only a
+ * server shows is that the click asks the level's Spans and that the name survives a save. All of these tests share the {@code station_}
  * prefix.
  */
 final class StationTests {
@@ -133,8 +135,10 @@ final class StationTests {
             helper.fail("a Station by B planned " + plan + ", not refused for the bend beyond B", byPylon);
             return;
         }
-        if (!place(helper, player, new BlockPos(7, 1, 2)).consumesAction()) {
-            helper.fail("a Station two blocks short of B, by straight Rail, was refused", byPylon);
+        BlockPos shortOfPylon = new BlockPos(7, 1, 2);
+        if (!place(helper, player, shortOfPylon).consumesAction()
+                || !helper.getBlockState(shortOfPylon).is(RailworksRegistries.STATION.get())) {
+            helper.fail("a Station two blocks short of B, by straight Rail, was refused", shortOfPylon);
         }
         helper.succeed();
     }
@@ -158,6 +162,9 @@ final class StationTests {
         if (plan == null || !plan.isRefused() || plan.refusal() != expected) {
             helper.fail("a Station at " + pos + " planned " + plan + ", not refused " + expected, pos);
             return;
+        }
+        if (!StationItem.messageKey(expected).equals("message.railworks." + expected.name().toLowerCase(java.util.Locale.ROOT))) {
+            helper.fail("a Station refused for " + expected + " says " + StationItem.messageKey(expected), pos);
         }
         if (place(helper, player, pos).consumesAction()
                 || !helper.getBlockState(pos).isAir() || player.getMainHandItem().getCount() != 4) {
