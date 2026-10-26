@@ -56,6 +56,12 @@ public final class Platform {
      */
     public record Side(List<Beside> blocks, boolean alongX) {
 
+        public Side {
+            if (blocks.isEmpty()) {
+                throw new IllegalArgumentException("a side with no blocks");
+            }
+        }
+
         /** The car spot it is beside. */
         public int spot() {
             return blocks.getFirst().spot();

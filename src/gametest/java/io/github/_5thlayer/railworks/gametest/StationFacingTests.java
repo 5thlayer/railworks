@@ -17,6 +17,7 @@ import io.github._5thlayer.railworks.StationBlock;
 import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.StationItem;
 import io.github._5thlayer.railworks.StationPlacement;
+import io.github._5thlayer.railworks.rail.Place;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -25,7 +26,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -62,8 +62,8 @@ final class StationFacingTests {
                 helper -> serves(helper, NORTH, Direction.EAST, false));
         tests.testDrivingLeft("logistics_station_driving_left_south_of_the_rail_serves_trains_heading_west", 20,
                 helper -> serves(helper, SOUTH, Direction.WEST, true));
-        tests.test("logistics_station_a_train_at_rest_by_it_settles_onto_its_mark", 60, helper -> settles(helper, false));
-        tests.test("logistics_station_a_train_with_its_driver_seated_does_not_settle", 60, helper -> settles(helper, true));
+        tests.test("logistics_station_a_train_at_rest_by_it_settles_onto_its_platform", 80, helper -> settles(helper, false));
+        tests.test("logistics_station_a_train_with_its_driver_seated_settles_only_once_they_get_off", 120, helper -> settles(helper, true));
     }
 
     private static void refusedUnder(GameTestHelper helper) {
@@ -129,17 +129,17 @@ final class StationFacingTests {
     }
 
     /**
-     * A Train at rest by a Station, short of its mark: with nobody in its Locomotive it eases onto the
-     * mark, and with a driver seated, pressing nothing, it stays where it was brought to rest.
+     * A Train at rest by a Station, off the place its platform puts it: with nobody in its Locomotive
+     * it eases onto it and stops there; with a driver seated, pressing nothing, it stays where it was
+     * brought to rest until they get off, and then settles.
      */
     private static void settles(GameTestHelper helper, boolean seated) {
-        CargoCarEntity cargo = CargoAccessTests.cargoBehindLocomotive(helper);
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        CargoCarEntity cargo = CargoCarTests.placeCargoBeside(helper, locomotive, -1);
         var train = cargo.train();
+        ServerPlayer driver = helper.makeMockServerPlayerInLevel();
+        driver.setGameMode(GameType.SURVIVAL);
         if (seated) {
-            ServerPlayer driver = helper.makeMockServerPlayerInLevel();
-            driver.setGameMode(GameType.SURVIVAL);
-            var locomotive = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class,
-                    new AABB(helper.absolutePos(NORTH)).inflate(8.0)).getFirst();
             locomotive.interact(driver, InteractionHand.MAIN_HAND, Vec3.ZERO);
             if (driver.getVehicle() != locomotive) {
                 helper.fail("the driver did not board the Locomotive", NORTH);
@@ -147,19 +147,29 @@ final class StationFacingTests {
             }
         }
         var start = train.head();
+        var held = new Object() {
+            Place at;
+        };
         CargoAccessTests.station(helper, NORTH);
-        helper.startSequence()
-                .thenIdle(40)
-                .thenExecute(() -> {
-                    var network = LevelRails.of(helper.getLevel()).network();
-                    var stations = LevelStations.of(helper.getLevel()).stations();
-                    boolean moved = !train.head().equals(start);
-                    if (seated && moved) {
-                        helper.fail("a Train with its driver seated moved from " + start + " to " + train.head(), NORTH);
+        var sequence = helper.startSequence().thenIdle(40);
+        if (seated) {
+            sequence = sequence.thenExecute(() -> {
+                if (!train.head().equals(start)) {
+                    helper.fail("a Train with its driver seated moved from " + start + " to " + train.head(), NORTH);
+                }
+                driver.stopRiding();
+            }).thenIdle(40);
+        }
+        sequence.thenExecute(() -> {
+                    if (train.head().equals(start)) {
+                        helper.fail("a Train at rest by the Station, nobody aboard, did not settle from " + start, NORTH);
                     }
-                    if (!seated && (!moved || stations.settle(network, train, span -> false))) {
-                        helper.fail("a Train at rest by the Station did not settle onto its mark: from " + start
-                                + " to " + train.head(), NORTH);
+                    held.at = train.head();
+                })
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    if (!train.head().equals(held.at)) {
+                        helper.fail("a settled Train went on moving, to " + train.head(), NORTH);
                     }
                 })
                 .thenSucceed();

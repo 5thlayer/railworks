@@ -364,8 +364,7 @@ final class HatchTests {
                         helper.fail("the requester took over the stale provider's record: " + hatch.mode() + " holding "
                                 + count(hatch.contents()), FIRST);
                     }
-                    int coal = helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(at).inflate(1.5)).stream()
-                            .filter(item -> item.getItem().is(Items.COAL)).mapToInt(item -> item.getItem().getCount()).sum();
+                    int coal = dropped(helper, at, Items.COAL);
                     if (coal != 3) {
                         helper.fail("the stale record's coal was not dropped: " + coal, FIRST);
                     }
@@ -382,9 +381,8 @@ final class HatchTests {
         if (LevelHatches.of(helper.getLevel()).at(at).isPresent()) {
             helper.fail("a broken hatch is still in the level's hatches", FIRST);
         }
-        var dropped = helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(at).inflate(1.5));
-        int coal = dropped.stream().filter(item -> item.getItem().is(Items.COAL)).mapToInt(item -> item.getItem().getCount()).sum();
-        boolean itself = dropped.stream().anyMatch(item -> item.getItem().is(RailworksRegistries.REQUESTER_HATCH_ITEM.get()));
+        int coal = dropped(helper, at, Items.COAL);
+        boolean itself = dropped(helper, at, RailworksRegistries.REQUESTER_HATCH_ITEM.get()) > 0;
         if (coal != 6 || !itself) {
             helper.fail("a broken requester dropped " + coal + " coal" + (itself ? "" : " and not itself as a requester"), FIRST);
         }
@@ -394,15 +392,19 @@ final class HatchTests {
         helper.succeed();
     }
 
-    /** A command replacing a hatch skips its side effects: the Station's count finds the record stale and forgets it. */
+    /** A command replacing a hatch skips its side effects: the Station's count finds the record stale, takes it out and drops what it held. */
     private static void removedByCommand(GameTestHelper helper) {
         ServerPlayer player = withStation(helper);
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
         hatch(helper, player, SECOND, HatchMode.PROVIDER);
+        insert(helper, FIRST, new ItemStack(Items.COAL, 5));
         BlockPos at = helper.absolutePos(FIRST);
         helper.getLevel().setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS);
         if (station(helper).hatches() != 1 || LevelHatches.of(helper.getLevel()).at(at).isPresent()) {
             helper.fail("the Station counts " + station(helper).hatches() + " hatches after a command removed one", FIRST);
+        }
+        if (dropped(helper, at, Items.COAL) != 5) {
+            helper.fail("the stale record's coal was not dropped at its block: " + dropped(helper, at, Items.COAL), FIRST);
         }
         helper.succeed();
     }
@@ -482,6 +484,12 @@ final class HatchTests {
             ResourceHandlerUtil.insertStacking(contents, ItemResource.of(stack), stack.getCount(), transaction);
             transaction.commit();
         }
+    }
+
+    /** How many of {@code item} lie dropped about the block at {@code at}, an absolute position. */
+    private static int dropped(GameTestHelper helper, BlockPos at, Item item) {
+        return helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(at).inflate(1.5)).stream()
+                .filter(entity -> entity.getItem().is(item)).mapToInt(entity -> entity.getItem().getCount()).sum();
     }
 
     private static int count(ResourceHandler<ItemResource> handler) {

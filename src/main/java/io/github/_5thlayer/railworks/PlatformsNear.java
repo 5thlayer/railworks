@@ -19,9 +19,11 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 /**
- * The Stations and platforms near a block, on either side: a server asks the level's Stations, and a
- * client, which has only the blocks it was sent, the Station blocks loaded near it. What a Station or a
- * hatch in hand, a hatch's block and Jade ask, so each asks one rule.
+ * What Stations, platforms and hatches ask of the level, on either side: the Rail, the Stations near
+ * a block, the Station a hatch joins, the free car spots a held hatch draws, and a Station's hatches.
+ * A server asks the level's Spans and Stations, and a client, which has only what it was sent, its
+ * Spans and the Station blocks loaded near. A Station or a hatch in hand, a hatch's block and Jade
+ * all ask here, so each asks one rule.
  */
 public final class PlatformsNear {
 
@@ -113,9 +115,7 @@ public final class PlatformsNear {
             if (!Platform.near(station, pos.getX(), pos.getY(), pos.getZ())) {
                 continue;
             }
-            if (level.isLoaded(pos) && !level.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
-                hatches.remove(pos);
-                hatch.drop(level);
+            if (hatches.dropIfStale(level, pos)) {
                 continue;
             }
             if (joined(level, pos).filter(at -> at.station().samePlace(station)).isPresent()) {
