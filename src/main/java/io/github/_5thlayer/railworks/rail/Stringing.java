@@ -111,8 +111,7 @@ public final class Stringing {
     /**
      * Whether a Span from {@code at} to {@code to} bends too sharply against any other Span at
      * {@code at}, the one to {@code to} itself left out where it is already strung. Any, since an Arm
-     * takes two Spans and so one line; a Junction's branch leaving beside its sibling would only need to
-     * run on from one of them, judged by the same {@link SpanRules#tooSharp}.
+     * takes two Spans and so one line (ADR 0003).
      */
     private static boolean bendsTooSharply(RailNetwork network, Arm at, Arm to) {
         for (Span span : network.spansAt(at)) {
