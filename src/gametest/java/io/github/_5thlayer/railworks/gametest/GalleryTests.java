@@ -13,6 +13,7 @@ import io.github._5thlayer.libworks.testkit.GalleryCheck.Scene;
 import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
+import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
@@ -34,12 +35,12 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The Gallery pack (libworks ADR 0010), through libworks' {@link GalleryCheck}: offered and off, its
  * build running every command without failing, and each scene's key block where it stands, the
- * Stations scene's Stations in the level's Stations under their names. Beyond the build, the
- * coupling scene's sign, clicked, builds it again, leaving one Train and nothing loose, and the two
- * logistics scenes are built working: each requester's chest gets what it asks for. How a Train
- * plans and runs its jobs is the mechanics' own game tests' to check, never the Gallery's. Each test turns
- * the pack on, which reloads the server's data, and off again, passing or failing, so each runs in a
- * batch of its own.
+ * Stations scene's Stations in the level's Stations under their names, and the flyover's two lines
+ * strung and not joined. Beyond the build, the coupling scene's sign, clicked, builds it again,
+ * leaving one Train and nothing loose, and the two logistics scenes are built working: each
+ * requester's chest gets what it asks for. How a Train plans and runs its jobs is the mechanics' own
+ * game tests' to check, never the Gallery's. Each test turns the pack on, which reloads the server's
+ * data, and off again, passing or failing, so each runs in a batch of its own.
  */
 final class GalleryTests {
 
@@ -58,6 +59,11 @@ final class GalleryTests {
     private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);
     private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(22, 0, -7);
     private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
+    /** The flyover's Arms, from where it is run: the low line's, west to east, and the high line's, south to north. */
+    private static final List<BlockPos> LOW_LINE = List.of(
+            new BlockPos(3, 1, -6), new BlockPos(11, 1, -6), new BlockPos(19, 1, -6), new BlockPos(25, 1, -6));
+    private static final List<BlockPos> HIGH_LINE = List.of(new BlockPos(15, 6, -1), new BlockPos(15, 6, -12));
+
     /** The stacks the logistics scene's provider holds once built. */
     private static final int PROVIDED_STACKS = 8;
 
@@ -78,7 +84,8 @@ final class GalleryTests {
                 new Scene("coupling", new BlockPos(10, 0, -2), Blocks.CHEST),
                 new Scene("stations", QUARRY, RailworksRegistries.STATION.get()),
                 new Scene("logistics", PROVIDER, RailworksRegistries.HATCH.get()),
-                new Scene("two_loads", PROVIDER, RailworksRegistries.HATCH.get()));
+                new Scene("two_loads", PROVIDER, RailworksRegistries.HATCH.get()),
+                new Scene("flyover", HIGH_LINE.getLast(), pylon));
     }
 
     static void register(RailworksGameTests.Registrar tests) {
@@ -90,12 +97,17 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::logisticsDeliver);
     }
 
-    /** libworks' build check, written out to add what no key block shows: the Stations scene's Stations, registered by name. */
+    /**
+     * libworks' build check, written out to add what no key block shows: the Stations scene's
+     * Stations, registered by name, and the flyover's two lines, each strung and neither joined to
+     * the other.
+     */
     private static void builds(GameTestHelper helper) {
         var scenes = scenes();
         var at = helper.absolutePos(ORIGIN);
         var functions = helper.getLevel().getServer().getFunctions();
         var stations = ROWS.sceneOrigin(at, indexOf(scenes, "stations"));
+        var flyover = ROWS.sceneOrigin(at, indexOf(scenes, "flyover"));
         GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, scenes.size(), (source, steps) -> steps
                 .thenExecute(() -> {
                     GalleryCheck.assertLoads(helper, source, Railworks.MOD_ID);
@@ -105,6 +117,11 @@ final class GalleryTests {
                     }
                     GalleryCheck.assertRuns(helper, source, GalleryPack.build(Railworks.MOD_ID));
                     GalleryCheck.assertKeyBlocks(helper, at, ROWS, scenes);
+                    var low = arms(flyover, LOW_LINE);
+                    var high = arms(flyover, HIGH_LINE);
+                    strung(helper, low);
+                    strung(helper, high);
+                    notJoined(helper, low, high);
                 })
                 // A Station set by a command registers as its block entity loads, a tick on.
                 .thenWaitUntil(() -> {
@@ -164,6 +181,31 @@ final class GalleryTests {
                     holds(helper, second.offset(SECOND_SPOT_CHEST), Items.RAW_COPPER);
                     holds(helper, second.offset(FIRST_SPOT_CHEST), Items.RAW_GOLD);
                 })).thenSucceed();
+    }
+
+    /** The Arms at {@code line}, from {@code origin}. */
+    private static List<Arm> arms(BlockPos origin, List<BlockPos> line) {
+        return line.stream().map(pos -> PylonColumn.arm(origin.offset(pos))).toList();
+    }
+
+    /** Asserts a Span strings each of the {@code line}'s Arms to the next. */
+    private static void strung(GameTestHelper helper, List<Arm> line) {
+        var network = LevelRails.of(helper.getLevel()).network();
+        for (int next = 1; next < line.size(); next++) {
+            helper.assertTrue(network.contains(line.get(next - 1), line.get(next)),
+                    "the flyover has no Span from " + line.get(next - 1) + " to " + line.get(next));
+        }
+    }
+
+    /** Asserts no Span at an Arm of {@code one} reaches an Arm of {@code other}. */
+    private static void notJoined(GameTestHelper helper, List<Arm> one, List<Arm> other) {
+        var network = LevelRails.of(helper.getLevel()).network();
+        for (var arm : one) {
+            for (var span : network.spansAt(arm)) {
+                helper.assertTrue(!other.contains(span.a()) && !other.contains(span.b()),
+                        "the flyover's lines are joined by " + span);
+            }
+        }
     }
 
     /** Asserts the chest at {@code pos}, absolute, holds some {@code item}. */
