@@ -43,8 +43,14 @@ public final class Train {
             Place.MAP_CODEC.forGetter(Train::head),
             Codec.DOUBLE.fieldOf("speed").forGetter(Train::speed),
             Car.CODEC.listOf(1, Integer.MAX_VALUE).fieldOf("cars").forGetter(Train::cars),
-            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed))
-    ).apply(i, (head, speed, cars, reversed) -> restore(head, speed, cars, Set.copyOf(reversed))));
+            Car.ID_CODEC.listOf().optionalFieldOf("reversed", List.of()).forGetter(t -> List.copyOf(t.reversed)),
+            // A Train saved with a Schedule, before jobs (ADR 0008), has none of this and loads manual.
+            Codec.BOOL.optionalFieldOf("automatic", false).forGetter(Train::automatic)
+    ).apply(i, (head, speed, cars, reversed, automatic) -> {
+        Train train = restore(head, speed, cars, Set.copyOf(reversed));
+        train.automatic = automatic;
+        return train;
+    }));
 
     /**
      * What a Locomotive saved before Trains had cars looks like: the Locomotive was the whole Train,
@@ -63,6 +69,8 @@ public final class Train {
     private final Set<UUID> reversed;
     private Place head;
     private double speed;
+    /** Whether it takes jobs (ADR 0008), rather than being driven by hand. */
+    private boolean automatic;
 
     private Train(Place head, List<? extends Car> cars, Set<UUID> reversed) {
         if (cars.isEmpty()) {
@@ -123,6 +131,18 @@ public final class Train {
     /** Blocks a tick, positive the way it faces. */
     public double speed() {
         return speed;
+    }
+
+    /**
+     * Whether it is automatic, taking jobs between hatches (ADR 0008), rather than manual, driven by
+     * hand. A Train coupled to keeps its mode, and the Trains it parts into are manual.
+     */
+    public boolean automatic() {
+        return automatic;
+    }
+
+    public void setAutomatic(boolean automatic) {
+        this.automatic = automatic;
     }
 
     /** Whether it stands still: a car couples to it, and a Cargo car loads at a Station, only then. */
@@ -261,7 +281,9 @@ public final class Train {
         if (reversed) {
             facing.add(car.id());
         }
-        return new Train(end == End.FRONT ? slot : head, joined, facing);
+        Train train = new Train(end == End.FRONT ? slot : head, joined, facing);
+        train.automatic = automatic;
+        return train;
     }
 
     /**
@@ -314,7 +336,7 @@ public final class Train {
         return left;
     }
 
-    /** Its cars from {@code from} up to {@code to} as a Train of their own, where they stand. */
+    /** Its cars from {@code from} up to {@code to} as a Train of their own, where they stand, manual. */
     private Train part(RailNetwork network, int from, int to) {
         Train part = new Train(placeOf(network, cars.get(from)), cars.subList(from, to), reversed);
         part.speed = speed;

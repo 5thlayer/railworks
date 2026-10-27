@@ -20,7 +20,7 @@ import snownee.jade.api.WailaPlugin;
 import snownee.jade.api.config.IPluginConfig;
 
 /**
- * A Burner Locomotive in Jade: its fuel and its speed, read from the entity's synched data, which
+ * A Burner Locomotive in Jade: its Train's status line, its speed and its fuel, read from the entity's synched data, which
  * the server fills every tick, so no server data provider is needed. Found by Jade's annotation scan
  * and named nowhere else, so Jade stays a soft dependency.
  */
@@ -41,6 +41,7 @@ public class LocomotiveJadePlugin implements IWailaPlugin {
             if (!(accessor.getEntity() instanceof LocomotiveEntity car)) {
                 return;
             }
+            tooltip.add(car.statusSeen());
             double speed = car.speedPerSecond();
             tooltip.add(Component.translatable("tooltip.railworks.locomotive.jade.speed",
                     String.format(Locale.ROOT, "%.1f", Math.abs(speed)),

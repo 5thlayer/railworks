@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.rail.DriveSide;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import net.neoforged.bus.api.IEventBus;
@@ -15,8 +16,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, the Burner
- * Locomotive's drive and fuel, the drive side, how many car spots a Station's platform has and how
- * many slots a hatch holds. A server config, so the client measures the same limits the server
+ * Locomotive's drive and fuel, the drive side, how many car spots a Station's platform has, how
+ * many slots a hatch holds, and how fast hatches trade and how long a Train waits on them. A server config, so the client measures the same limits the server
  * strings by.
  */
 public final class RailworksConfig {
@@ -33,6 +34,8 @@ public final class RailworksConfig {
     private static final ModConfigSpec.EnumValue<DriveSide> DRIVE_SIDE;
     private static final ModConfigSpec.IntValue PLATFORM_CARS;
     private static final ModConfigSpec.IntValue HATCH_SLOTS;
+    private static final ModConfigSpec.IntValue HATCH_TICKS_PER_STACK;
+    private static final ModConfigSpec.DoubleValue STALL_SECONDS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -48,6 +51,10 @@ public final class RailworksConfig {
                 .defineInRange("platformCars", Platform.MAX_CARS, 1, Platform.MAX_CARS);
         HATCH_SLOTS = builder.comment("How many slots a hatch holds, a chest's 27 by default. A hatch keeps the slots it was placed with.")
                 .defineInRange("hatchSlots", Hatches.DEFAULT_SLOTS, 1, 54);
+        HATCH_TICKS_PER_STACK = builder.comment("How many ticks a hatch takes to move each stack to or from the Cargo car at its car spot. 20 is a stack a second.")
+                .defineInRange("hatchTicksPerStack", Logistics.DEFAULT_HATCH_TICKS_PER_STACK, 1, 1200);
+        STALL_SECONDS = builder.comment("How long an automatic Train waits at a Station with nothing moving before it leaves, in seconds.")
+                .defineInRange("stallSeconds", Logistics.DEFAULT_STALL_SECONDS, 0.0, 600.0);
         builder.push("burner_locomotive");
         LOCOMOTIVE_MAX_SPEED = builder.comment("Top speed either way, in blocks a second. Factorio's locomotive does 72, which outruns chunk loading.")
                 .defineInRange("maxSpeed", LocomotiveSpec.DEFAULT_MAX_SPEED, 1.0, 200.0);
@@ -81,6 +88,7 @@ public final class RailworksConfig {
                 DriveSide.configure(DriveSide.DEFAULT);
                 Platform.configure(Platform.MAX_CARS);
                 Hatches.configure(Hatches.DEFAULT_SLOTS);
+                Logistics.configure(Logistics.DEFAULT_HATCH_TICKS_PER_STACK, Logistics.DEFAULT_STALL_SECONDS);
             }
         });
     }
@@ -96,6 +104,7 @@ public final class RailworksConfig {
             DriveSide.configure(DRIVE_SIDE.get());
             Platform.configure(PLATFORM_CARS.get());
             Hatches.configure(HATCH_SLOTS.get());
+            Logistics.configure(HATCH_TICKS_PER_STACK.get(), STALL_SECONDS.get());
         }
     }
 }

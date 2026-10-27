@@ -31,7 +31,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * A Burner Locomotive in the world: the view of its {@link Locomotive}, a car in a {@link Train}.
  * The model runs the drive and holds the joule fuel (the car's); this entity feeds it the driver's
- * keys and the fuel slot, and mirrors the fuel a client shows (Jade) into synched data.
+ * keys and the fuel slot, and mirrors the fuel, its Train's mode and its status line that a client
+ * shows (its menu and Jade) into synched data.
  *
  * <p>Fuel in hand fills the fuel slot rather than boarding; the rest is {@link CarEntity}'s.
  */
@@ -43,6 +44,10 @@ public final class LocomotiveEntity extends CarEntity {
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<Boolean> DATA_AUTOMATIC =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Component> DATA_STATUS =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.COMPONENT);
 
     /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
@@ -84,13 +89,25 @@ public final class LocomotiveEntity extends CarEntity {
         return entityData.get(DATA_FUEL_ITEM);
     }
 
+    /** Whether its Train is automatic, as the server last synced it. */
+    public boolean automaticSeen() {
+        return entityData.get(DATA_AUTOMATIC);
+    }
+
+    /** Its Train's status line, as the server last synced it. */
+    public Component statusSeen() {
+        return entityData.get(DATA_STATUS);
+    }
+
     @Override
-    protected void syncCar(Car car) {
+    protected void syncCar(ServerLevel level, Train train, Car car) {
         if (car instanceof Locomotive locomotive) {
             entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
             entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         }
         entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
+        entityData.set(DATA_AUTOMATIC, train.automatic());
+        entityData.set(DATA_STATUS, StatusLine.of(LevelRails.of(level).status(level, train)));
     }
 
     // ---- the drive ----
@@ -109,6 +126,11 @@ public final class LocomotiveEntity extends CarEntity {
             }
         }
         return Throttle.NONE;
+    }
+
+    /** Whether its slot holds fuel, which logistics counts as able to pull before its buffer is lit. */
+    boolean hasFuel() {
+        return fuelValue(level(), cab.getItem(LocomotiveMenu.FUEL)) > 0L;
     }
 
     /** Burns one fuel item from the slot whole and says what it was worth; 0 when there is none. */
@@ -174,6 +196,18 @@ public final class LocomotiveEntity extends CarEntity {
                 Component.translatable("entity.railworks.burner_locomotive")));
     }
 
+    /** Switches its Train between automatic and manual, as the menu's toggle does; false for a car no Train holds. */
+    boolean toggleAutomatic() {
+        Train train = train();
+        if (train == null || !(level() instanceof ServerLevel level)) {
+            return false;
+        }
+        train.setAutomatic(!train.automatic());
+        LevelRails.of(level).setDirty();
+        syncFromModel(train);
+        return true;
+    }
+
     // ---- breaking it ----
 
     @Override
@@ -198,6 +232,8 @@ public final class LocomotiveEntity extends CarEntity {
         entityData.define(DATA_FUEL, 0L);
         entityData.define(DATA_FUEL_CAPACITY, 0L);
         entityData.define(DATA_FUEL_ITEM, ItemStack.EMPTY);
+        entityData.define(DATA_AUTOMATIC, false);
+        entityData.define(DATA_STATUS, Component.empty());
     }
 
     @Override

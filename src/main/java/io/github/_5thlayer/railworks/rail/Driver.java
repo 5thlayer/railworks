@@ -29,16 +29,39 @@ public final class Driver {
     public static final double ARRIVE = 0.25;
 
     private final Station station;
+    /** Whether it keeps to the way it was given, never picking another. */
+    private final boolean fixed;
     /** The way it runs to the Station, +1 the Train's heading and -1 against it; 0 until it picks one. */
     private int way;
+    /** Whether the Station was out of reach the last tick it looked. */
+    private boolean lost;
 
     public Driver(Station station) {
         this.station = station;
+        this.fixed = false;
+    }
+
+    /**
+     * A driver that runs only {@code way}, +1 the Train's heading and -1 against it, so the Train
+     * arrives with the leading car it was planned to: its cars stand on the car spots its job counts on.
+     */
+    public Driver(Station station, int way) {
+        if (way != 1 && way != -1) {
+            throw new IllegalArgumentException("way " + way);
+        }
+        this.station = station;
+        this.fixed = true;
+        this.way = way;
     }
 
     /** The Station it drives to. */
     public Station station() {
         return station;
+    }
+
+    /** Whether the Station was out of reach the last tick it looked: cut off from it, or arriving against its serving way. */
+    public boolean lost() {
+        return lost;
     }
 
     /**
@@ -83,16 +106,20 @@ public final class Driver {
     /** The way to push it this tick, +1 the Train's heading, -1 against it and 0 for neither. */
     private int push(RailNetwork network, Train train, Predicate<Locomotive> slotFuelled) {
         // At rest unable to pull its way, it looks for the other; moving, it runs on, out of fuel or not.
-        if (way == 0 || train.atRest() && !train.pulls(way, slotFuelled)) {
+        if (!fixed && (way == 0 || train.atRest() && !train.pulls(way, slotFuelled))) {
             way = pick(network, train, slotFuelled);
         }
         if (way == 0) {
+            lost = true;
             return hold(train);
         }
         double d = distance(network, train, way);
-        if (Double.isNaN(d)) {
+        lost = Double.isNaN(d);
+        if (lost) {
             // Cut off from it, or left too far behind: the next tick looks again.
-            way = 0;
+            if (!fixed) {
+                way = 0;
+            }
             return hold(train);
         }
         double v = train.speed() * way;

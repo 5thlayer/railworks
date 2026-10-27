@@ -601,4 +601,43 @@ class TrainTest {
         assertTrue(train.slot(network, Train.End.BACK, 2.0) != null);
         assertEquals(null, train.slot(network, Train.End.BACK, 2.01));
     }
+
+    // ---- automatic ----
+
+    @Test
+    void aNewTrainIsManual() {
+        assertFalse(atStart().automatic());
+    }
+
+    @Test
+    void itKeepsBeingAutomaticAcrossASave() {
+        Train train = atStart();
+        train.setAutomatic(true);
+        var json = Train.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, train).getOrThrow();
+        assertTrue(Train.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, json).getOrThrow().automatic());
+    }
+
+    @Test
+    void aTrainSavedBeforeTheModeLoadsAsManual() {
+        Train train = atStart();
+        var json = Train.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, train).getOrThrow()
+                .getAsJsonObject();
+        json.remove("automatic");
+        json.addProperty("schedule", "an old Schedule, ignored");
+        assertFalse(Train.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, json).getOrThrow().automatic());
+    }
+
+    @Test
+    void aTrainCoupledToKeepsItsModeAndTheTrainsItPartsIntoAreManual() {
+        Train train = train(network.get(A, B), B, 10.0);
+        train.setAutomatic(true);
+        Train coupled = train.coupled(network, Train.End.BACK, CargoCar.create(), false);
+        assertTrue(coupled.automatic());
+        for (Train part : coupled.uncoupled(network, 1)) {
+            assertFalse(part.automatic());
+        }
+        for (Train part : coupled.without(network, coupled.cars().getLast())) {
+            assertFalse(part.automatic());
+        }
+    }
 }

@@ -33,6 +33,7 @@ public final class Railworks {
         modBus.addListener(WorksTabContents::add);
         modBus.addListener(Railworks::registerPayloads);
         NeoForge.EVENT_BUS.addListener(LevelRails::onChunkSent);
+        NeoForge.EVENT_BUS.addListener(LevelRails::onLevelTick);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onPlayerTick);
         if (FMLEnvironment.getDist() == Dist.CLIENT) {

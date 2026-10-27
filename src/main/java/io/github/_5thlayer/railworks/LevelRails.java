@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.function.ToLongFunction;
 import java.util.stream.Stream;
 
 import com.mojang.serialization.Codec;
@@ -18,6 +20,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.Locomotive;
+import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
@@ -33,19 +37,22 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * A level's Spans and its Trains, saved with it. The rules are {@link Stringing}'s and the storage
  * {@link RailNetwork}'s and {@link Trains}'; this is where they meet a world. It also knows each car's
  * loaded entity, its view, so a Train's tick can read its drivers' keys and its Locomotives' fuel
- * slots and move every car it has in view.
+ * slots and move every car it has in view. Its {@link Logistics}, which runs the automatic Trains'
+ * jobs between the level's hatches, ticks with the level and is not saved.
  */
 public final class LevelRails extends SavedData {
 
@@ -62,6 +69,10 @@ public final class LevelRails extends SavedData {
     private final Trains trains;
     /** Each loaded car's entity, by its car's id. */
     private final Map<UUID, CarEntity> views = new HashMap<>();
+    private final Logistics<Item> logistics = new Logistics<>();
+    /** The hatches that join a Station as logistics last asked, in the order they were placed; asked afresh once a plan. */
+    private List<Logistics.Hatch<Item>> joined = List.of();
+    private int ticks;
 
     public LevelRails() {
         this(new RailNetwork(), new Trains());
@@ -113,9 +124,10 @@ public final class LevelRails extends SavedData {
 
     /**
      * One tick of {@code train}, from its first car's view: the keys of the first player driving one
-     * of its Locomotives, each Locomotive's fuel slot, and every car it has in view set where the
-     * model now puts it. Left at rest by a Station with nobody driving it, it settles onto the
-     * Station's mark.
+     * of its Locomotives, or, with no driver pressing one, its job while it is automatic; each
+     * Locomotive's fuel slot; and every car it has in view set where the model now puts it. A driver's
+     * keys switch an automatic Train to manual, as in Factorio. Left at rest by a Station with nobody
+     * driving it, it settles onto the Station's mark.
      */
     void tick(ServerLevel level, Train train) {
         Car driven = train.cars().getFirst();
@@ -127,11 +139,19 @@ public final class LevelRails extends SavedData {
                 break;
             }
         }
+        if (throttle != Throttle.NONE && train.automatic()) {
+            train.setAutomatic(false);
+            setDirty();
+        }
         double speed = train.speed();
         Place head = train.head();
         Predicate<Span> taken = trains.takenFrom(network, train);
-        train.tick(network, throttle, driven,
-                locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L, taken);
+        ToLongFunction<Locomotive> ignite = locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L;
+        if (train.automatic()) {
+            logistics.drive(network, train, goods(level), ignite, taken);
+        } else {
+            train.tick(network, throttle, driven, ignite, taken);
+        }
         if (train.cars().stream().noneMatch(car -> view(car) instanceof LocomotiveEntity locomotive && locomotive.driven())) {
             // At rest within a Station's stretch, nobody driving it, it eases onto the Station's mark,
             // its cars onto the car spots.
@@ -147,6 +167,43 @@ public final class LevelRails extends SavedData {
                 view.syncFromModel(train);
             }
         }
+    }
+
+    // ---- logistics ----
+
+    /** {@code train}'s status line, as its Locomotive's menu and Jade show it. */
+    public Logistics.Status<Item> status(ServerLevel level, Train train) {
+        return logistics.status(train, goods(level));
+    }
+
+    private LevelGoods goods(ServerLevel level) {
+        return new LevelGoods(level, this);
+    }
+
+    /** The level ticked: its logistics too, with the hatches that join a Station asked afresh once a plan. */
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            of(level).tickLogistics(level);
+        }
+    }
+
+    private void tickLogistics(ServerLevel level) {
+        // In step with the logistics' own count, so each plan sees the hatches as they are that tick.
+        if (++ticks % Logistics.PLAN_TICKS == 0) {
+            joined = joinedHatches(level);
+        }
+        logistics.tick(network, trains, joined, goods(level));
+    }
+
+    /** Every hatch of the level that joins a Station, as logistics sees it, in the order they were placed. */
+    private List<Logistics.Hatch<Item>> joinedHatches(ServerLevel level) {
+        List<Logistics.Hatch<Item>> joined = new ArrayList<>();
+        for (Hatches.Hatch hatch : LevelHatches.of(level).all()) {
+            BlockPos pos = hatch.pos();
+            PlatformsNear.joined(level, pos).ifPresent(at -> joined.add(new Logistics.Hatch<>(pos.getX(), pos.getY(),
+                    pos.getZ(), at.station(), at.spot(), hatch.mode() == HatchMode.PROVIDER, hatch.request())));
+        }
+        return List.copyOf(joined);
     }
 
     /** {@code train} fell off the Rail: it is gone, and each of its cars in view breaks, dropping itself and what it holds. */

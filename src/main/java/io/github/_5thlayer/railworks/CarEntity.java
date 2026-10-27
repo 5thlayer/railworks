@@ -269,11 +269,11 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
             links |= AT_REST;
         }
         entityData.set(DATA_LINKS, links);
-        syncCar(car);
+        syncCar(server, train, car);
     }
 
-    /** Mirrors what a client needs of this kind of car. */
-    protected void syncCar(Car car) {
+    /** Mirrors what a client needs of this kind of car, which {@code train} holds. */
+    protected void syncCar(ServerLevel level, Train train, Car car) {
     }
 
     // ---- using it ----

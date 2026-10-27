@@ -67,8 +67,8 @@ public final class CargoCarEntity extends CarEntity {
         return CarKind.CARGO;
     }
 
-    /** What it carries: the server's, for its menu. */
-    public Container cargo() {
+    /** What it carries: the server's, for its menu and its station's hatches. */
+    public SimpleContainer cargo() {
         return cargo;
     }
 
