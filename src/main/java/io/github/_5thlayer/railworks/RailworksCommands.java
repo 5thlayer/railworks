@@ -3,13 +3,12 @@
 
 package io.github._5thlayer.railworks;
 
-import java.util.Locale;
-
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import io.github._5thlayer.groundworks.Refusal;
 import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -47,7 +46,9 @@ public final class RailworksCommands {
     private static final DynamicCommandExceptionType SPAN_REFUSED =
             new DynamicCommandExceptionType(reason -> (Component) reason);
     private static final DynamicCommandExceptionType CAR_REFUSED =
-            new DynamicCommandExceptionType(refusal -> Component.translatable("commands.railworks.car." + refusal));
+            new DynamicCommandExceptionType(key -> Component.translatable((String) key));
+    private static final SimpleCommandExceptionType CAR_NOT_SET =
+            new SimpleCommandExceptionType(Component.translatable("commands.railworks.car.not_set"));
 
     private RailworksCommands() {
     }
@@ -106,13 +107,27 @@ public final class RailworksCommands {
         LevelRails rails = LevelRails.of(level);
         var result = CarPlacement.plan(level, rails.network(), CarPlacement.Sight.over(pos, yaw), pos, kind);
         if (result.plan().isRefused()) {
-            throw CAR_REFUSED.create(result.plan().refusal().toString().toLowerCase(Locale.ROOT));
+            throw CAR_REFUSED.create(refusalKey(result.plan().refusal()));
         }
-        if (CarItem.set(level, result, kind, context.getSource().getEntity()) == null) {
-            throw CAR_REFUSED.create("span_taken");
+        if (CarItem.setOnRail(level, result, kind, context.getSource().getEntity()) == null) {
+            throw CAR_NOT_SET.create();
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.railworks.car.set",
                 Component.translatable(kind.entityType().getDescriptionId()), pos.toShortString()), true);
         return 1;
+    }
+
+    /** The message for why {@link CarPlacement} refused a car. */
+    private static String refusalKey(Refusal refusal) {
+        if (refusal == RailworksRefusal.OFF_SPAN) {
+            return "commands.railworks.car.off_span";
+        }
+        if (refusal == RailworksRefusal.SPAN_TAKEN) {
+            return "commands.railworks.car.span_taken";
+        }
+        if (refusal == RailworksRefusal.BLOCKED_CAR) {
+            return "commands.railworks.car.blocked_car";
+        }
+        return "commands.railworks.car.not_set";
     }
 }

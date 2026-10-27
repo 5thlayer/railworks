@@ -14,6 +14,7 @@ import io.github._5thlayer.railworks.LevelStations;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
@@ -38,13 +39,13 @@ final class GalleryTests {
     /** Three scenes a row, each row 16 blocks north of the last, as {@code gallery/build} lays them. */
     private static final Layout ROWS = new Layout(3, 16);
 
-    /** Where the gallery is run from: the platform's south-west corner, its plots spilling north and east of the platform. */
+    /** Where the gallery is run from: the platform's south-west corner, the plots spilling north and east of it. */
     private static final BlockPos ORIGIN = new BlockPos(0, 1, 8);
     /** Where a scene's sign stands, from where the scene is run. */
     private static final BlockPos SIGN = new BlockPos(14, 0, 0);
     /** The Stations scene's two Stations, from where it is run, and what it names them. */
-    private static final BlockPos QUARRY = new BlockPos(5, 2, -7);
-    private static final BlockPos SMELTER = new BlockPos(23, 2, -5);
+    private static final BlockPos QUARRY = new BlockPos(4, 2, -7);
+    private static final BlockPos SMELTER = new BlockPos(24, 2, -5);
 
     /** A test of one scene, run on its own from where the gallery is run, loads only the first plot. */
     private static final int ONE_SCENE = 1;
@@ -52,7 +53,7 @@ final class GalleryTests {
     private GalleryTests() {
     }
 
-    /** The scenes in the order {@code build} lays them, each with a key block and where, from where the scene is run, its function places it. */
+    /** The scenes in the order {@code build} lays them, each with a key block and where its function places it. */
     private static List<Scene> scenes() {
         var pylon = RailworksRegistries.PYLON.get();
         return List.of(
@@ -89,8 +90,14 @@ final class GalleryTests {
                 })
                 // A Station set by a command registers as its block entity loads, a tick on.
                 .thenWaitUntil(() -> {
-                    registered(helper, stations.offset(QUARRY), "Quarry");
-                    registered(helper, stations.offset(SMELTER), "Smelter");
+                    var quarry = registered(helper, stations.offset(QUARRY), "Quarry");
+                    var smelter = registered(helper, stations.offset(SMELTER), "Smelter");
+                    // Set by setblock, which no placement rule asks: the scene shows only what a player could place.
+                    var network = LevelRails.of(helper.getLevel()).network();
+                    helper.assertTrue(Platform.of(network, quarry).isPresent() && Platform.of(network, smelter).isPresent(),
+                            "a Station of the Stations scene has no platform");
+                    helper.assertTrue(Platform.overlapping(network, quarry, List.of(smelter)).isEmpty(),
+                            "the Stations scene's two platforms overlap");
                 })).thenSucceed();
     }
 
@@ -112,10 +119,12 @@ final class GalleryTests {
         })).thenSucceed();
     }
 
-    private static void registered(GameTestHelper helper, BlockPos pos, String name) {
+    /** The Station at {@code pos}, absolute, asserting the level's Stations hold it under {@code name}. */
+    private static Station registered(GameTestHelper helper, BlockPos pos, String name) {
         Station station = LevelStations.of(helper.getLevel()).stations().get(pos.getX(), pos.getY(), pos.getZ());
         helper.assertTrue(station != null && station.name().equals(name),
                 "the Station at " + pos.toShortString() + " is in the level's Stations as " + station + ", not " + name);
+        return station;
     }
 
     /** The Trains whose leading car stands on a Span with an end in {@code plot}. */

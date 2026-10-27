@@ -37,12 +37,14 @@ final class CommandTests {
     }
 
     static void register(RailworksGameTests.Registrar tests) {
-        tests.test("command_span_strings_a_span_for_no_rail", 1, CommandTests::spanStrings);
-        tests.test("command_span_refuses_a_span_past_a_limit", 1, CommandTests::spanRefusesSteep);
-        tests.test("command_span_refuses_a_block_that_is_no_pylon", 1, CommandTests::spanRefusesNoPylon);
-        tests.test("command_car_sets_a_car_on_the_rail_as_a_train_of_its_own", 1, CommandTests::carSets);
-        tests.test("command_car_beside_a_train_at_rest_couples_into_it", 1, CommandTests::carCouples);
-        tests.test("command_car_refuses_where_the_item_would", 1, CommandTests::carRefused);
+        tests.test("gallery_command_span_strings_a_span_for_no_rail", 1, CommandTests::spanStrings);
+        tests.test("gallery_command_span_refuses_a_span_past_the_grade_limit", 1, CommandTests::spanRefusesSteep);
+        tests.test("gallery_command_span_refuses_a_span_past_the_length_limit", 1, CommandTests::spanRefusesLong);
+        tests.test("gallery_command_span_refuses_a_span_past_the_bend_limit", 1, CommandTests::spanRefusesSharp);
+        tests.test("gallery_command_span_refuses_a_block_that_is_no_pylon", 1, CommandTests::spanRefusesNoPylon);
+        tests.test("gallery_command_car_sets_a_car_on_the_rail_as_a_train_of_its_own", 1, CommandTests::carSets);
+        tests.test("gallery_command_car_beside_a_train_at_rest_couples_into_it", 1, CommandTests::carCouples);
+        tests.test("gallery_command_car_refuses_where_the_item_would", 1, CommandTests::carRefused);
     }
 
     private static void spanStrings(GameTestHelper helper) {
@@ -62,6 +64,32 @@ final class CommandTests {
         refused(helper, "railworks span %s %s", EAST, STEEP);
         helper.assertFalse(LevelRails.of(helper.getLevel()).network().contains(PylonColumn.arm(helper.absolutePos(EAST)),
                 PylonColumn.arm(helper.absolutePos(STEEP.above(2)))), "a refused Span was strung");
+        helper.succeed();
+    }
+
+    private static void spanRefusesLong(GameTestHelper helper) {
+        // 70 blocks apart on x, past the 32 limit; the far column stands where the test never looks.
+        BlockPos far = WEST.offset(70, 0, 0);
+        helper.setBlock(WEST, RailworksRegistries.PYLON.get().defaultBlockState());
+        helper.setBlock(far, RailworksRegistries.PYLON.get().defaultBlockState());
+        // A far column in an unloaded chunk would be air, and the command's refusal would be for that.
+        if (!helper.getBlockState(far).is(RailworksRegistries.PYLON.get())) {
+            helper.fail("the far Pylon did not stand", far);
+        }
+        refused(helper, "railworks span %s %s", WEST, far);
+        helper.assertFalse(LevelRails.of(helper.getLevel()).network().contains(PylonColumn.arm(helper.absolutePos(WEST)),
+                PylonColumn.arm(helper.absolutePos(far))), "a refused Span was strung");
+        helper.succeed();
+    }
+
+    private static void spanRefusesSharp(GameTestHelper helper) {
+        strung(helper);
+        // From the east Arm, back and to the side: a turn of 135 degrees.
+        BlockPos back = EAST.offset(-4, 0, 4);
+        helper.setBlock(back, RailworksRegistries.PYLON.get().defaultBlockState());
+        refused(helper, "railworks span %s %s", EAST, back);
+        helper.assertFalse(LevelRails.of(helper.getLevel()).network().contains(PylonColumn.arm(helper.absolutePos(EAST)),
+                PylonColumn.arm(helper.absolutePos(back))), "a refused Span was strung");
         helper.succeed();
     }
 

@@ -62,7 +62,7 @@ public final class CarItem extends Item implements PlansPlacement {
             return InteractionResult.FAIL;
         }
         if (level instanceof ServerLevel server) {
-            if (set(server, result, kind, player) == null) {
+            if (setOnRail(server, result, kind, player) == null) {
                 return InteractionResult.FAIL;
             }
             player.getItemInHand(hand).consume(1, player);
@@ -75,7 +75,7 @@ public final class CarItem extends Item implements PlansPlacement {
      * plays its place sound; the car, or null, changing nothing, where it cannot be set. The click and
      * {@code /railworks car} both set a car by this.
      */
-    static @Nullable CarEntity set(ServerLevel server, CarPlacement.Result result, CarKind kind, @Nullable Entity placer) {
+    static @Nullable CarEntity setOnRail(ServerLevel server, CarPlacement.Result result, CarKind kind, @Nullable Entity placer) {
         if (result.car() == null || (result.train() == null && result.slot() == null)) {
             return null;
         }

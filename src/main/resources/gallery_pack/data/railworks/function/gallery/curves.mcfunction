@@ -1,4 +1,4 @@
-# Curves: a line of two-segment columns bending left through 45 degrees and back again, the Rail
+# Curves: a line of two-segment columns bending right through 45 degrees and back again, the Rail
 # drawn as a smooth curve through each Arm, and a Locomotive with coal at its west end, facing east,
 # to ride it round.
 function railworks:gallery/clear

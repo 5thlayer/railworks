@@ -17,7 +17,8 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 /**
- * The Module's entry point. It fills its part of the suite's Works tab and offers its Gallery pack. The game tests hook
+ * The Module's entry point. It fills its part of the suite's Works tab and offers its Gallery
+ * pack. The game tests hook
  * themselves in from the {@code gametest} source set, which never ships (libworks ADR 0011).
  */
 @Mod(Railworks.MOD_ID)
