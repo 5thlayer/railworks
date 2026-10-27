@@ -3,6 +3,8 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.Optional;
+
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,11 +30,23 @@ public final class Stringing {
         TOO_SHARP,
         /** One of the Arms already takes {@link SpanRules#SPANS_PER_ARM} Spans. */
         ARM_FULL,
+        /**
+         * A block fills the {@link Clearance} of the Span, or of a Span already at either Arm as the new
+         * one would bend it.
+         */
+        BLOCKED,
         SHORT_OF_RAIL
     }
 
-    /** @param rail Rail spent on a {@code STRUNG}, refunded on a {@code CUT}, else 0 */
-    public record Outcome(Result result, int rail) {
+    /**
+     * @param rail    Rail spent on a {@code STRUNG}, refunded on a {@code CUT}, else 0
+     * @param blocked on a {@code BLOCKED}, the first block in the way, nearest the held Arm; else null
+     */
+    public record Outcome(Result result, int rail, Clearance.@Nullable Cell blocked) {
+
+        public Outcome(Result result, int rail) {
+            this(result, rail, null);
+        }
     }
 
     private Stringing() {
@@ -55,9 +69,10 @@ public final class Stringing {
      * the rules live: {@link #click} applies what this decides, and the preview draws it, so a Span
      * the preview promises is a Span the click makes.
      *
+     * @param blocks   which blocks of the world are filled
      * @param railHeld the Rail the player can spend
      */
-    public static Outcome decide(RailNetwork network, Arm anchor, Arm target, int railHeld) {
+    public static Outcome decide(RailNetwork network, Clearance.Blocks blocks, Arm anchor, Arm target, int railHeld) {
         if (anchor.equals(target)) {
             return new Outcome(Result.CANCELLED, 0);
         }
@@ -77,6 +92,10 @@ public final class Stringing {
         }
         if (bendsTooSharply(network, anchor, target) || bendsTooSharply(network, target, anchor)) {
             return new Outcome(Result.TOO_SHARP, 0);
+        }
+        Optional<Clearance.Cell> blocked = blocked(network, blocks, anchor, target);
+        if (blocked.isPresent()) {
+            return new Outcome(Result.BLOCKED, 0, blocked.get());
         }
         int cost = SpanRules.cost(anchor, target);
         if (railHeld < cost) {
@@ -99,20 +118,43 @@ public final class Stringing {
         return false;
     }
 
+    /**
+     * The first block filling the Clearance of a new Span from {@code anchor} to {@code target}, or of
+     * a Span already at either Arm, along the curve it would take once the new one bends it there.
+     */
+    private static Optional<Clearance.Cell> blocked(RailNetwork network, Clearance.Blocks blocks, Arm anchor, Arm target) {
+        Optional<Clearance.Cell> own = Clearance.firstFilled(Clearance.along(RailCurve.between(network, anchor, target)), blocks);
+        if (own.isPresent()) {
+            return own;
+        }
+        Span added = Span.of(anchor, target, 0);
+        for (Arm end : new Arm[] {anchor, target}) {
+            for (Span span : network.spansAt(end)) {
+                RailCurve bent = RailCurve.strung(network, added, span.a(), span.b());
+                Optional<Clearance.Cell> filled = Clearance.firstFilled(Clearance.along(bent), blocks);
+                if (filled.isPresent()) {
+                    return filled;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /** Whether {@code result} is a refusal: the click changes nothing and spends nothing. */
     public static boolean refused(Result result) {
         return switch (result) {
             case STRUNG, CUT, CANCELLED -> false;
-            case TOO_LONG, TOO_STEEP, TOO_SHARP, ARM_FULL, SHORT_OF_RAIL -> true;
+            case TOO_LONG, TOO_STEEP, TOO_SHARP, ARM_FULL, BLOCKED, SHORT_OF_RAIL -> true;
         };
     }
 
     /** The slack's tint for an aim at {@code target}, or at nothing when it is null. */
-    public static Tint tintFor(RailNetwork network, Arm anchor, @Nullable Arm target, int railHeld) {
+    public static Tint tintFor(RailNetwork network, Clearance.Blocks blocks, Arm anchor, @Nullable Arm target,
+                               int railHeld) {
         if (target == null) {
             return Tint.HELD;
         }
-        Result result = decide(network, anchor, target, railHeld).result();
+        Result result = decide(network, blocks, anchor, target, railHeld).result();
         if (refused(result)) {
             return Tint.REFUSED;
         }
@@ -127,10 +169,11 @@ public final class Stringing {
      * The second click of the gesture, from the Arm held to the Arm clicked: decides it
      * ({@link #decide}) and applies a Span strung or cut.
      *
+     * @param blocks   which blocks of the world are filled
      * @param railHeld the Rail the player can spend
      */
-    public static Outcome click(RailNetwork network, Arm anchor, Arm target, int railHeld) {
-        Outcome outcome = decide(network, anchor, target, railHeld);
+    public static Outcome click(RailNetwork network, Clearance.Blocks blocks, Arm anchor, Arm target, int railHeld) {
+        Outcome outcome = decide(network, blocks, anchor, target, railHeld);
         switch (outcome.result()) {
             case STRUNG -> network.add(Span.of(anchor, target, outcome.rail()));
             case CUT -> network.remove(anchor, target);

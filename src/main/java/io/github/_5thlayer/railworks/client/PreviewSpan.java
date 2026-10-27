@@ -25,7 +25,7 @@ import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
  * {@link PlacedColumn#autoString} asked of the previewed spot, answered entirely on the client from its
  * block entities, {@link ClientRails} and the player's inventory, so the preview cannot promise a Span
  * the placement will not make, along the curve it would take. Faded, like the Rail it promises; where
- * the grade or bend limit refuses the Span it would have strung, that Span in red.
+ * the grade or bend limit or a filled Clearance refuses the Span it would have strung, that Span in red.
  */
 final class PreviewSpan {
 
@@ -49,7 +49,7 @@ final class PreviewSpan {
             draw(event, pos, choice.get().target(), FADE, new float[] {SpanRenderer.R, SpanRenderer.G, SpanRenderer.B});
             return;
         }
-        // Nothing would string: the Span the grade or bend limit refused shows red, as the held Rail's slack does.
+        // Nothing would string: the Span the grade or bend limit or a filled Clearance refused shows red, as the held Rail's slack does.
         PlacedColumn.refusedString(level, pos, player, ClientRails.network())
                 .ifPresent(target -> draw(event, pos, target, 1.0F, SpanRenderer.colourOf(Stringing.Tint.REFUSED)));
     }

@@ -32,18 +32,18 @@ public final class PlacedColumn {
         if (!strings(level, pos, placer)) {
             return Optional.empty();
         }
-        return AutoStringing.choose(network, PylonColumn.arm(pos), armsInReach(level, pos), RailPurse.count(placer));
+        return AutoStringing.choose(network, LevelClearance.blocks(level), PylonColumn.arm(pos), armsInReach(level, pos), RailPurse.count(placer));
     }
 
     /**
-     * The Arm the column would have strung to but for the grade or bend limit, which the preview draws
+     * The Arm the column would have strung to but for the grade or bend limit or a filled Clearance, which the preview draws
      * red, as {@link AutoStringing#refused} says.
      */
     public static Optional<Arm> refusedString(Level level, BlockPos pos, Player placer, RailNetwork network) {
         if (!strings(level, pos, placer)) {
             return Optional.empty();
         }
-        return AutoStringing.refused(network, PylonColumn.arm(pos), armsInReach(level, pos), RailPurse.count(placer));
+        return AutoStringing.refused(network, LevelClearance.blocks(level), PylonColumn.arm(pos), armsInReach(level, pos), RailPurse.count(placer));
     }
 
     private static boolean strings(Level level, BlockPos pos, Player placer) {

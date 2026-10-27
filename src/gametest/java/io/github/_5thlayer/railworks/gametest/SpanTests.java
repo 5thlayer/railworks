@@ -48,12 +48,12 @@ final class SpanTests {
         tests.test("span_a_span_past_the_length_limit_is_refused", 20, SpanTests::tooLong);
         tests.test("span_a_span_past_the_grade_limit_is_refused", 20, SpanTests::tooSteep);
         tests.test("span_a_span_bending_past_the_bend_limit_is_refused", 20, SpanTests::tooSharp);
-        tests.test("span_a_third_span_on_one_arm_is_refused", 20, SpanTests::thirdRefused);
+        tests.testOnItsOwn("span_a_third_span_on_one_arm_is_refused", 20, SpanTests::thirdRefused);
         tests.test("span_using_the_same_arm_again_cancels", 20, SpanTests::sameArmCancels);
         tests.test("span_switching_items_cancels", 20, SpanTests::switchingCancels);
         tests.test("span_walking_away_cancels", 20, SpanTests::walkingAwayCancels);
         tests.test("span_repeating_the_gesture_cuts_and_refunds", 20, SpanTests::cutRefunds);
-        tests.test("span_breaking_a_pylon_cuts_its_spans_and_refunds_them", 20, SpanTests::breakingRefunds);
+        tests.testOnItsOwn("span_breaking_a_pylon_cuts_its_spans_and_refunds_them", 20, SpanTests::breakingRefunds);
         tests.test("span_stacking_a_segment_keeps_the_spans", 20, SpanTests::stackingKeepsSpans);
         tests.test("span_joining_two_columns_cuts_the_lower_arms_spans", 20, SpanTests::joiningCutsLowerArm);
         tests.test("span_the_arm_is_the_top_segment", 20, SpanTests::armIsTheTop);

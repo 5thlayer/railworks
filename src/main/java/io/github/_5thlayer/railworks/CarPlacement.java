@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.Clearance;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailCurve;
 import io.github._5thlayer.railworks.rail.RailGeometry;
@@ -46,7 +47,7 @@ public final class CarPlacement {
     private CarPlacement() {
     }
 
-    /** The space the car takes above the Rail point: the Clearance the placement checks. */
+    /** The box a car takes above the Rail point, a block across and its height up: {@link Clearance}'s car. */
     static AABB carBox(Vec3 rail) {
         double half = CarEntity.WIDTH / 2.0;
         return new AABB(rail.x - half, rail.y, rail.z - half, rail.x + half, rail.y + CarEntity.HEIGHT, rail.z + half);
@@ -118,7 +119,7 @@ public final class CarPlacement {
         if (coupling == null ? taken(level, network, Train.of(aimed, car)) : coupling.taken()) {
             return refused(PlacementPlan.refused(at, state, RailworksRefusal.SPAN_TAKEN));
         }
-        if (!level.noCollision(box)) {
+        if (Clearance.firstFilled(Clearance.car(place.point(network)), LevelClearance.blocks(level)).isPresent()) {
             return refused(PlacementPlan.refused(at, state, RailworksRefusal.BLOCKED_CAR));
         }
         if (coupling == null) {

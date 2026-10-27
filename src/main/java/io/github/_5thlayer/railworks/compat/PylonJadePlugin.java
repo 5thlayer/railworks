@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks.compat;
 
 import java.util.Locale;
 
+import io.github._5thlayer.railworks.LevelClearance;
 import io.github._5thlayer.railworks.PylonBlock;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailPurse;
@@ -59,10 +60,11 @@ public class PylonJadePlugin implements IWailaPlugin {
                 return;
             }
             Arm anchor = PylonColumn.arm(pending.pos());
-            Stringing.Result result = Stringing.decide(ClientRails.network(), anchor, arm, RailPurse.count(player)).result();
-            if (Stringing.refused(result)) {
+            Stringing.Outcome outcome = Stringing.decide(ClientRails.network(), LevelClearance.blocks(accessor.getLevel()),
+                    anchor, arm, RailPurse.count(player));
+            if (Stringing.refused(outcome.result())) {
                 tooltip.add(Component.translatable("tooltip.railworks.pylon.jade.refused",
-                        SpanGesture.reason(result, anchor, arm)));
+                        SpanGesture.reason(outcome, anchor, arm)));
             }
         }
 
