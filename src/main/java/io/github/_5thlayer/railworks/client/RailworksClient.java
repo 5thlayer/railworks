@@ -9,7 +9,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-/** The client half of the Rail: the Rail between Arms. Called only on the client, from {@code Railworks}. */
+/** The client half of the Rail: the Rail between Arms, and the item each hatch shows. Called only on the client, from {@code Railworks}. */
 public final class RailworksClient {
 
     private RailworksClient() {
@@ -31,5 +31,6 @@ public final class RailworksClient {
         event.registerEntityRenderer(RailworksRegistries.LOCOMOTIVE_ENTITY.get(), CarRenderer::locomotive);
         event.registerEntityRenderer(RailworksRegistries.CARGO_CAR_ENTITY.get(), CarRenderer::cargo);
         event.registerBlockEntityRenderer(RailworksRegistries.PYLON_ENTITY.get(), context -> new SpanRenderer());
+        event.registerBlockEntityRenderer(RailworksRegistries.HATCH_ENTITY.get(), context -> new HatchRenderer());
     }
 }

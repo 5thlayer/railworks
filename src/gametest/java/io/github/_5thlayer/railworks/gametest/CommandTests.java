@@ -148,7 +148,7 @@ final class CommandTests {
         run(helper, "railworks span %s %s", WEST, EAST);
     }
 
-    private static void run(GameTestHelper helper, String command, BlockPos... at) {
+    static void run(GameTestHelper helper, String command, BlockPos... at) {
         try {
             dispatch(helper, command, at);
         } catch (CommandSyntaxException e) {

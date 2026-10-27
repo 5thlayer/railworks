@@ -23,6 +23,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -77,6 +79,15 @@ public final class HatchBlock extends Block implements EntityBlock {
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new HatchBlockEntity(pos, state);
+    }
+
+    /** Ticks on the server only, working out the item its watchers draw on its sides. */
+    @Override
+    public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        if (!(level instanceof ServerLevel) || type != RailworksRegistries.HATCH_ENTITY.get()) {
+            return null;
+        }
+        return (world, pos, blockState, entity) -> ((HatchBlockEntity) entity).serverTick((ServerLevel) world);
     }
 
     /** In the level's hatches at once, holding nothing; what a hatch removed with no side effects left there is dropped, not lost. */

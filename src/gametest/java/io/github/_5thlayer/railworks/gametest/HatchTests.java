@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks.gametest;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
@@ -98,6 +99,13 @@ final class HatchTests {
         tests.test("logistics_hatch_breaking_it_drops_what_it_holds", 20, HatchTests::breaking);
         tests.test("logistics_hatch_one_a_command_removed_is_forgotten", 20, HatchTests::removedByCommand);
         tests.test("logistics_hatch_jade_shows_its_mode_request_and_station", 20, HatchTests::report);
+        tests.test("logistics_hatch_shows_a_requesters_request_and_nothing_once_cleared", 40, HatchTests::showsRequest);
+        tests.test("logistics_hatch_shows_a_providers_first_stack_as_it_fills_and_empties", 40, HatchTests::showsFirstStack);
+        tests.test("logistics_hatch_shows_what_it_is_once_switched", 40, HatchTests::showsSwitched);
+        tests.test("logistics_hatch_shows_what_a_command_sets_it_up_for", 40, HatchTests::showsCommand);
+        tests.test("logistics_hatch_shows_its_record_once_its_block_loads_again", 40, HatchTests::showsReloaded);
+        tests.test("logistics_hatch_shows_its_watchers_the_item_alone_and_keeps_it_while_unchanged", 40, HatchTests::showsUpdates);
+        tests.test("logistics_hatch_shows_its_item_joining_no_station", 40, HatchTests::showsUnjoined);
     }
 
     // ---- crafting ----
@@ -434,6 +442,163 @@ final class HatchTests {
         helper.succeed();
     }
 
+    // ---- what it shows ----
+
+    private static void showsRequest(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.REQUESTER);
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
+                .thenExecute(() -> {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT, 7));
+                    use(helper, player, FIRST);
+                    use(helper, player, FIRST);
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
+                .thenExecute(() -> {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL));
+                    use(helper, player, FIRST);
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.COAL)))
+                .thenExecute(() -> {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                    use(helper, player, FIRST);
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
+                .thenSucceed();
+    }
+
+    /** Filled and emptied through its record, as a hopper or a Train does, and by a player's empty hand. */
+    private static void showsFirstStack(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.PROVIDER);
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
+                .thenExecute(() -> {
+                    insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 10));
+                    insert(helper, FIRST, new ItemStack(Items.COAL, 3));
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
+                .thenExecute(() -> {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                    use(helper, player, FIRST);
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.COAL)))
+                .thenExecute(() -> {
+                    var contents = record(helper, FIRST).contents();
+                    try (var transaction = Transaction.openRoot()) {
+                        contents.extract(ItemResource.of(Items.COAL), 3, transaction);
+                        transaction.commit();
+                    }
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
+                .thenSucceed();
+    }
+
+    /** A requester asking for iron and holding coal shows the coal once a provider, and nothing once a requester again, its request cleared. */
+    private static void showsSwitched(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.REQUESTER);
+        record(helper, FIRST).ask(Items.IRON_INGOT);
+        insert(helper, FIRST, new ItemStack(Items.COAL, 4));
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
+                .thenExecute(() -> sneakUse(helper, player, FIRST))
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.COAL)))
+                .thenExecute(() -> sneakUse(helper, player, FIRST))
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
+                .thenSucceed();
+    }
+
+    private static void showsCommand(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.PROVIDER);
+        hatch(helper, player, SECOND, HatchMode.REQUESTER);
+        CommandTests.run(helper, "railworks hatch %s provider minecraft:raw_iron 2", FIRST);
+        CommandTests.run(helper, "railworks hatch %s requester minecraft:raw_gold 3", SECOND);
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.RAW_IRON)))
+                .thenExecute(() -> expectShown(helper, SECOND, new ItemStack(Items.RAW_GOLD)))
+                .thenSucceed();
+    }
+
+    /**
+     * A hatch's block set afresh over its record, as a chunk loading again makes its block entity anew,
+     * shows what the record holds, though the record changed while no block entity watched it.
+     */
+    private static void showsReloaded(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.PROVIDER);
+        BlockPos at = helper.absolutePos(FIRST);
+        helper.getLevel().setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS);
+        insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));
+        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
+                .thenSucceed();
+    }
+
+    /** Set by a command where no platform covers it, a provider shows its first stack all the same. */
+    private static void showsUnjoined(GameTestHelper helper) {
+        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    expectJoined(helper, FIRST, -1);
+                    insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));
+                })
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
+                .thenSucceed();
+    }
+
+    /** Its update tag holds the item alone, and nothing for a hatch showing nothing; while it is unchanged, the stack shown is never replaced, so nothing is sent. */
+    private static void showsUpdates(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        hatch(helper, player, FIRST, HatchMode.PROVIDER);
+        var registries = helper.getLevel().registryAccess();
+        helper.startSequence()
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    var tag = helper.getBlockEntity(FIRST, HatchBlockEntity.class).getUpdateTag(registries);
+                    if (!tag.isEmpty()) {
+                        helper.fail("a hatch showing nothing sends " + tag, FIRST);
+                    }
+                    insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));
+                })
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    var entity = helper.getBlockEntity(FIRST, HatchBlockEntity.class);
+                    var tag = entity.getUpdateTag(registries);
+                    if (!tag.keySet().equals(Set.of("shown"))) {
+                        helper.fail("a hatch's update tag holds " + tag.keySet() + ", not the item it shows alone", FIRST);
+                    }
+                    ItemStack shown = entity.shown();
+                    insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));
+                    insert(helper, FIRST, new ItemStack(Items.COAL, 5));
+                    helper.runAfterDelay(3, () -> {
+                        if (entity.shown() != shown) {
+                            helper.fail("the hatch replaced the item it shows, sending it again, though it did not change", FIRST);
+                        }
+                    });
+                })
+                .thenIdle(5)
+                .thenSucceed();
+    }
+
     // ---- setup ----
 
     /** {@link LocomotiveTests}' Span with a Station north of it, and a survival player beside it. */
@@ -513,6 +678,22 @@ final class HatchTests {
                 && joined.get().station().y() == station.getY() && joined.get().station().z() == station.getZ();
         if (!right) {
             helper.fail("the hatch joins " + joined + ", not " + (spot < 0 ? "nothing" : "the Station at car spot " + spot), pos);
+        }
+    }
+
+    /** Sneak-uses the hatch at {@code pos} with an empty hand, switching it. */
+    private static void sneakUse(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        player.setShiftKeyDown(true);
+        use(helper, player, pos);
+        player.setShiftKeyDown(false);
+    }
+
+    /** The hatch at {@code pos} shows {@code expected}, one of it, or nothing for an empty stack. */
+    private static void expectShown(GameTestHelper helper, BlockPos pos, ItemStack expected) {
+        ItemStack shown = helper.getBlockEntity(pos, HatchBlockEntity.class).shown();
+        if (!ItemStack.matches(shown, expected)) {
+            helper.fail("the hatch shows " + shown + ", not " + expected, pos);
         }
     }
 
