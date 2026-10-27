@@ -79,7 +79,7 @@ final class ClearanceKeptTests {
             helper.fail("a refused segment was spent", A.above());
         }
         expectStrung(helper, A, B, true, "a refused segment");
-        helper.succeed();
+        succeed(helper);
     }
 
     private static void raisedTooSteep(GameTestHelper helper) {
@@ -92,7 +92,7 @@ final class ClearanceKeptTests {
             helper.fail("a segment raised the Span past the grade limit", HIGH_B.above());
         }
         expectStrung(helper, A, HIGH_B, true, "a refused segment");
-        helper.succeed();
+        succeed(helper);
     }
 
     private static void sneakingRaisedTooSteep(GameTestHelper helper) {
@@ -104,7 +104,7 @@ final class ClearanceKeptTests {
             helper.fail("a sneaking player's segment raised the Span past the grade limit", HIGH_B.above());
         }
         expectStrung(helper, A, HIGH_B, true, "a refused segment");
-        helper.succeed();
+        succeed(helper);
     }
 
     private static void setPastARule(GameTestHelper helper) {
@@ -119,7 +119,7 @@ final class ClearanceKeptTests {
         if (rail != 9) {
             helper.fail("the cut Span dropped " + rail + " Rail, not the 9 it cost", HIGH_B);
         }
-        helper.succeed();
+        succeed(helper);
     }
 
     /** A lone Pylon under the middle of the Span: a segment on it would stand where the Span's cars pass. */
@@ -133,7 +133,7 @@ final class ClearanceKeptTests {
         if (!helper.getBlockState(under.above()).isAir()) {
             helper.fail("a segment went into the Span's Clearance", under.above());
         }
-        helper.succeed();
+        succeed(helper);
     }
 
     /** One piston pushes stone toward the Rail and stays put; one beside it pushes stone along it, clear of the cars. */
@@ -152,7 +152,7 @@ final class ClearanceKeptTests {
             if (!helper.getBlockState(along.east(2)).is(Blocks.STONE)) {
                 helper.fail("a piston clear of the Span did not push", along.east(2));
             }
-            helper.succeed();
+            succeed(helper);
         });
     }
 
@@ -164,7 +164,7 @@ final class ClearanceKeptTests {
             if (helper.getBlockState(at).getValue(PistonBaseBlock.EXTENDED) || !helper.getBlockState(at.north()).isAir()) {
                 helper.fail("a piston put its head into the Span's Clearance", at.north());
             }
-            helper.succeed();
+            succeed(helper);
         });
     }
 
@@ -190,8 +190,46 @@ final class ClearanceKeptTests {
             if (!helper.getBlockState(clear).is(Blocks.OBSIDIAN)) {
                 helper.fail("water beside lava clear of the Span made no obsidian", clear);
             }
-            helper.succeed();
+            drain(helper);
+            succeed(helper);
         });
+    }
+
+    /**
+     * Passes, first cutting every Span with both ends in the plot: the level keeps its Spans past the
+     * test, and a later test building a line through this ground would find them in its way.
+     */
+    private static void succeed(GameTestHelper helper) {
+        RailNetwork network = LevelRails.of(helper.getLevel()).network();
+        for (Span span : network.all()) {
+            if (inPlot(helper, span.a()) && inPlot(helper, span.b())) {
+                network.remove(span.a(), span.b());
+            }
+        }
+        helper.succeed();
+    }
+
+    private static boolean inPlot(GameTestHelper helper, Arm arm) {
+        BlockPos relative = helper.relativePos(PylonColumn.block(arm));
+        return relative.getX() >= 0 && relative.getX() <= 10 && relative.getY() >= 0 && relative.getY() <= 6
+                && relative.getZ() >= 0 && relative.getZ() <= 8;
+    }
+
+    /**
+     * Every fluid left in the plot set to air, before it can flow out past the plot into the ground a
+     * later test builds on.
+     */
+    private static void drain(GameTestHelper helper) {
+        for (int x = 0; x <= 10; x++) {
+            for (int y = 1; y <= 4; y++) {
+                for (int z = 0; z <= 10; z++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    if (!helper.getBlockState(pos).getFluidState().isEmpty()) {
+                        helper.setBlock(pos, Blocks.AIR);
+                    }
+                }
+            }
+        }
     }
 
     /** A grown cactus under the Rail stays one block high, and one beside it grows. */
@@ -211,7 +249,7 @@ final class ClearanceKeptTests {
         if (!helper.getBlockState(beside.above()).is(Blocks.CACTUS)) {
             helper.fail("a cactus clear of the Span did not grow", beside.above());
         }
-        helper.succeed();
+        succeed(helper);
     }
 
     /**
