@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.railworks.rail.Impact;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -17,10 +18,13 @@ import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -28,6 +32,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
@@ -65,6 +70,10 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
 
     public static final float WIDTH = (float) CarBody.WIDTH;
     public static final float HEIGHT = (float) CarBody.HEIGHT;
+
+    /** Being struck by a moving car: {@code data/railworks/damage_type/train.json}. */
+    public static final ResourceKey<DamageType> TRAIN_DAMAGE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath(Railworks.MOD_ID, "train"));
 
     /** Its own synched {@link #DATA_LINKS} bits. */
     private static final byte FIRST = 1;
@@ -241,6 +250,28 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         setXRot((float) (-Mth.atan2(pose.dy(), horizontal) * Mth.RAD_TO_DEG));
         setDeltaMovement(pose.dx() * speed, pose.dy() * speed, pose.dz() * speed);
         setPos(rail.x, rail.y, rail.z);
+    }
+
+    /**
+     * Strikes every player and mob in the car's path, the space its box swept this tick, {@code swept}:
+     * hurt by how fast it runs ({@link Impact#damage}) and pushed aside ({@link Impact#push}). Whoever
+     * rides a car, its own Train's or another's, is inside it and never struck.
+     */
+    void strike(ServerLevel level, AABB swept) {
+        Vec3 velocity = getDeltaMovement();
+        double perSecond = LocomotiveSpec.blocksPerSecond(velocity.length());
+        if (perSecond == 0.0) {
+            return;
+        }
+        List<LivingEntity> struck = level.getEntitiesOfClass(LivingEntity.class, swept,
+                entity -> entity.isAlive() && !entity.isSpectator() && !(entity.getRootVehicle() instanceof CarEntity));
+        for (LivingEntity entity : struck) {
+            entity.hurtServer(level, damageSources().source(TRAIN_DAMAGE, this), (float) Impact.damage(perSecond));
+            Impact.Push push = Impact.push(velocity.x, velocity.y, velocity.z, entity.getX() - getX(), entity.getZ() - getZ());
+            entity.setDeltaMovement(push.dx(), push.dy(), push.dz());
+            // A player moves itself: the push reaches its client only marked.
+            entity.hurtMarked = true;
+        }
     }
 
     /** Mirrors what a client needs of its car into synched data. */
