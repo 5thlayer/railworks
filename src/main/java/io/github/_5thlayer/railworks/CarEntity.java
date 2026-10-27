@@ -5,7 +5,9 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.rail.Impact;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import io.github._5thlayer.railworks.rail.Arm;
@@ -70,6 +72,9 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
 
     public static final float WIDTH = (float) CarBody.WIDTH;
     public static final float HEIGHT = (float) CarBody.HEIGHT;
+
+    /** How far apart the boxes a car's path in a tick is taken as, in blocks: under its width. */
+    private static final double STRIKE_STEP = 0.25;
 
     /** Being struck by a moving car: {@code data/railworks/damage_type/train.json}. */
     public static final ResourceKey<DamageType> TRAIN_DAMAGE =
@@ -253,18 +258,26 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     }
 
     /**
-     * Strikes every player and mob in the car's path, the space its box swept this tick, {@code swept}:
-     * hurt by how fast it runs ({@link Impact#damage}) and pushed aside ({@link Impact#push}). Whoever
-     * rides a car, its own Train's or another's, is inside it and never struck.
+     * Strikes every player and mob in the car's path this tick, from {@code from} to where it is now:
+     * the box it swept, taken in steps shorter than a car is wide so a diagonal's path stays its own
+     * width. Each is hurt by how fast the car runs ({@link Impact#damage}) and pushed aside
+     * ({@link Impact#push}). Whoever rides a car, its own Train's or another's, is inside it and never
+     * struck.
      */
-    void strike(ServerLevel level, AABB swept) {
+    void strike(ServerLevel level, Vec3 from) {
         Vec3 velocity = getDeltaMovement();
         double perSecond = LocomotiveSpec.blocksPerSecond(velocity.length());
         if (perSecond == 0.0) {
             return;
         }
-        List<LivingEntity> struck = level.getEntitiesOfClass(LivingEntity.class, swept,
-                entity -> entity.isAlive() && !entity.isSpectator() && !(entity.getRootVehicle() instanceof CarEntity));
+        Vec3 moved = position().subtract(from);
+        int steps = Math.max(1, (int) Math.ceil(moved.length() / STRIKE_STEP));
+        Set<LivingEntity> struck = new LinkedHashSet<>();
+        for (int i = 0; i <= steps; i++) {
+            AABB box = getBoundingBox().move(moved.scale((double) i / steps - 1.0));
+            struck.addAll(level.getEntitiesOfClass(LivingEntity.class, box,
+                    entity -> entity.isAlive() && !entity.isSpectator() && !(entity.getRootVehicle() instanceof CarEntity)));
+        }
         for (LivingEntity entity : struck) {
             entity.hurtServer(level, damageSources().source(TRAIN_DAMAGE, this), (float) Impact.damage(perSecond));
             Impact.Push push = Impact.push(velocity.x, velocity.y, velocity.z, entity.getX() - getX(), entity.getZ() - getZ());
