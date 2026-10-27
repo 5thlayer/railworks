@@ -4,7 +4,6 @@
 package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
-import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
 import io.github._5thlayer.railworks.client.ClientRails;
 import io.github._5thlayer.railworks.rail.RailNetwork;
@@ -50,8 +49,10 @@ public final class CarItem extends Item implements PlansPlacement {
 
     @Override
     public @Nullable PlacementPlan plan(BlockPlaceContext context) {
+        // Refused where a block would go, across the aimed face, not in the aimed block, where it
+        // would be drawn flush with that block's faces.
         var result = CarPlacement.plan(context.getLevel(), networkOf(context.getLevel()), context.getPlayer(),
-                Placements.aimedPos(context), kind);
+                context.getClickedPos(), kind);
         return result == null ? null : result.plan();
     }
 

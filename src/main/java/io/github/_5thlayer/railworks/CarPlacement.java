@@ -83,14 +83,18 @@ public final class CarPlacement {
         }
     }
 
-    /** The plan for {@code player} aiming {@code kind} at {@code aimedBlock}'s neighbourhood, or null with no player. */
-    public static @Nullable Result plan(Level level, RailNetwork network, @Nullable Player player, BlockPos aimedBlock,
+    /** The plan for {@code player} aiming {@code kind}, refused at {@code offSpan} off a Span, or null with no player. */
+    public static @Nullable Result plan(Level level, RailNetwork network, @Nullable Player player, BlockPos offSpan,
                                         CarKind kind) {
-        return player == null ? null : plan(level, network, Sight.of(player), aimedBlock, kind);
+        return player == null ? null : plan(level, network, Sight.of(player), offSpan, kind);
     }
 
-    /** The plan for {@code kind} aimed along {@code sight}, refused at {@code aimedBlock} when it is aimed at no Span. */
-    public static Result plan(Level level, RailNetwork network, Sight sight, BlockPos aimedBlock, CarKind kind) {
+    /**
+     * The plan for {@code kind} aimed along {@code sight}, refused at {@code offSpan} when it is aimed at
+     * no Span: for a held car the block across the aimed face, as a block would go, since a refusal
+     * drawn in the aimed block itself would share that block's faces.
+     */
+    public static Result plan(Level level, RailNetwork network, Sight sight, BlockPos offSpan, CarKind kind) {
         BlockState state = kind.preview().defaultBlockState();
         Vec3 eye = sight.eye();
         Vec3 look = sight.look();
@@ -98,7 +102,7 @@ public final class CarPlacement {
                 eye.x - RailGeometry.ATTACH_X, eye.y - RailGeometry.AIM_Y, eye.z - RailGeometry.ATTACH_Z,
                 look.x, look.y, look.z, sight.reach(), AIM_TOLERANCE);
         if (aim.isEmpty()) {
-            return refused(PlacementPlan.refused(aimedBlock, state, RailworksRefusal.OFF_SPAN));
+            return refused(PlacementPlan.refused(offSpan, state, RailworksRefusal.OFF_SPAN));
         }
         Span span = aim.get().span();
         Place towardB = new Place(span, span.b(), span.length() - aim.get().fromA());

@@ -51,6 +51,8 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     private static final Vec3 START = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
     /** How many straight pieces a curve is drawn as for each block of its Span's length. */
     private static final double PIECES_PER_BLOCK = 1.0;
+    /** How far apart the Rail keeps faces that would otherwise share a plane. */
+    private static final double GAP = 0.005;
 
     /**
      * A curve sampled for drawing: where the flange's underside runs, relative to the drawing's
@@ -169,15 +171,20 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     /** The Rail along {@code sweep}: the inverted T as one pair of prisms for each piece of it. */
     static void drawCurve(Matrix4f pose, VertexConsumer buffer, Sweep sweep, int light, float fade,
                           float r, float g, float b) {
-        Vec3 flange = new Vec3(0, RailGeometry.FLANGE_HEIGHT / 2.0, 0);
-        Vec3 web = new Vec3(0, RailGeometry.FLANGE_HEIGHT + RailGeometry.WEB_HEIGHT / 2.0, 0);
+        // The flange's underside a hair over the Pylon top, and the web's bottom a hair down into the
+        // flange, so no two faces share a plane, as CarBody keeps them; the flange's top, where a car
+        // rides, and the web's top stay where RailGeometry has them.
+        double flangeHeight = RailGeometry.FLANGE_HEIGHT - GAP;
+        double webHeight = RailGeometry.WEB_HEIGHT + GAP;
+        Vec3 flange = new Vec3(0, GAP + flangeHeight / 2.0, 0);
+        Vec3 web = new Vec3(0, RailGeometry.FLANGE_HEIGHT - GAP + webHeight / 2.0, 0);
         Vec3[] points = sweep.points();
         Vec3[] headings = sweep.headings();
         Vec3[][] flanges = new Vec3[points.length][];
         Vec3[][] webs = new Vec3[points.length][];
         for (int i = 0; i < points.length; i++) {
-            flanges[i] = corners(headings[i], RailGeometry.FLANGE_WIDTH / 2.0, RailGeometry.FLANGE_HEIGHT / 2.0);
-            webs[i] = corners(headings[i], RailGeometry.WEB_WIDTH / 2.0, RailGeometry.WEB_HEIGHT / 2.0);
+            flanges[i] = corners(headings[i], RailGeometry.FLANGE_WIDTH / 2.0, flangeHeight / 2.0);
+            webs[i] = corners(headings[i], RailGeometry.WEB_WIDTH / 2.0, webHeight / 2.0);
         }
         for (int i = 0; i + 1 < points.length; i++) {
             drawPrism(pose, buffer, points[i].add(flange), flanges[i], points[i + 1].add(flange), flanges[i + 1],
