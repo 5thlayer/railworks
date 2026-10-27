@@ -132,6 +132,8 @@ final class StationTests {
         network(helper).add(Span.of(arm(helper, c), arm(helper, new BlockPos(17, 1, 7)), 6));
         // By B, the stretch reaches over it onto B to C; two blocks short of it, it stays on A to B.
         BlockPos byPylon = new BlockPos(9, 1, 2);
+        // Past the platform's edge: ground to click the top of.
+        helper.setBlock(byPylon.below(), Blocks.STONE);
         PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, byPylon));
         if (plan == null || !plan.isRefused() || plan.refusal() != RailworksRefusal.STATION_NOT_STRAIGHT) {
             helper.fail("a Station by B planned " + plan + ", not refused for the bend beyond B", byPylon);

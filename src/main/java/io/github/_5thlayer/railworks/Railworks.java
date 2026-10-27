@@ -38,6 +38,7 @@ public final class Railworks {
         NeoForge.EVENT_BUS.addListener(LevelRails::onLevelTick);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(LevelClearance::onBlockPlaced);
         RailworksCommands.register();
         // The Gallery pack, offered in the Data Packs screen and never on until a player turns it on (libworks ADR 0010).
         GalleryPack.register(modBus, MOD_ID);

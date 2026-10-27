@@ -54,8 +54,14 @@ final class CodeGameTest extends GameTestInstance {
         BODIES.put(id, body);
     }
 
+    /**
+     * Lifts the barrier cage the framework encases each structure in before the body runs: the tests
+     * build past the platform's edge and over its roof, and a Span's Clearance counts a barrier as a
+     * block in its cars' way.
+     */
     @Override
     public void run(GameTestHelper helper) {
+        helper.testInfo.getTestInstanceBlockEntity().removeBarriers();
         body.accept(helper);
     }
 

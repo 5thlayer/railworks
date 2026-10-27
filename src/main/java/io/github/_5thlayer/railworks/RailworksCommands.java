@@ -131,7 +131,7 @@ public final class RailworksCommands {
             }
             case CANCELLED -> throw SAME_ARM.create();
             case CUT -> throw ALREADY_STRUNG.create();
-            default -> throw SPAN_REFUSED.create(SpanGesture.reason(outcome.result(),
+            default -> throw SPAN_REFUSED.create(SpanGesture.reason(outcome,
                     PylonColumn.arm(anchor), PylonColumn.arm(target)));
         }
     }
