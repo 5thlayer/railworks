@@ -317,4 +317,54 @@ class StringingTest {
         Stringing.click(network, OPEN, A, B, 100);
         assertEquals(Stringing.Result.CUT, Stringing.click(network, (x, y, z) -> true, A, B, 0).result());
     }
+
+    @Test
+    void raisingAnArmWithNoSpansBreaksNothing() {
+        assertTrue(Stringing.raise(network, (x, y, z) -> true, A, new Arm(0, 6, 0)).isEmpty());
+    }
+
+    @Test
+    void raisingWithinTheLimitsBreaksNothingAndChangesNothing() {
+        Stringing.click(network, OPEN, A, B, 100);
+        assertTrue(Stringing.raise(network, OPEN, A, new Arm(0, 6, 0)).isEmpty());
+        assertTrue(network.contains(A, B));
+    }
+
+    @Test
+    void raisingASpanPastTheGradeLimitIsTooSteep() {
+        Arm high = new Arm(8, 7, 0);
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, OPEN, A, high, 100).result());
+        var broken = Stringing.raise(network, OPEN, high, new Arm(8, 8, 0));
+        assertEquals(Stringing.Result.TOO_STEEP, broken.orElseThrow().result());
+        assertTrue(network.contains(A, high));
+    }
+
+    @Test
+    void raisingAnArmPastTheBendLimitThroughItIsTooSharp() {
+        Stringing.click(network, OPEN, A, B, 100);
+        Stringing.click(network, OPEN, B, C, 100);
+        SpanRules.configureBend(10.0);
+        // A block up over ten across either way bends the line about 11 degrees through B.
+        assertEquals(Stringing.Result.TOO_SHARP, Stringing.raise(network, OPEN, B, new Arm(10, 6, 0)).orElseThrow().result());
+    }
+
+    @Test
+    void raisingAnArmPastTheBendLimitAtTheFarArmIsTooSharp() {
+        Stringing.click(network, OPEN, A, B, 100);
+        Stringing.click(network, OPEN, B, C, 100);
+        SpanRules.configureBend(10.0);
+        assertTrue(Stringing.raise(network, OPEN, A, new Arm(0, 6, 0)).isEmpty());
+        assertEquals(Stringing.Result.TOO_SHARP, Stringing.raise(network, OPEN, A, new Arm(0, 7, 0)).orElseThrow().result());
+    }
+
+    @Test
+    void raisingASpanIntoABlockIsBlocked() {
+        Stringing.click(network, OPEN, A, B, 100);
+        // Over the cars of the Span as it is, in the way of those of the Span raised a block at A.
+        Clearance.Blocks over = (x, y, z) -> y >= 9;
+        assertTrue(Clearance.firstFilled(Clearance.along(network.curve(network.get(A, B))), over).isEmpty());
+        var broken = Stringing.raise(network, over, A, new Arm(0, 6, 0)).orElseThrow();
+        assertEquals(Stringing.Result.BLOCKED, broken.result());
+        assertTrue(broken.blocked().y() >= 9);
+    }
 }

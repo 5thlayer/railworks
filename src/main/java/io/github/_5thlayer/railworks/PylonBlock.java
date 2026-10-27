@@ -7,6 +7,7 @@ import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -69,6 +70,11 @@ public final class PylonBlock extends Block implements EntityBlock {
         }
         // The rule is asked for, not restated: this executes the plan the Placement Preview draws.
         PlacementPlan plan = Placements.planFor(item, new BlockPlaceContext(level, player, hand, stack, hit));
+        if (plan != null && plan.refusal() == RailworksRefusal.RAISES_SPAN && player instanceof ServerPlayer serverPlayer) {
+            BlockPos top = plan.blocks().getFirst().pos();
+            LevelClearance.stacking(level, top).ifPresent(outcome -> serverPlayer.sendSystemMessage(
+                    SpanGesture.reason(outcome, PylonColumn.arm(top.below()), PylonColumn.arm(top)), true));
+        }
         if (plan == null || plan.isRefused() || plan.blocks().size() != 1 || !player.mayBuild()) {
             return InteractionResult.CONSUME;
         }

@@ -3,7 +3,10 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
 
@@ -138,6 +141,61 @@ public final class Stringing {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * What raising the Arm at {@code from} to {@code to}, a segment stacked on its column, would break,
+     * changing nothing: {@code TOO_STEEP} for a raised Span past the grade limit, {@code TOO_SHARP} for
+     * a bend past the limit through the raised Arm or at a raised Span's far Arm, or {@code BLOCKED},
+     * with the block, for a block in the Clearance of a Span the raise bends, the new segment at
+     * {@code to} counted as filled. Empty when every Span keeps the rules, as with no Spans at all.
+     */
+    public static Optional<Outcome> raise(RailNetwork network, Clearance.Blocks blocks, Arm from, Arm to) {
+        if (network.spansAt(from).isEmpty()) {
+            return Optional.empty();
+        }
+        RailNetwork raised = new RailNetwork();
+        network.all().forEach(raised::add);
+        raised.rekey(from, to);
+        List<Span> atTo = raised.spansAt(to);
+        Set<Span> bent = new LinkedHashSet<>(atTo);
+        for (Span span : atTo) {
+            Arm other = span.otherEnd(to);
+            if (SpanRules.tooSteep(to, other)) {
+                return Optional.of(new Outcome(Result.TOO_STEEP, 0));
+            }
+            if (bendsPastTheLimit(raised, other, span)) {
+                return Optional.of(new Outcome(Result.TOO_SHARP, 0));
+            }
+            bent.addAll(raised.spansAt(other));
+        }
+        if (bendsPastTheLimit(raised, to, null)) {
+            return Optional.of(new Outcome(Result.TOO_SHARP, 0));
+        }
+        Clearance.Blocks withSegment = (x, y, z) -> (x == to.x() && y == to.y() && z == to.z()) || blocks.filled(x, y, z);
+        for (Span span : bent) {
+            Optional<Clearance.Cell> filled = Clearance.firstFilled(Clearance.along(raised.curve(span)), withSegment);
+            if (filled.isPresent()) {
+                return Optional.of(new Outcome(Result.BLOCKED, 0, filled.get()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Whether two of the Spans at {@code at} bend too sharply, or, given {@code through}, it and another of them. */
+    private static boolean bendsPastTheLimit(RailNetwork network, Arm at, @Nullable Span through) {
+        List<Span> spans = network.spansAt(at);
+        for (int i = 0; i < spans.size(); i++) {
+            for (int j = i + 1; j < spans.size(); j++) {
+                Span one = spans.get(i);
+                Span other = spans.get(j);
+                if ((through == null || one.equals(through) || other.equals(through))
+                        && SpanRules.tooSharp(one.otherEnd(at), at, other.otherEnd(at))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether {@code result} is a refusal: the click changes nothing and spends nothing. */
