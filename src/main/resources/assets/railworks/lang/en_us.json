@@ -7,6 +7,8 @@
   "message.railworks.too_sharp": "That Span bends more than %s° through an Arm",
   "message.railworks.arm_full": "An Arm takes at most %s Spans",
   "message.railworks.short_of_rail": "That Span needs %s Rail",
+  "death.attack.railworks.train": "%1$s was struck by %2$s",
+  "death.attack.railworks.train.player": "%1$s was struck by %2$s",
   "message.railworks.blocked": "The block at %s %s %s is in the way of that Span's cars",
   "message.railworks.in_clearance": "That block would be in the way of a Span's cars",
   "tooltip.railworks.pylon.jade.span": "Span: %s blocks",

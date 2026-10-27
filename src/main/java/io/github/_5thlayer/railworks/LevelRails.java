@@ -43,6 +43,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -127,7 +128,8 @@ public final class LevelRails extends SavedData {
      * of its Locomotives, or, with no driver pressing one, its job while it is automatic; each
      * Locomotive's fuel slot; and every car it has in view set where the model now puts it. A driver's
      * keys switch an automatic Train to manual, as in Factorio. Left at rest by a Station with nobody
-     * driving it, it settles onto the Station's mark.
+     * driving it, it settles onto the Station's mark. Moving, each car in view strikes what is in the
+     * space it swept.
      */
     void tick(ServerLevel level, Train train) {
         Car driven = train.cars().getFirst();
@@ -145,6 +147,13 @@ public final class LevelRails extends SavedData {
         }
         double speed = train.speed();
         Place head = train.head();
+        Map<CarEntity, AABB> before = new HashMap<>();
+        for (Car car : train.cars()) {
+            CarEntity view = view(car);
+            if (view != null) {
+                before.put(view, view.getBoundingBox());
+            }
+        }
         Predicate<Span> taken = trains.takenFrom(network, train);
         ToLongFunction<Locomotive> ignite = locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L;
         if (train.automatic()) {
@@ -166,6 +175,9 @@ public final class LevelRails extends SavedData {
                 view.moveToModel(train);
                 view.syncFromModel(train);
             }
+        }
+        if (train.speed() != 0.0) {
+            before.forEach((view, box) -> view.strike(level, box.minmax(view.getBoundingBox())));
         }
     }
 
