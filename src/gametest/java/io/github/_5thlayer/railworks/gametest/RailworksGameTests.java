@@ -82,6 +82,8 @@ public final class RailworksGameTests {
         StationFacingTests.register(tests);
         HatchTests.register(tests);
         LogisticsTests.register(tests);
+        CommandTests.register(tests);
+        GalleryTests.register(tests);
     }
 
     private static Identifier id(String path) {
@@ -99,6 +101,15 @@ public final class RailworksGameTests {
         /** A test run driving on the left ({@link LeftDrive}), in a batch of its own. */
         void testDrivingLeft(String name, int maxTicks, Consumer<GameTestHelper> body) {
             test(leftDrive, name, maxTicks, body);
+        }
+
+        /**
+         * A test that runs in a batch of its own, for one that changes the whole server, such as turning
+         * a datapack on, which reloads its data under every test running with it.
+         */
+        void testOnItsOwn(String name, int maxTicks, Consumer<GameTestHelper> body) {
+            test(event.registerEnvironment(id("on_its_own/" + name), new TestEnvironmentDefinition.AllOf(List.of())),
+                    name, maxTicks, body);
         }
 
         private void test(Holder<TestEnvironmentDefinition<?>> in, String name, int maxTicks, Consumer<GameTestHelper> body) {

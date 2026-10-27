@@ -13,3 +13,7 @@ In design: the first release is specified in [5thlayer/factoryworks#705](https:/
 ## Dependencies
 
 Minecraft 26.1.2, NeoForge and Groundworks, which Railworks requires for its placement preview and does not bundle. The libworks runtime is nested in the jar.
+
+## Gallery
+
+Railworks carries a gallery of its features: Pylons and Rail, the grade and bend limits, curves, the Burner Locomotive, Cargo cars coupled into a Train, and Stations, each a scene with a sign naming it, built in rows of three north and east of where you stand. It is a datapack in the jar, **Railworks Gallery**, off until you turn it on in a world's Data Packs screen or with `/datapack enable "mod/railworks:gallery_pack"`. Then `/function railworks:gallery/build` builds every scene, and `/function railworks:gallery/<scene>` one of them, such as `coupling`. Click a scene's sign to build it again from the start. A function needs cheats in single player (on at world creation, or Open to LAN with cheats) or operator rights on a server. The gallery clears the ground it builds on and changes nothing else; it adds no recipes, loot or worldgen.

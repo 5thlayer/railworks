@@ -14,10 +14,10 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -62,29 +62,43 @@ public final class CarItem extends Item implements PlansPlacement {
             return InteractionResult.FAIL;
         }
         if (level instanceof ServerLevel server) {
-            ItemStack stack = player.getItemInHand(hand);
-            CarEntity car = kind.entityType().create(server, EntitySpawnReason.SPAWN_ITEM_USE);
-            if (car == null) {
+            if (set(server, result, kind, player) == null) {
                 return InteractionResult.FAIL;
             }
-            LevelRails rails = LevelRails.of(server);
-            Train train = result.train();
-            if (train != null) {
-                rails.add(train);
-            } else {
-                train = rails.couple(result.slot(), result.car(), result.reversed());
-                if (train == null) {
-                    return InteractionResult.FAIL;
-                }
-            }
-            car.setCar(train, result.car());
-            server.addFreshEntity(car);
-            server.gameEvent(player, GameEvent.ENTITY_PLACE, car.position());
-            // To everyone, the placer too: the client predicts no car, so it plays no sound of its own.
-            server.playSound(null, car.getX(), car.getY(), car.getZ(), SoundEvents.METAL_PLACE, SoundSource.BLOCKS,
-                    1.0F, PLACE_PITCH);
-            stack.consume(1, player);
+            player.getItemInHand(hand).consume(1, player);
         }
         return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * Sets the car of an accepted {@code result} on the Rail, as a new Train or coupled into one, and
+     * plays its place sound; the car, or null, changing nothing, where it cannot be set. The click and
+     * {@code /railworks car} both set a car by this.
+     */
+    static @Nullable CarEntity set(ServerLevel server, CarPlacement.Result result, CarKind kind, @Nullable Entity placer) {
+        if (result.car() == null || (result.train() == null && result.slot() == null)) {
+            return null;
+        }
+        CarEntity car = kind.entityType().create(server, EntitySpawnReason.SPAWN_ITEM_USE);
+        if (car == null) {
+            return null;
+        }
+        LevelRails rails = LevelRails.of(server);
+        Train train = result.train();
+        if (train != null) {
+            rails.add(train);
+        } else {
+            train = rails.couple(result.slot(), result.car(), result.reversed());
+            if (train == null) {
+                return null;
+            }
+        }
+        car.setCar(train, result.car());
+        server.addFreshEntity(car);
+        server.gameEvent(placer, GameEvent.ENTITY_PLACE, car.position());
+        // To everyone, the placer too: the client predicts no car, so it plays no sound of its own.
+        server.playSound(null, car.getX(), car.getY(), car.getZ(), SoundEvents.METAL_PLACE, SoundSource.BLOCKS,
+                1.0F, PLACE_PITCH);
+        return car;
     }
 }

@@ -62,18 +62,41 @@ public final class CarPlacement {
         return new Vec3(p.x() + RailGeometry.ATTACH_X, p.y() + RailGeometry.RIDE_Y, p.z() + RailGeometry.ATTACH_Z);
     }
 
+    /**
+     * A line of sight a car is aimed along: from {@code eye}, along the unit {@code look}, for
+     * {@code reach} blocks. A player's, or a command's.
+     */
+    public record Sight(Vec3 eye, Vec3 look, double reach) {
+
+        public static Sight of(Player player) {
+            return new Sight(player.getEyePosition(), player.getLookAngle(), player.blockInteractionRange());
+        }
+
+        /**
+         * The sight a command places a car with: level along {@code yaw}, through the middle of the
+         * web over the block {@code at}, the block a car riding the Rail there stands in.
+         */
+        public static Sight over(BlockPos at, float yaw) {
+            Vec3 eye = new Vec3(at.getX() + RailGeometry.ATTACH_X, at.getY() - RailGeometry.ATTACH_Y + RailGeometry.AIM_Y,
+                    at.getZ() + RailGeometry.ATTACH_Z);
+            return new Sight(eye, Vec3.directionFromRotation(0.0F, yaw), 1.0);
+        }
+    }
+
     /** The plan for {@code player} aiming {@code kind} at {@code aimedBlock}'s neighbourhood, or null with no player. */
     public static @Nullable Result plan(Level level, RailNetwork network, @Nullable Player player, BlockPos aimedBlock,
                                         CarKind kind) {
-        if (player == null) {
-            return null;
-        }
+        return player == null ? null : plan(level, network, Sight.of(player), aimedBlock, kind);
+    }
+
+    /** The plan for {@code kind} aimed along {@code sight}, refused at {@code aimedBlock} when it is aimed at no Span. */
+    public static Result plan(Level level, RailNetwork network, Sight sight, BlockPos aimedBlock, CarKind kind) {
         BlockState state = kind.preview().defaultBlockState();
-        Vec3 eye = player.getEyePosition();
-        Vec3 look = player.getLookAngle();
+        Vec3 eye = sight.eye();
+        Vec3 look = sight.look();
         var aim = SpanAim.nearest(network,
                 eye.x - RailGeometry.ATTACH_X, eye.y - RailGeometry.AIM_Y, eye.z - RailGeometry.ATTACH_Z,
-                look.x, look.y, look.z, player.blockInteractionRange(), AIM_TOLERANCE);
+                look.x, look.y, look.z, sight.reach(), AIM_TOLERANCE);
         if (aim.isEmpty()) {
             return refused(PlacementPlan.refused(aimedBlock, state, RailworksRefusal.OFF_SPAN));
         }

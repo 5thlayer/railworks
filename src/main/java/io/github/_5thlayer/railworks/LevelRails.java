@@ -282,6 +282,22 @@ public final class LevelRails extends SavedData {
     }
 
     /**
+     * Strings a Span from the Arm at {@code anchor} to the one at {@code target} for no Rail, under the
+     * rules a player's click is: {@code /railworks span}. Only a {@code STRUNG} changes anything; a
+     * Span already there is left, as {@code CUT}, and a refusal is returned as the click's would be.
+     */
+    public Stringing.Outcome string(ServerLevel level, BlockPos anchor, BlockPos target) {
+        Arm from = PylonColumn.arm(anchor);
+        Arm to = PylonColumn.arm(target);
+        Stringing.Outcome outcome = Stringing.decide(network, from, to, Integer.MAX_VALUE);
+        if (outcome.result() == Stringing.Result.STRUNG) {
+            network.add(Span.of(from, to, outcome.rail()));
+            changed(level, from, to);
+        }
+        return outcome;
+    }
+
+    /**
      * A segment was placed at {@code pos}. On top of a column it is the new top: the Arm moves up
      * and keeps its Spans. Under another column it joins two, and the lower column's Arm is gone.
      */

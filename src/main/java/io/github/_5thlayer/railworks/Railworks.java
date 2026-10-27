@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.libworks.gallery.GalleryPack;
 import io.github._5thlayer.railworks.client.RailworksClient;
 import io.github._5thlayer.railworks.network.NameStationPacket;
 import io.github._5thlayer.railworks.network.SpansPacket;
@@ -16,7 +17,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 /**
- * The Module's entry point. It fills its part of the suite's Works tab. The game tests hook
+ * The Module's entry point. It fills its part of the suite's Works tab and offers its Gallery pack. The game tests hook
  * themselves in from the {@code gametest} source set, which never ships (libworks ADR 0011).
  */
 @Mod(Railworks.MOD_ID)
@@ -36,6 +37,9 @@ public final class Railworks {
         NeoForge.EVENT_BUS.addListener(LevelRails::onLevelTick);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onPlayerTick);
+        RailworksCommands.register();
+        // The Gallery pack, offered in the Data Packs screen and never on until a player turns it on (libworks ADR 0010).
+        GalleryPack.register(modBus, MOD_ID);
         if (FMLEnvironment.getDist() == Dist.CLIENT) {
             RailworksClient.register(modBus);
         }
