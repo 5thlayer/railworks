@@ -274,7 +274,7 @@ public final class LevelRails extends SavedData {
     public Stringing.Outcome click(ServerLevel level, BlockPos anchor, BlockPos target, int railHeld) {
         Arm from = PylonColumn.arm(anchor);
         Arm to = PylonColumn.arm(target);
-        Stringing.Outcome outcome = Stringing.click(network, from, to, railHeld);
+        Stringing.Outcome outcome = Stringing.click(network, LevelClearance.blocks(level), from, to, railHeld);
         if (outcome.result() == Stringing.Result.STRUNG || outcome.result() == Stringing.Result.CUT) {
             changed(level, from, to);
         }
@@ -283,13 +283,13 @@ public final class LevelRails extends SavedData {
 
     /**
      * Strings a Span from the Arm at {@code anchor} to the one at {@code target} for no Rail, under the
-     * rules a player's click is: {@code /railworks span}. Only a {@code STRUNG} changes anything; a
+     * rules a player's click is, its Clearance included: {@code /railworks span}. Only a {@code STRUNG} changes anything; a
      * Span already there is left, as {@code CUT}, and a refusal is returned as the click's would be.
      */
     public Stringing.Outcome string(ServerLevel level, BlockPos anchor, BlockPos target) {
         Arm from = PylonColumn.arm(anchor);
         Arm to = PylonColumn.arm(target);
-        Stringing.Outcome outcome = Stringing.decide(network, from, to, Integer.MAX_VALUE);
+        Stringing.Outcome outcome = Stringing.decide(network, LevelClearance.blocks(level), from, to, Integer.MAX_VALUE);
         if (outcome.result() == Stringing.Result.STRUNG) {
             network.add(Span.of(from, to, outcome.rail()));
             changed(level, from, to);

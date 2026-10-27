@@ -86,23 +86,25 @@ public final class SpanGesture {
             }
             case CANCELLED -> rail.remove(RailworksRegistries.PENDING_SPAN.get());
             // A refusal changes nothing, the held end included.
-            default -> refused(server, player, reason(outcome.result(), PylonColumn.arm(pending.pos()), PylonColumn.arm(arm)));
+            default -> refused(server, player, reason(outcome, PylonColumn.arm(pending.pos()), PylonColumn.arm(arm)));
         }
         return InteractionResult.SUCCESS_SERVER;
     }
 
     /**
-     * Why a Span from {@code anchor} to {@code target} is refused, for a {@code result} that
+     * Why a Span from {@code anchor} to {@code target} is refused, for an {@code outcome} that
      * {@link Stringing#refused} says is a refusal: the action-bar line, and Jade's.
      */
-    public static Component reason(Stringing.Result result, Arm anchor, Arm target) {
-        return switch (result) {
+    public static Component reason(Stringing.Outcome outcome, Arm anchor, Arm target) {
+        return switch (outcome.result()) {
             case TOO_LONG -> Component.translatable("message.railworks.too_long", number(SpanRules.lengthLimit()));
             case TOO_STEEP -> Component.translatable("message.railworks.too_steep", number(SpanRules.gradeLimit() * 100.0));
             case TOO_SHARP -> Component.translatable("message.railworks.too_sharp", number(SpanRules.bendLimit()));
             case ARM_FULL -> Component.translatable("message.railworks.arm_full", SpanRules.SPANS_PER_ARM);
+            case BLOCKED -> Component.translatable("message.railworks.blocked", outcome.blocked().x(), outcome.blocked().y(),
+                    outcome.blocked().z());
             case SHORT_OF_RAIL -> Component.translatable("message.railworks.short_of_rail", SpanRules.cost(anchor, target));
-            case STRUNG, CUT, CANCELLED -> throw new IllegalArgumentException("not a refusal: " + result);
+            case STRUNG, CUT, CANCELLED -> throw new IllegalArgumentException("not a refusal: " + outcome);
         };
     }
 

@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks.client;
 
+import io.github._5thlayer.railworks.LevelClearance;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailPurse;
 import io.github._5thlayer.railworks.RailworksRegistries;
@@ -73,7 +74,7 @@ final class HeldSpan {
                 && PylonColumn.isPylon(level, hit.getBlockPos())) {
             target = PylonColumn.arm(PylonColumn.topOf(level, hit.getBlockPos()));
         }
-        Stringing.Tint tint = Stringing.tintFor(ClientRails.network(), PylonColumn.arm(pending.pos()), target,
+        Stringing.Tint tint = Stringing.tintFor(ClientRails.network(), LevelClearance.blocks(level), PylonColumn.arm(pending.pos()), target,
                 RailPurse.count(player));
         return new Aim(pending.pos(), target, tint);
     }

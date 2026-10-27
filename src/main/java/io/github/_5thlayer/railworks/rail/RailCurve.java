@@ -3,6 +3,11 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.jspecify.annotations.Nullable;
+
 /**
  * The line the Rail takes along a Span: a smooth curve from its first Arm to its second, so that
  * what draws the Rail and what rides it agree, as {@link RailGeometry} makes them agree on the
@@ -38,6 +43,8 @@ public final class RailCurve {
     /** How finely the curve is measured to space equal steps evenly along it. */
     static final int SAMPLES = 32;
 
+    private final Arm a;
+    private final Arm b;
     private final double length;
     private final double ax;
     private final double ay;
@@ -52,6 +59,8 @@ public final class RailCurve {
     private final double[] arc = new double[SAMPLES + 1];
 
     private RailCurve(Arm a, Arm b, double[] startHeading, double[] endHeading) {
+        this.a = a;
+        this.b = b;
         this.length = Math.sqrt(a.distanceSquaredTo(b));
         this.ax = a.x();
         this.ay = a.y();
@@ -76,12 +85,35 @@ public final class RailCurve {
      * would on stringing, the Spans already there unchanged.
      */
     public static RailCurve between(RailNetwork network, Arm a, Arm b) {
-        Arm beforeA = beyond(network, a, b);
-        Arm afterB = beyond(network, b, a);
+        return between(network, null, a, b);
+    }
+
+    /**
+     * The curve the Span between {@code a} and {@code b}, which {@code network} holds, would take once
+     * {@code added} is strung too: a Span strung at an Arm bends the one already there, which was
+     * heading straight at its other Arm.
+     */
+    public static RailCurve strung(RailNetwork network, Span added, Arm a, Arm b) {
+        return between(network, added, a, b);
+    }
+
+    private static RailCurve between(RailNetwork network, @Nullable Span added, Arm a, Arm b) {
+        Arm beforeA = beyond(network, added, a, b);
+        Arm afterB = beyond(network, added, b, a);
         double[] chord = unit(b.x() - a.x(), b.y() - a.y(), b.z() - a.z());
         return new RailCurve(a, b,
                 beforeA == null ? chord : bisector(beforeA, a, chord),
                 afterB == null ? chord : bisector(a, b, unit(afterB.x() - b.x(), afterB.y() - b.y(), afterB.z() - b.z())));
+    }
+
+    /** The Arm the curve starts from, where {@code fromA} is 0. */
+    public Arm a() {
+        return a;
+    }
+
+    /** The Arm the curve runs to. */
+    public Arm b() {
+        return b;
     }
 
     /** The straight distance between the Arms, the length {@code fromA} runs over. */
@@ -160,9 +192,16 @@ public final class RailCurve {
         return half == null ? out : half;
     }
 
-    /** The far end of the first Span at {@code arm} other than the one toward {@code other}, or null at a line's end. */
-    private static Arm beyond(RailNetwork network, Arm arm, Arm other) {
-        for (Span span : network.spansAt(arm)) {
+    /**
+     * The far end of the first Span at {@code arm} other than the one toward {@code other}, or null at
+     * a line's end; {@code added}, when there is one, is strung after those {@code network} holds.
+     */
+    private static @Nullable Arm beyond(RailNetwork network, @Nullable Span added, Arm arm, Arm other) {
+        List<Span> spans = new ArrayList<>(network.spansAt(arm));
+        if (added != null && added.touches(arm)) {
+            spans.add(added);
+        }
+        for (Span span : spans) {
             Arm far = span.otherEnd(arm);
             if (!far.equals(other)) {
                 return far;
