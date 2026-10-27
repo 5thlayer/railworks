@@ -7,6 +7,8 @@ import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -34,13 +36,53 @@ public final class PylonItem extends BlockItem implements PlansPlacement {
         Level level = context.getLevel();
         BlockPos aimed = Placements.aimedPos(context);
         if (!PylonColumn.isPylon(level, aimed) || context.isSecondaryUseActive()) {
-            return Placements.vanillaPlan(this, context);
+            PlacementPlan plan = Placements.vanillaPlan(this, context);
+            if (plan == null || plan.isRefused() || plan.blocks().size() != 1) {
+                return plan;
+            }
+            PlacementPlan.Placed placed = plan.blocks().getFirst();
+            return raisesPastARule(level, placed.pos())
+                    ? PlacementPlan.refused(placed.pos(), placed.state(), RailworksRefusal.RAISES_SPAN) : plan;
         }
         BlockPos next = PylonColumn.topOf(level, aimed).above();
         BlockState segment = getBlock().defaultBlockState();
         if (level.isOutsideBuildHeight(next) || !level.getBlockState(next).canBeReplaced()) {
             return PlacementPlan.refused(next, segment, RailworksRefusal.BLOCKED_TOP);
         }
+        if (raisesPastARule(level, next)) {
+            return PlacementPlan.refused(next, segment, RailworksRefusal.RAISES_SPAN);
+        }
         return PlacementPlan.accepted(next, segment);
+    }
+
+    /** A sneaking player's segment on top of a column places as vanilla's does, and is refused as the plan is. */
+    @Override
+    protected boolean canPlace(BlockPlaceContext context, BlockState state) {
+        if (!super.canPlace(context, state)) {
+            return false;
+        }
+        if (raisesPastARule(context.getLevel(), context.getClickedPos())) {
+            tellWhy(context.getLevel(), context.getPlayer(), context.getClickedPos());
+            return false;
+        }
+        return true;
+    }
+
+    /** Tells {@code player}, on the server, which rule a segment at {@code pos} would break, on the action bar. */
+    static void tellWhy(Level level, @Nullable Player player, BlockPos pos) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            LevelClearance.stacking(level, pos).ifPresent(outcome -> serverPlayer.sendSystemMessage(
+                    SpanGesture.reason(outcome, PylonColumn.arm(pos.below()), PylonColumn.arm(pos)), true));
+        }
+    }
+
+    /**
+     * Whether a segment at {@code pos} would go on top of a column's Arm, raising it, and break a rule
+     * there ({@link LevelClearance#stacking}). A segment joining two columns cuts the lower one's
+     * Spans instead, as breaking its Arm does, and is no raise.
+     */
+    private static boolean raisesPastARule(Level level, BlockPos pos) {
+        return PylonColumn.isArm(level, pos.below()) && !PylonColumn.isPylon(level, pos.above())
+                && LevelClearance.stacking(level, pos).isPresent();
     }
 }

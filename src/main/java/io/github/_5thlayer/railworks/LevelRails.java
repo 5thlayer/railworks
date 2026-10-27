@@ -313,13 +313,17 @@ public final class LevelRails extends SavedData {
     /**
      * A segment was placed at {@code pos}. On top of a column it is the new top: the Arm moves up
      * and keeps its Spans. Under another column it joins two, and the lower column's Arm is gone.
+     * A segment raising a Span past a rule is refused before it is placed ({@code PylonItem}); one
+     * put there some other way, by a command, cuts the Arm's Spans and drops their Rail, as losing
+     * the Arm would, so no Span stands past a rule.
      */
     public void placed(ServerLevel level, BlockPos pos) {
         BlockPos below = pos.below();
         if (!PylonColumn.isPylon(level, below)) {
             return;
         }
-        if (PylonColumn.isPylon(level, pos.above())) {
+        if (PylonColumn.isPylon(level, pos.above())
+                || Stringing.raise(network, LevelClearance.blocks(level), PylonColumn.arm(below), PylonColumn.arm(pos)).isPresent()) {
             armLost(level, below);
             return;
         }

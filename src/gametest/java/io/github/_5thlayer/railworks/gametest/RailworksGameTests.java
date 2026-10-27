@@ -86,6 +86,7 @@ public final class RailworksGameTests {
         GalleryTests.register(tests);
         CollisionTests.register(tests);
         ClearanceTests.register(tests);
+        ClearanceKeptTests.register(tests);
     }
 
     private static Identifier id(String path) {

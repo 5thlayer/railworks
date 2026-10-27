@@ -69,6 +69,9 @@ public final class PylonBlock extends Block implements EntityBlock {
         }
         // The rule is asked for, not restated: this executes the plan the Placement Preview draws.
         PlacementPlan plan = Placements.planFor(item, new BlockPlaceContext(level, player, hand, stack, hit));
+        if (plan != null && plan.refusal() == RailworksRefusal.RAISES_SPAN) {
+            PylonItem.tellWhy(level, player, plan.blocks().getFirst().pos());
+        }
         if (plan == null || plan.isRefused() || plan.blocks().size() != 1 || !player.mayBuild()) {
             return InteractionResult.CONSUME;
         }

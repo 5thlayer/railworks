@@ -9,6 +9,11 @@ import io.github._5thlayer.groundworks.Refusal;
 public enum RailworksRefusal implements Refusal {
     /** A Pylon aimed at a column whose next segment's position is occupied or past the build limit. */
     BLOCKED_TOP,
+    /**
+     * A Pylon segment stacked on an Arm that would raise one of its Spans past the grade or bend limit
+     * or into a block, or would stand in another Span's Clearance.
+     */
+    RAISES_SPAN,
     /** A car aimed at no Span. */
     OFF_SPAN,
     /** A car aimed at a Span a Train already holds, other than where it would couple: one Train holds a Span at a time. */
