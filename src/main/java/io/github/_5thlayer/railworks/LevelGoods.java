@@ -3,6 +3,9 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Locomotive;
@@ -55,6 +58,19 @@ final class LevelGoods implements Goods<Item> {
     public long held(CargoCar car, Item item) {
         SimpleContainer cargo = cargo(car);
         return cargo == null ? 0 : cargo.countItem(item);
+    }
+
+    @Override
+    public Map<Item, Long> contents(CargoCar car) {
+        SimpleContainer cargo = cargo(car);
+        Map<Item, Long> contents = new LinkedHashMap<>();
+        for (int slot = 0; cargo != null && slot < cargo.getContainerSize(); slot++) {
+            ItemStack stack = cargo.getItem(slot);
+            if (!stack.isEmpty()) {
+                contents.merge(stack.getItem(), (long) stack.getCount(), Long::sum);
+            }
+        }
+        return contents;
     }
 
     @Override

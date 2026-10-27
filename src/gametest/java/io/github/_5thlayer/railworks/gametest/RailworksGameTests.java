@@ -105,7 +105,8 @@ public final class RailworksGameTests {
 
         /**
          * A test that runs in a batch of its own, for one that changes the whole server, such as turning
-         * a datapack on, which reloads its data under every test running with it.
+         * a datapack on, which reloads its data under every test running with it, or one that builds out
+         * past its structure into the plots beside it.
          */
         void testOnItsOwn(String name, int maxTicks, Consumer<GameTestHelper> body) {
             test(event.registerEnvironment(id("on_its_own/" + name), new TestEnvironmentDefinition.AllOf(List.of())),

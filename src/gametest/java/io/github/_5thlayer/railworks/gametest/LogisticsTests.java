@@ -50,8 +50,9 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * Automatic Trains in a real level (#37, ADR 0008): the Locomotive's menu switches its Train to
  * automatic, the level saves the mode, a driver takes it over, the status line follows it, and one
  * Train runs unattended from a provider Station to a requester Station through the level's tick, the
- * Stations and hatches real blocks and the fuel burnt from the slot. How jobs are planned and stacks
- * moved is {@code LogisticsTest}'s. All of these tests share the {@code logistics_} prefix.
+ * Stations and hatches real blocks and the fuel burnt from the slot, and what it loaded for a requester
+ * broken on the way is held until a requester asks for it again (#38). How jobs are planned, stacks
+ * moved and claims broken is {@code LogisticsTest}'s. All of these tests share the {@code logistics_} prefix.
  */
 final class LogisticsTests {
 
@@ -77,6 +78,9 @@ final class LogisticsTests {
         tests.test("logistics_a_driver_pressing_forward_switches_the_train_to_manual", 20, LogisticsTests::driverTakesOver);
         tests.test("logistics_the_mode_is_kept_across_a_save_and_reload", 20, LogisticsTests::saved);
         tests.test("logistics_runs_a_train_unattended_from_a_provider_to_a_requester", 1_200, LogisticsTests::unattended);
+        // Its line runs out past the structure, as the unattended run's does, so the two would cross side by side.
+        tests.testOnItsOwn("logistics_a_broken_requester_leaves_a_leftover_delivered_once_one_asks_again", 1_600,
+                LogisticsTests::brokenRequester);
     }
 
     // ---- the mode ----
@@ -134,7 +138,16 @@ final class LogisticsTests {
 
     // ---- running unattended ----
 
-    private static void unattended(GameTestHelper helper) {
+    /** The two Locomotives and the Cargo car between them of the Train {@link #running} sets going. */
+    private record Shuttle(LocomotiveEntity leading, CargoCarEntity cargo, LocomotiveEntity trailing) {
+    }
+
+    /**
+     * The Mine with 100 iron in its provider and the Depot's requester asking for a stack, and between
+     * them, heading east, the first car on the east leg, a fuelled Train of a Locomotive facing each way,
+     * a Cargo car between them, switched to automatic by its menu.
+     */
+    private static Shuttle running(GameTestHelper helper) {
         Span last = line(helper);
         ServerPlayer player = near(helper);
         station(helper, MINE);
@@ -147,8 +160,6 @@ final class LogisticsTests {
         expectJoined(helper, REQUESTER, DEPOT);
         insert(record(helper, PROVIDER), new ItemStack(Items.IRON_INGOT, 100));
         record(helper, REQUESTER).ask(Items.IRON_INGOT);
-        // Between the Stations, heading east, the first car on the east leg: a Locomotive facing each way,
-        // a Cargo car between them.
         Locomotive east = Locomotive.burner();
         CargoCar wagon = CargoCar.create();
         Locomotive west = Locomotive.burner();
@@ -161,6 +172,14 @@ final class LogisticsTests {
         LocomotiveTests.fill(helper, trailing, new ItemStack(Items.COAL, 4));
         leading.openCustomInventoryScreen(player);
         ((LocomotiveMenu) player.containerMenu).clickMenuButton(player, LocomotiveMenu.TOGGLE_AUTOMATIC);
+        return new Shuttle(leading, cargo, trailing);
+    }
+
+    private static void unattended(GameTestHelper helper) {
+        Shuttle shuttle = running(helper);
+        LocomotiveEntity leading = shuttle.leading();
+        CargoCarEntity cargo = shuttle.cargo();
+        LocomotiveEntity trailing = shuttle.trailing();
         // Loading a single stack takes a tick, too short to wait on: the Train is seen leaving the Mine loaded.
         helper.startSequence()
                 .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.to_unload"))
@@ -184,6 +203,44 @@ final class LogisticsTests {
                     // Unloaded, it waits by the Depot, its cars on the car spots.
                     if (Math.abs(cargo.getX() - (helper.absolutePos(REQUESTER).getX() + 1.0)) > 1.0) {
                         helper.fail("the Cargo car stands at x " + cargo.getX() + ", not by the requester", REQUESTER);
+                    }
+                })
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    private static void brokenRequester(GameTestHelper helper) {
+        Shuttle shuttle = running(helper);
+        LocomotiveEntity leading = shuttle.leading();
+        CargoCarEntity cargo = shuttle.cargo();
+        helper.startSequence()
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.to_unload"))
+                .thenExecute(() -> helper.destroyBlock(REQUESTER))
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.holding"))
+                .thenExecute(() -> {
+                    if (cargo.cargo().countItem(Items.IRON_INGOT) != 64) {
+                        helper.fail("the Cargo car holds " + cargo.cargo().countItem(Items.IRON_INGOT)
+                                + " iron, not the stack loaded for the broken requester", REQUESTER);
+                    }
+                })
+                // Holding, it waits: nothing more is fetched from the Mine.
+                .thenIdle(3 * 20)
+                .thenExecute(() -> {
+                    expectStatus(helper, leading, "status.railworks.train.holding");
+                    if (held(record(helper, PROVIDER)) != 36) {
+                        helper.fail("the Mine holds " + held(record(helper, PROVIDER)) + " iron, not the 36 left", PROVIDER);
+                    }
+                    helper.setBlock(REQUESTER, RailworksRegistries.HATCH.get().defaultBlockState()
+                            .setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+                    record(helper, REQUESTER).ask(Items.IRON_INGOT);
+                })
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.waiting"))
+                .thenExecute(() -> {
+                    if (held(record(helper, REQUESTER)) != 64 || !cargo.cargo().isEmpty()
+                            || held(record(helper, PROVIDER)) != 36) {
+                        helper.fail("the leftover was not delivered: the requester holds " + held(record(helper, REQUESTER))
+                                + ", the car " + cargo.cargo().countItem(Items.IRON_INGOT) + " and the Mine "
+                                + held(record(helper, PROVIDER)), REQUESTER);
                     }
                 })
                 .thenExecute(() -> forceLoad(helper, false))

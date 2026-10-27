@@ -14,7 +14,7 @@ import net.minecraft.world.item.Item;
 /**
  * A Train's status line as a player reads it, under the Locomotive menu's Automatic toggle and in
  * Jade: "Manual", "Waiting for a job", "To X to load", "Loading at X", "To X to unload: 6 stacks of
- * iron ore, 2 of coal", "Unloading at X" or "Cannot reach X".
+ * iron ore, 2 of coal", "Unloading at X", "Cannot reach X" or "Holding 2 stacks of iron ore, nowhere to deliver".
  */
 public final class StatusLine {
 
@@ -25,6 +25,9 @@ public final class StatusLine {
         String key = "status.railworks.train." + status.kind().name().toLowerCase(Locale.ROOT);
         if (status.kind() == Logistics.Kind.TO_UNLOAD) {
             return Component.translatable(key, status.station(), cargo(status.cargo()));
+        }
+        if (status.kind() == Logistics.Kind.HOLDING) {
+            return Component.translatable(key, cargo(status.cargo()));
         }
         return status.station().isEmpty() ? Component.translatable(key) : Component.translatable(key, status.station());
     }

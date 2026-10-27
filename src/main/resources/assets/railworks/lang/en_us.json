@@ -21,6 +21,7 @@
   "menu.railworks.locomotive.automatic_off": "Manual",
   "status.railworks.train.manual": "Manual",
   "status.railworks.train.waiting": "Waiting for a job",
+  "status.railworks.train.holding": "Holding %s, nowhere to deliver",
   "status.railworks.train.to_load": "To %s to load",
   "status.railworks.train.loading": "Loading at %s",
   "status.railworks.train.to_unload": "To %s to unload: %s",
