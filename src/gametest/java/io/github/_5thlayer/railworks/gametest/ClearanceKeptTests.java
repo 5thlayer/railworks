@@ -71,7 +71,7 @@ final class ClearanceKeptTests {
         helper.getLevel().setBlockAndUpdate(stone, Blocks.STONE.defaultBlockState());
         ServerPlayer player = player(helper, false);
         expectRefusedPlan(helper, player, A);
-        stackOnto(helper, player, A);
+        stackOnto(helper, player, A, Direction.NORTH);
         if (!helper.getBlockState(A.above()).isAir()) {
             helper.fail("a segment raised the Span into the stone at " + stone, A.above());
         }
@@ -87,7 +87,7 @@ final class ClearanceKeptTests {
         string(helper, A, HIGH_B);
         ServerPlayer player = player(helper, false);
         expectRefusedPlan(helper, player, HIGH_B);
-        stackOnto(helper, player, HIGH_B);
+        stackOnto(helper, player, HIGH_B, Direction.NORTH);
         if (!helper.getBlockState(HIGH_B.above()).isAir()) {
             helper.fail("a segment raised the Span past the grade limit", HIGH_B.above());
         }
@@ -99,9 +99,7 @@ final class ClearanceKeptTests {
         column(helper, HIGH_B, 3);
         string(helper, A, HIGH_B);
         ServerPlayer player = player(helper, true);
-        BlockPos absolute = helper.absolutePos(HIGH_B);
-        player.gameMode.useItemOn(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND,
-                new BlockHitResult(Vec3.atCenterOf(absolute).relative(Direction.UP, 0.5), Direction.UP, absolute, false));
+        stackOnto(helper, player, HIGH_B, Direction.UP);
         if (!helper.getBlockState(HIGH_B.above()).isAir()) {
             helper.fail("a sneaking player's segment raised the Span past the grade limit", HIGH_B.above());
         }
@@ -131,7 +129,7 @@ final class ClearanceKeptTests {
         helper.setBlock(under, RailworksRegistries.PYLON.get().defaultBlockState());
         ServerPlayer player = player(helper, false);
         expectRefusedPlan(helper, player, under);
-        stackOnto(helper, player, under);
+        stackOnto(helper, player, under, Direction.NORTH);
         if (!helper.getBlockState(under.above()).isAir()) {
             helper.fail("a segment went into the Span's Clearance", under.above());
         }
@@ -247,10 +245,10 @@ final class ClearanceKeptTests {
         }
     }
 
-    private static void stackOnto(GameTestHelper helper, ServerPlayer player, BlockPos column) {
+    private static void stackOnto(GameTestHelper helper, ServerPlayer player, BlockPos column, Direction face) {
         BlockPos absolute = helper.absolutePos(column);
         player.gameMode.useItemOn(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND,
-                new BlockHitResult(Vec3.atCenterOf(absolute).relative(Direction.NORTH, 0.5), Direction.NORTH, absolute, false));
+                new BlockHitResult(Vec3.atCenterOf(absolute).relative(face, 0.5), face, absolute, false));
     }
 
     /** A piston at {@code pos} facing {@code facing}, powered from behind by a redstone block. */
@@ -267,7 +265,7 @@ final class ClearanceKeptTests {
 
     /** The Span from {@code a} to {@code b}, strung by the command's rule, both Pylons standing. */
     private static void string(GameTestHelper helper, BlockPos a, BlockPos b) {
-        helper.setBlock(A, RailworksRegistries.PYLON.get().defaultBlockState());
+        helper.setBlock(a, RailworksRegistries.PYLON.get().defaultBlockState());
         if (!PylonColumn.isPylon(helper.getLevel(), helper.absolutePos(b))) {
             helper.setBlock(b, RailworksRegistries.PYLON.get().defaultBlockState());
         }

@@ -7,6 +7,8 @@ import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -56,7 +58,22 @@ public final class PylonItem extends BlockItem implements PlansPlacement {
     /** A sneaking player's segment on top of a column places as vanilla's does, and is refused as the plan is. */
     @Override
     protected boolean canPlace(BlockPlaceContext context, BlockState state) {
-        return super.canPlace(context, state) && !raisesPastARule(context.getLevel(), context.getClickedPos());
+        if (!super.canPlace(context, state)) {
+            return false;
+        }
+        if (raisesPastARule(context.getLevel(), context.getClickedPos())) {
+            tellWhy(context.getLevel(), context.getPlayer(), context.getClickedPos());
+            return false;
+        }
+        return true;
+    }
+
+    /** Tells {@code player}, on the server, which rule a segment at {@code pos} would break, on the action bar. */
+    static void tellWhy(Level level, @Nullable Player player, BlockPos pos) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            LevelClearance.stacking(level, pos).ifPresent(outcome -> serverPlayer.sendSystemMessage(
+                    SpanGesture.reason(outcome, PylonColumn.arm(pos.below()), PylonColumn.arm(pos)), true));
+        }
     }
 
     /**
