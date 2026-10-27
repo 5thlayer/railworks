@@ -175,11 +175,6 @@ public final class Logistics<I> {
             this.driver = new Driver(requester, way);
         }
 
-        /** Whether it is a delivery job, with no provider. */
-        boolean delivery() {
-            return provider == null;
-        }
-
         boolean stopped() {
             return leg == Leg.AT_PROVIDER || leg == Leg.AT_REQUESTER;
         }
@@ -408,7 +403,7 @@ public final class Logistics<I> {
     /**
      * What is left of {@code load} to move at this Station: to take at its provider, no more than its
      * requester now wants less what the job carries to it already, or to give at its requester, no
-     * more than it now wants. A request changed on the way cuts both, so the job takes nothing only to
+     * more than it now wants. A request changed on the way cuts both, so the job takes nothing just to
      * leave it over; other Trains' loads to the same requester it does not count.
      */
     private static <I> long left(Job<I> job, Load<I> load, boolean loading, List<Hatch<I>> hatches, Goods<I> goods) {
@@ -458,7 +453,7 @@ public final class Logistics<I> {
     private void plan(RailNetwork network, Trains trains, List<Hatch<I>> hatches, Goods<I> goods) {
         for (Train train : trains.all()) {
             Run<I> run = runs.get(train);
-            // A job that can no longer reach its requester is given up, what it carries a leftover to deliver elsewhere.
+            // A job that can no longer reach its requester is given up, what it carries a leftover for a delivery job.
             if (run != null && run.job != null && run.job.leg == Leg.TO_REQUESTER && run.job.driver.lost()) {
                 run.job = null;
             }
@@ -560,7 +555,7 @@ public final class Logistics<I> {
         for (Asking<I> asking : asking(train, way, requester, hatches)) {
             I item = asking.item();
             CargoCar car = asking.car();
-            long need = need(asking.hatch(), hatches, goods) - planned(loads, load -> load.requester.samePlace(asking.hatch()));
+            long need = needLeft(asking.hatch(), loads, hatches, goods);
             long holds = goods.held(car, item) - planned(loads, load -> load.car == car && load.item.equals(item));
             long amount = Math.min(need, holds);
             if (amount > 0) {
@@ -676,7 +671,7 @@ public final class Logistics<I> {
             I item = asking.item();
             CargoCar car = asking.car();
             int spot = spotOf(train, approach.wayAtProvider(), car);
-            long need = need(asking.hatch(), hatches, goods) - planned(loads, load -> load.requester.samePlace(asking.hatch()));
+            long need = needLeft(asking.hatch(), loads, hatches, goods);
             for (Hatch<I> offering : hatches) {
                 if (need <= 0) {
                     break;
@@ -697,6 +692,11 @@ public final class Logistics<I> {
             }
         }
         return loads;
+    }
+
+    /** What {@code requester} needs less what {@code loads}, being planned, already take to it. */
+    private long needLeft(Hatch<I> requester, List<Load<I>> loads, List<Hatch<I>> hatches, Goods<I> goods) {
+        return need(requester, hatches, goods) - planned(loads, load -> load.requester.samePlace(requester));
     }
 
     private static <I> long planned(List<Load<I>> loads, Predicate<Load<I>> which) {

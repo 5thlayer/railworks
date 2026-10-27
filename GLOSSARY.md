@@ -111,7 +111,7 @@ An automatic Train's errand: from a provider Station to a requester Station, wit
 _Avoid_: Trip (Voidworks'), order, route, schedule, task
 
 **Leftover**:
-What a Cargo car holds that no job of its Train claims, left after a requester stopped wanting it, or put in by hand; its Train takes only delivery jobs until it is gone.
+What a Cargo car holds that no job of its Train claims, left after a requester stopped wanting it or a job was given up as cut off from its requester, or put in by hand; its Train takes only delivery jobs until it is gone.
 _Avoid_: stowed load, surplus
 
 ### Dev runs
