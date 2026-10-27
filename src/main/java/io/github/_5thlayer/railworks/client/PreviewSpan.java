@@ -49,7 +49,8 @@ final class PreviewSpan {
             draw(event, pos, choice.get().target(), FADE, new float[] {SpanRenderer.R, SpanRenderer.G, SpanRenderer.B});
             return;
         }
-        // Nothing would string: the Span the grade or bend limit or a filled Clearance refused shows red, as the held Rail's slack does.
+        // Nothing would string: the Span the grade or bend limit or a filled Clearance refused shows red,
+        // as the held Rail's slack does.
         PlacedColumn.refusedString(level, pos, player, ClientRails.network())
                 .ifPresent(target -> draw(event, pos, target, 1.0F, SpanRenderer.colourOf(Stringing.Tint.REFUSED)));
     }

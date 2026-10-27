@@ -74,7 +74,8 @@ final class HeldSpan {
                 && PylonColumn.isPylon(level, hit.getBlockPos())) {
             target = PylonColumn.arm(PylonColumn.topOf(level, hit.getBlockPos()));
         }
-        Stringing.Tint tint = Stringing.tintFor(ClientRails.network(), LevelClearance.blocks(level), PylonColumn.arm(pending.pos()), target,
+        Stringing.Tint tint = Stringing.tintFor(ClientRails.network(), LevelClearance.blocks(level),
+                PylonColumn.arm(pending.pos()), target,
                 RailPurse.count(player));
         return new Aim(pending.pos(), target, tint);
     }

@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.common.util.BlockSnapshot;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
@@ -77,7 +78,9 @@ public final class LevelClearance {
                 ? multi.getReplacedBlockSnapshots() : List.of(event.getBlockSnapshot());
         for (BlockSnapshot snapshot : placed) {
             BlockPos pos = snapshot.getPos();
-            if (level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
+            // An item has set its block by now, an Enderman not yet: one block placed is the event's own.
+            BlockState state = placed.size() == 1 ? event.getPlacedBlock() : level.getBlockState(pos);
+            if (state.getCollisionShape(level, pos).isEmpty()) {
                 continue;
             }
             if (through(level, network, pos).isPresent()) {

@@ -43,7 +43,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -147,11 +147,11 @@ public final class LevelRails extends SavedData {
         }
         double speed = train.speed();
         Place head = train.head();
-        Map<CarEntity, AABB> before = new HashMap<>();
+        Map<CarEntity, Vec3> before = new HashMap<>();
         for (Car car : train.cars()) {
             CarEntity view = view(car);
             if (view != null) {
-                before.put(view, view.getBoundingBox());
+                before.put(view, view.position());
             }
         }
         Predicate<Span> taken = trains.takenFrom(network, train);
@@ -177,7 +177,7 @@ public final class LevelRails extends SavedData {
             }
         }
         if (train.speed() != 0.0) {
-            before.forEach((view, box) -> view.strike(level, box.minmax(view.getBoundingBox())));
+            before.forEach((view, from) -> view.strike(level, from));
         }
     }
 
@@ -295,8 +295,9 @@ public final class LevelRails extends SavedData {
 
     /**
      * Strings a Span from the Arm at {@code anchor} to the one at {@code target} for no Rail, under the
-     * rules a player's click is, its Clearance included: {@code /railworks span}. Only a {@code STRUNG} changes anything; a
-     * Span already there is left, as {@code CUT}, and a refusal is returned as the click's would be.
+     * rules a player's click is, its Clearance included: {@code /railworks span}. Only a {@code STRUNG}
+     * changes anything; a Span already there is left, as {@code CUT}, and a refusal is returned as the
+     * click's would be.
      */
     public Stringing.Outcome string(ServerLevel level, BlockPos anchor, BlockPos target) {
         Arm from = PylonColumn.arm(anchor);

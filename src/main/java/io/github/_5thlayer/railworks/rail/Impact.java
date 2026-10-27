@@ -19,7 +19,7 @@ public final class Impact {
      */
     static final double DAMAGE_PER_BLOCK_PER_SECOND = 0.8;
     /** How hard what is struck is pushed off the Rail, in blocks a tick: past a car's half width in a tick or two. */
-    public static final double ASIDE = 0.6;
+    static final double ASIDE = 0.6;
     /** How far up it is thrown, in blocks a tick, so it clears the ground it is pushed along. */
     static final double LIFT = 0.25;
 
