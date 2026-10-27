@@ -3,6 +3,8 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.Map;
+
 /**
  * What only Minecraft knows of the goods {@link Logistics} moves: what hatches and Cargo cars hold,
  * and moving it between them, and whether fuel waits in a Locomotive's slot. Counts are items, of one
@@ -20,6 +22,9 @@ public interface Goods<I> {
 
     /** How many of {@code item} {@code car} holds. */
     long held(CargoCar car, I item);
+
+    /** What {@code car} holds, item by item in the order of its slots; nothing for a car out of view. */
+    Map<I, Long> contents(CargoCar car);
 
     /** Whether {@code car} holds nothing at all. */
     boolean empty(CargoCar car);

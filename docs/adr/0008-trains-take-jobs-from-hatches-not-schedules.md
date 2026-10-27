@@ -4,6 +4,8 @@ status: accepted
 
 # Trains take jobs from hatches, not Schedules
 
+> Amended in #38: a claim lasts only while what it was made against does. A Train switched to manual or broken up drops its job and claims, keeping its cargo; a hatch broken or switched in mode drops the loads claimed against it, what was loaded for a lost requester left in its car as a leftover. A Train holding anything takes only delivery jobs, with no provider, so nothing it carries is mixed with a fresh load.
+
 > Amended in #37: a Cargo car's cargo is still its entity's, so a hatch trades only with a car in view, and a Train still runs only while its first car's entity ticks. The hatch's side runs with its chunk unloaded; the car's waits for abstract Trains (#6), which move cargo into the model.
 
 > Amended in #36: the car spots start behind the leading car, which stands at the Station with no spot of its own, since a Train usually leads with its Locomotive and a hatch beside it would trade with nothing. A platform is the leading car's place and up to four car spots behind it. A Station at a line's end keeps its spots, the leading car's front standing over the end Arm.

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -536,6 +537,209 @@ class LogisticsTest {
         assertEquals("Mine", status.station());
     }
 
+    // ---- claims break ----
+
+    @Test
+    void aTrainSwitchedToManualReleasesItsClaimsAndKeepsItsCargo() {
+        loop();
+        provider(NORTH, 0, "iron", 640);
+        requester(SOUTH, 0, "iron", 1);
+        Train one = onLoop(LOOP[2], LOOP[3], 4.0);
+        Train other = onLoop(LOOP[6], LOOP[7], 4.0);
+        runUntil(() -> kind(one) == Logistics.Kind.TO_UNLOAD, "loaded");
+        one.setAutomatic(false);
+        runUntil(() -> kind(other) == Logistics.Kind.TO_LOAD, "sent the other Train for the released request");
+        assertEquals(Logistics.Kind.MANUAL, kind(one));
+        assertEquals(64, goods.held(cargo(one, 1), "iron"));
+    }
+
+    @Test
+    void aTrainBrokenUpReleasesItsClaimsAndItsCarsKeepTheirCargo() {
+        loop();
+        provider(NORTH, 0, "iron", 640);
+        requester(SOUTH, 0, "iron", 3);
+        Train one = onLoop(LOOP[2], LOOP[3], 4.0);
+        Train other = onLoop(LOOP[6], LOOP[7], 4.0);
+        runUntil(() -> kind(one) == Logistics.Kind.LOADING && goods.held(cargo(one, 1), "iron") > 0, "loading");
+        CargoCar wagon = cargo(one, 1);
+        // Stopped at the provider, as shears part a Train only while it stands still.
+        if (trains.uncouple(network, one, 1) == null) {
+            throw new AssertionError("could not part " + one);
+        }
+        runUntil(() -> kind(other) == Logistics.Kind.TO_LOAD, "sent the other Train for the released request");
+        assertEquals(64, goods.held(wagon, "iron"));
+    }
+
+    @Test
+    void aBrokenProviderDropsItsLoadsAndTheEmptyJobIsCancelled() {
+        line();
+        Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
+        requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
+        hatches.remove(mine);
+        step();
+        assertEquals(Logistics.Kind.WAITING, kind(train));
+        runFor(200);
+        assertEquals(Logistics.Kind.WAITING, kind(train));
+        assertTrue(goods.empty(cargo(train, 1)));
+    }
+
+    @Test
+    void aProviderSwitchedToARequesterDropsItsLoads() {
+        line();
+        Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
+        requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
+        replace(mine, new Logistics.Hatch<>(mine.x(), mine.y(), mine.z(), MINE, 0, false, Optional.empty()));
+        step();
+        assertEquals(Logistics.Kind.WAITING, kind(train));
+    }
+
+    @Test
+    void whatWasLoadedForABrokenRequesterIsALeftoverWithNowhereToDeliver() {
+        line();
+        provider(MINE, 0, "iron", 640);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        hatches.remove(depot);
+        step();
+        Logistics.Status<String> status = logistics.status(train, goods);
+        assertEquals(Logistics.Kind.HOLDING, status.kind());
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 1)), status.cargo());
+        runUntil(train::atRest, "stopped");
+        Place at = train.head();
+        runFor(200);
+        assertEquals(at, train.head());
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+        assertEquals(Logistics.Kind.HOLDING, kind(train));
+    }
+
+    @Test
+    void aRequesterSwitchedToAProviderLeavesALeftover() {
+        line();
+        provider(MINE, 0, "iron", 640);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        replace(depot, new Logistics.Hatch<>(depot.x(), depot.y(), depot.z(), DEPOT, 0, true, Optional.empty()));
+        step();
+        assertEquals(Logistics.Kind.HOLDING, kind(train));
+    }
+
+    @Test
+    void aJobKeepsTheLoadsWhoseHatchesStand() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        provider(QUARRY, 1, "coal", 16);
+        Logistics.Hatch<String> iron = requester(DEPOT, 0, "iron", 1);
+        Logistics.Hatch<String> coal = requester(DEPOT, 1, "coal", 1);
+        Train train = eastbound(5.0, 2);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        hatches.remove(coal);
+        step();
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 1)), logistics.status(train, goods).cargo());
+        runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "unloaded what still has somewhere to go");
+        assertEquals(64, goods.held(iron, "iron"));
+        assertEquals(16, goods.held(cargo(train, 2), "coal"));
+    }
+
+    @Test
+    void aRequestCutOnTheWayCapsUnloadingAndTheRestIsALeftover() {
+        line();
+        provider(MINE, 0, "iron", 640);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(128, goods.held(cargo(train, 1), "iron"));
+        Logistics.Hatch<String> cut = ask(depot, "iron", 1);
+        runUntil(() -> kind(train) == Logistics.Kind.UNLOADING, "arrived");
+        int unloading = runUntil(() -> kind(train) != Logistics.Kind.UNLOADING, "left");
+        assertTrue(unloading < 5, "it unloaded for " + unloading + " ticks");
+        assertEquals(64, goods.held(cut, "iron"));
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+        assertEquals(Logistics.Kind.HOLDING, kind(train));
+    }
+
+    @Test
+    void aRequestForAnotherItemTakesNothingOfTheOldOne() {
+        line();
+        provider(MINE, 0, "iron", 640);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        ask(depot, "copper", 1);
+        runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "gave up on the Depot");
+        assertEquals(0, goods.held(depot, "iron"));
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+    }
+
+    // ---- leftovers ----
+
+    @Test
+    void aLeftoverIsDeliveredOnceARequesterAsksForIt() {
+        line();
+        Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 640);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        hatches.remove(depot);
+        runFor(Logistics.PLAN_TICKS * 3);
+        assertEquals(Logistics.Kind.HOLDING, kind(train));
+        Logistics.Hatch<String> again = requester(DEPOT, 0, "iron", 1);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "sent to deliver the leftover");
+        assertEquals("Depot", logistics.status(train, goods).station());
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING, "delivered");
+        assertEquals(64, goods.held(again, "iron"));
+        // A delivery job has no provider: nothing more was taken from the Mine.
+        assertEquals(640 - 64, goods.held(mine, "iron"));
+    }
+
+    @Test
+    void aHandLoadedTrainSetToAutomaticDeliversToTheNearestRequesterAskingForWhatEachCarHolds() {
+        line();
+        Logistics.Hatch<String> far = requester(DEPOT, 0, "iron", 1);
+        Logistics.Hatch<String> near = requester(QUARRY, 0, "iron", 1);
+        // At the nearest Station of all, but asking for another item.
+        Logistics.Hatch<String> other = requester(new Station(7, 6, 1, "Siding"), 0, "copper", 1);
+        Train train = eastbound(3.0, 1);
+        train.setAutomatic(false);
+        goods.put(cargo(train, 1), "iron", 40);
+        train.setAutomatic(true);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "sent to deliver");
+        assertEquals("Quarry", logistics.status(train, goods).station());
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING, "delivered");
+        assertEquals(40, goods.held(near, "iron"));
+        assertEquals(0, goods.held(far, "iron"));
+        assertEquals(0, goods.held(other, "copper"));
+    }
+
+    @Test
+    void aTrainHoldingAnythingTakesNoJobFromAProvider() {
+        line();
+        Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 640);
+        requester(DEPOT, 0, "iron", 1);
+        Train train = shuttle(20.0);
+        goods.put(cargo(train, 1), "coal", 5);
+        runFor(200);
+        assertEquals(Logistics.Kind.HOLDING, kind(train));
+        assertEquals(640, goods.held(mine, "iron"));
+    }
+
+    private void replace(Logistics.Hatch<String> hatch, Logistics.Hatch<String> with) {
+        hatches.set(hatches.indexOf(hatch), with);
+    }
+
+    /** {@code hatch}, a requester, asking for {@code stacks} of {@code item} now, which is the hatch it becomes. */
+    private Logistics.Hatch<String> ask(Logistics.Hatch<String> hatch, String item, int stacks) {
+        Logistics.Hatch<String> asking = new Logistics.Hatch<>(hatch.x(), hatch.y(), hatch.z(), hatch.station(),
+                hatch.spot(), false, Optional.of(new HatchRequest<>(item, stacks)));
+        replace(hatch, asking);
+        return asking;
+    }
+
     private List<Station> stationsAt(Train train) {
         Stations stations = new Stations();
         List.of(MINE, DEPOT, QUARRY).forEach(stations::put);
@@ -556,6 +760,10 @@ class LogisticsTest {
             inHatches.computeIfAbsent(hatch.x(), x -> new HashMap<>()).put(item, count);
         }
 
+        void put(CargoCar car, String item, long count) {
+            inCars.computeIfAbsent(car.id(), id -> new HashMap<>()).put(item, count);
+        }
+
         @Override
         public int stackSize(String item) {
             return item.equals("coal") ? 16 : 64;
@@ -569,6 +777,17 @@ class LogisticsTest {
         @Override
         public long held(CargoCar car, String item) {
             return inCars.getOrDefault(car.id(), Map.of()).getOrDefault(item, 0L);
+        }
+
+        @Override
+        public Map<String, Long> contents(CargoCar car) {
+            Map<String, Long> contents = new LinkedHashMap<>();
+            inCars.getOrDefault(car.id(), Map.of()).forEach((item, count) -> {
+                if (count > 0) {
+                    contents.put(item, count);
+                }
+            });
+            return contents;
         }
 
         @Override

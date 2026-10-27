@@ -40,6 +40,16 @@ import java.util.function.ToLongFunction;
  * provider with a part load its claims shrink to what it took, and having taken nothing its job is
  * dropped. A Train with no job waits where it is. Jobs are not saved: a Train set going again has none.
  *
+ * <p>Claims break with what they were made against. A Train switched to manual, or coupled, parted or
+ * gone, drops its job and every claim with it, its cars keeping what they hold. A hatch broken, or
+ * switched to the other mode, drops the loads claimed against it: one gone from a provider keeps only
+ * what it took there, and one gone from a requester leaves what it took as a <b>leftover</b> in its car;
+ * a job with no loads left is cancelled. At a requester whose request changed on the way, unloading
+ * stops at what it now wants, and the rest is a leftover. A Train holding anything, leftovers or
+ * cargo loaded by hand, takes only <b>delivery jobs</b>, with no provider: to the nearest requester
+ * Station, arriving either way it pulls, whose hatch at a car's spot asks for what that car holds,
+ * planned before any job from a provider. With none, it waits where it is, holding.
+ *
  * <p>Pure: no Minecraft types. {@code I} is the item's kind, the game's {@code Item}.
  */
 public final class Logistics<I> {
@@ -69,7 +79,7 @@ public final class Logistics<I> {
 
     /** What a status line says an automatic Train does. */
     public enum Kind {
-        MANUAL, WAITING, TO_LOAD, LOADING, TO_UNLOAD, UNLOADING, CANNOT_REACH
+        MANUAL, WAITING, HOLDING, TO_LOAD, LOADING, TO_UNLOAD, UNLOADING, CANNOT_REACH
     }
 
     /** So many stacks of an item, as a status line counts what a Train carries. */
@@ -78,7 +88,8 @@ public final class Logistics<I> {
 
     /**
      * A Train's status line: what it does, the Station it does it at or heads for (empty for none),
-     * and, heading to unload, what it carries there, item by item in the order they were loaded.
+     * and, heading to unload, what it carries there, item by item in the order they were loaded, or,
+     * holding with nowhere to deliver, what its Cargo cars hold, car by car.
      */
     public record Status<I>(Kind kind, String station, List<Cargo<I>> cargo) {
 
@@ -96,9 +107,10 @@ public final class Logistics<I> {
         TO_PROVIDER, AT_PROVIDER, TO_REQUESTER, AT_REQUESTER
     }
 
-    /** One load of a job: from a provider hatch, in one car, to a requester hatch. */
+    /** One load of a job: from a provider hatch, in one car, to a requester hatch; with no provider, what the car holds already. */
     private static final class Load<I> {
 
+        /** Null for a delivery job's load. */
         final Hatch<I> provider;
         final Hatch<I> requester;
         final CargoCar car;
@@ -115,11 +127,19 @@ public final class Logistics<I> {
             this.item = item;
             this.amount = amount;
         }
+
+        /** A delivery job's load: {@code amount} of what {@code car} holds, to {@code requester}. */
+        static <I> Load<I> held(Hatch<I> requester, CargoCar car, I item, long amount) {
+            Load<I> load = new Load<>(null, requester, car, item, amount);
+            load.loaded = amount;
+            return load;
+        }
     }
 
-    /** A Train's errand: from a provider Station to a requester Station, arriving each running its way. */
+    /** A Train's errand: from a provider Station to a requester Station, arriving each running its way; a delivery job's to the requester only. */
     private static final class Job<I> {
 
+        /** Null for a delivery job. */
         final Station provider;
         final Station requester;
         final int wayAtProvider;
@@ -135,6 +155,17 @@ public final class Logistics<I> {
             this.wayAtRequester = wayAtRequester;
             this.loads = loads;
             this.driver = new Driver(provider, wayAtProvider);
+        }
+
+        /** A delivery job: what the Train holds, to {@code requester}, arriving it running {@code way}. */
+        Job(Station requester, int way, List<Load<I>> loads) {
+            this.provider = null;
+            this.requester = requester;
+            this.wayAtProvider = 0;
+            this.wayAtRequester = way;
+            this.loads = loads;
+            this.leg = Leg.TO_REQUESTER;
+            this.driver = new Driver(requester, way);
         }
 
         boolean stopped() {
@@ -181,9 +212,10 @@ public final class Logistics<I> {
 
     /**
      * One tick: Trains no longer automatic, or gone, coupled or parted, drop their jobs and with them
-     * their claims; each automatic Train stopped on a job trades with the hatches there and leaves
-     * when it is done; and once every {@link #PLAN_TICKS} jobs are planned. {@code hatches} are those
-     * that join a Station, in the order they were placed.
+     * their claims; loads claimed against a hatch no longer there as it was are dropped; each automatic
+     * Train stopped on a job trades with the hatches there and leaves when it is done; and once every
+     * {@link #PLAN_TICKS} jobs are planned. {@code hatches} are those that join a Station, in the
+     * order they were placed.
      */
     public void tick(RailNetwork network, Trains trains, List<Hatch<I>> hatches, Goods<I> goods) {
         Set<Train> automatic = new HashSet<>();
@@ -194,6 +226,11 @@ public final class Logistics<I> {
             }
         }
         runs.keySet().retainAll(automatic);
+        for (Run<I> run : runs.values()) {
+            if (run.job != null) {
+                forget(run, hatches);
+            }
+        }
         for (var entry : runs.entrySet()) {
             Run<I> run = entry.getValue();
             if (run.job != null && run.job.stopped()) {
@@ -239,7 +276,8 @@ public final class Logistics<I> {
         Run<I> run = runs.get(train);
         Job<I> job = run == null ? null : run.job;
         if (job == null) {
-            return Status.of(Kind.WAITING);
+            List<Cargo<I>> holding = holding(train, goods);
+            return holding.isEmpty() ? Status.of(Kind.WAITING) : new Status<>(Kind.HOLDING, "", holding);
         }
         return switch (job.leg) {
             case TO_PROVIDER -> Status.at(job.driver.lost() ? Kind.CANNOT_REACH : Kind.TO_LOAD, job.provider);
@@ -265,6 +303,57 @@ public final class Logistics<I> {
         return cargo;
     }
 
+    /** What {@code train}'s Cargo cars hold, item by item, car by car, in stacks rounded up. */
+    private static <I> List<Cargo<I>> holding(Train train, Goods<I> goods) {
+        Map<I, Long> items = new LinkedHashMap<>();
+        for (Car car : train.cars()) {
+            if (car instanceof CargoCar cargo) {
+                goods.contents(cargo).forEach((item, count) -> items.merge(item, count, Long::sum));
+            }
+        }
+        List<Cargo<I>> cargo = new ArrayList<>();
+        items.forEach((item, count) -> {
+            if (count > 0) {
+                cargo.add(new Cargo<>(item, (int) stacks(count, goods.stackSize(item))));
+            }
+        });
+        return cargo;
+    }
+
+    // ---- claims breaking ----
+
+    /**
+     * Drops the loads of {@code run}'s job claimed against a hatch no longer among {@code hatches} as
+     * it was, broken or switched in mode: one whose provider is gone keeps only what it took, and goes
+     * if it took nothing; one whose requester is gone goes, what it took a leftover. A job with no
+     * loads left is cancelled.
+     */
+    private static <I> void forget(Run<I> run, List<Hatch<I>> hatches) {
+        List<Load<I>> loads = run.job.loads;
+        loads.removeIf(load -> !standing(load.requester, false, hatches));
+        for (Load<I> load : loads) {
+            if (load.provider != null && !standing(load.provider, true, hatches)) {
+                load.amount = load.loaded;
+            }
+        }
+        loads.removeIf(load -> load.amount <= 0);
+        if (loads.isEmpty()) {
+            run.job = null;
+        }
+    }
+
+    /** Whether {@code hatch} still stands, joining its Station at its spot, a provider or not as {@code provider} says. */
+    private static <I> boolean standing(Hatch<I> hatch, boolean provider, List<Hatch<I>> hatches) {
+        return now(hatch, hatches).filter(h -> h.provider() == provider).isPresent();
+    }
+
+    /** {@code hatch} as it is now, joining its Station at its spot; empty once it is broken or joins elsewhere. */
+    private static <I> Optional<Hatch<I>> now(Hatch<I> hatch, List<Hatch<I>> hatches) {
+        return hatches.stream()
+                .filter(h -> h.samePlace(hatch) && h.station().samePlace(hatch.station()) && h.spot() == hatch.spot())
+                .findFirst();
+    }
+
     // ---- at a Station ----
 
     /** One tick of {@code train} stopped on its job: each hatch moves a stack when its time comes, and the Train leaves when done or stalled. */
@@ -279,11 +368,11 @@ public final class Logistics<I> {
             List<Hatch<I>> turned = new ArrayList<>();
             for (Load<I> load : job.loads) {
                 Hatch<I> hatch = loading ? load.provider : load.requester;
-                if (left(load, loading) <= 0 || turned.stream().anyMatch(hatch::samePlace)
-                        || !standing(hatch, hatches) || carAt(train, way, hatch.spot()) != load.car) {
+                long left = left(load, loading, hatches, goods);
+                if (left <= 0 || turned.stream().anyMatch(hatch::samePlace) || carAt(train, way, hatch.spot()) != load.car) {
                     continue;
                 }
-                long most = Math.min(goods.stackSize(load.item), left(load, loading));
+                long most = Math.min(goods.stackSize(load.item), left);
                 long count = loading ? goods.load(hatch, load.car, load.item, most)
                         : goods.unload(load.car, hatch, load.item, most);
                 if (count > 0) {
@@ -298,22 +387,26 @@ public final class Logistics<I> {
             }
         }
         run.stalled = moved ? 0 : run.stalled + 1;
-        boolean done = job.loads.stream().allMatch(load -> left(load, loading) <= 0);
+        boolean done = job.loads.stream().allMatch(load -> left(load, loading, hatches, goods) <= 0);
         // Stalled only once a hatch's turn has come round and moved nothing, however slow the turns.
         if (done || run.stalled >= Math.max(stallSeconds * LocomotiveSpec.TICKS_PER_SECOND, hatchTicksPerStack)) {
             leave(run, loading);
         }
     }
 
-    /** What is left of {@code load} to move at this Station: to take at its provider, or to give at its requester. */
-    private static long left(Load<?> load, boolean loading) {
-        return loading ? load.amount - load.loaded : load.loaded - load.unloaded;
-    }
-
-    /** Whether {@code hatch} still stands, joining its Station at its spot. */
-    private static <I> boolean standing(Hatch<I> hatch, List<Hatch<I>> hatches) {
-        return hatches.stream().anyMatch(h -> h.samePlace(hatch) && h.station().samePlace(hatch.station())
-                && h.spot() == hatch.spot());
+    /**
+     * What is left of {@code load} to move at this Station: to take at its provider, or to give at its
+     * requester, no more than the requester now wants, which a request changed on the way may cut.
+     */
+    private static <I> long left(Load<I> load, boolean loading, List<Hatch<I>> hatches, Goods<I> goods) {
+        if (loading) {
+            return load.amount - load.loaded;
+        }
+        long wanted = now(load.requester, hatches).flatMap(Hatch::request)
+                .filter(request -> request.item().equals(load.item))
+                .map(request -> (long) request.stacks() * goods.stackSize(load.item) - goods.held(load.requester, load.item))
+                .orElse(0L);
+        return Math.min(load.loaded - load.unloaded, wanted);
     }
 
     /**
@@ -339,6 +432,12 @@ public final class Logistics<I> {
     // ---- planning ----
 
     private void plan(RailNetwork network, Trains trains, List<Hatch<I>> hatches, Goods<I> goods) {
+        for (Train train : trains.all()) {
+            Run<I> run = runs.get(train);
+            if (run != null && run.job == null && !free(train, goods)) {
+                deliver(network, train, run, hatches, goods);
+            }
+        }
         for (Hatch<I> requester : hatches) {
             if (requester.provider() || requester.request().isEmpty()) {
                 continue;
@@ -401,6 +500,66 @@ public final class Logistics<I> {
                 }
             }
         }
+    }
+
+    /**
+     * Plans a delivery job for {@code train}, which holds something: to the nearest requester Station,
+     * arriving either way it pulls, where a hatch at a car's spot asks for what that car holds, each
+     * load the least of what the car holds and the hatch's need.
+     */
+    private void deliver(RailNetwork network, Train train, Run<I> run, List<Hatch<I>> hatches, Goods<I> goods) {
+        List<Station> requesters = new ArrayList<>();
+        for (Hatch<I> hatch : hatches) {
+            if (!hatch.provider() && hatch.request().isPresent()
+                    && requesters.stream().noneMatch(hatch.station()::samePlace)) {
+                requesters.add(hatch.station());
+            }
+        }
+        Job<I> nearest = null;
+        double shortest = Double.POSITIVE_INFINITY;
+        for (Station station : requesters) {
+            Optional<Platform> platform = Platform.of(network, station);
+            if (platform.isEmpty()) {
+                continue;
+            }
+            for (int way : new int[] {1, -1}) {
+                if (!train.pulls(way, goods::slotFuelled)) {
+                    continue;
+                }
+                double distance = platform.get().toLeadMark(network, train.lead(network, way), Station.STRETCH);
+                if (Double.isNaN(distance) || Math.max(distance, 0.0) >= shortest) {
+                    continue;
+                }
+                List<Load<I>> loads = held(train, way, station, hatches, goods);
+                if (!loads.isEmpty()) {
+                    shortest = Math.max(distance, 0.0);
+                    nearest = new Job<>(station, way, loads);
+                }
+            }
+        }
+        run.job = nearest;
+    }
+
+    /** A delivery job's loads for {@code train} arriving at {@code requester} running {@code way}: for each hatch there with need left, what the car at its spot holds of its item. */
+    private List<Load<I>> held(Train train, int way, Station requester, List<Hatch<I>> hatches, Goods<I> goods) {
+        List<Load<I>> loads = new ArrayList<>();
+        for (Hatch<I> asking : hatches) {
+            if (asking.provider() || asking.request().isEmpty() || !asking.station().samePlace(requester)) {
+                continue;
+            }
+            I item = asking.request().get().item();
+            CargoCar car = carAt(train, way, asking.spot());
+            if (car == null) {
+                continue;
+            }
+            long need = need(asking, hatches, goods) - planned(loads, load -> load.requester.samePlace(asking));
+            long holds = goods.held(car, item) - planned(loads, load -> load.car == car && load.item.equals(item));
+            long amount = Math.min(need, holds);
+            if (amount > 0) {
+                loads.add(Load.held(asking, car, item, amount));
+            }
+        }
+        return loads;
     }
 
     private static double nonNegative(double distance) {
@@ -522,7 +681,7 @@ public final class Logistics<I> {
     private long unclaimed(Hatch<I> provider, I item, Goods<I> goods) {
         long claimed = 0;
         for (Load<I> load : loads()) {
-            if (load.provider.samePlace(provider) && load.item.equals(item)) {
+            if (load.provider != null && load.provider.samePlace(provider) && load.item.equals(item)) {
                 claimed += load.amount - load.loaded;
             }
         }
