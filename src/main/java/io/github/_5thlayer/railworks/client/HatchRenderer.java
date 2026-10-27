@@ -32,11 +32,13 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     private static final float OFF_FACE = 1 / 16F;
     /** Its size, against an item's own: an item frame's. */
     private static final float SCALE = 0.5F;
+    /** How big vanilla's block model draws a block item held {@code FIXED}, as in a frame: half a block. */
+    private static final float BLOCK_FIXED_SCALE = 0.5F;
     /**
-     * How far past a side the item can reach: a block item, a block model's half size again at
-     * {@link #SCALE}, is a quarter of a block deep, its middle {@link #OFF_FACE} out, so it reaches 3/16.
+     * How far past a side the item can reach: a block item, the deepest of vanilla's, is {@link #BLOCK_FIXED_SCALE}
+     * times {@link #SCALE} of a block deep, its middle {@link #OFF_FACE} out, so it reaches 3/16.
      */
-    private static final double REACH = 0.25;
+    private static final double REACH = OFF_FACE + BLOCK_FIXED_SCALE * SCALE / 2;
 
     @Override
     public RenderState createRenderState() {
