@@ -25,6 +25,7 @@ import net.minecraft.world.Containers;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 
 /**
@@ -162,6 +163,23 @@ public final class Hatches {
         /** What it holds, which its block's item handler fills and empties, and a Train too. */
         public ItemStacksResourceHandler contents() {
             return contents;
+        }
+
+        /**
+         * What it shows on its sides: a requester its request's item, a provider its first stack;
+         * {@link ItemResource#EMPTY} for a requester asking for nothing and a provider holding nothing.
+         */
+        public ItemResource shown() {
+            if (mode == HatchMode.REQUESTER) {
+                return request().map(asked -> ItemResource.of(asked.item())).orElse(ItemResource.EMPTY);
+            }
+            for (int slot = 0; slot < contents.size(); slot++) {
+                ItemResource resource = contents.getResource(slot);
+                if (!resource.isEmpty()) {
+                    return resource;
+                }
+            }
+            return ItemResource.EMPTY;
         }
 
         /** Switches it between provider and requester, keeping what it holds and asking for nothing. Returns what it is now. */
