@@ -571,6 +571,32 @@ class LogisticsTest {
     }
 
     @Test
+    void aTrainGoneFromTheRailReleasesItsClaims() {
+        loop();
+        provider(NORTH, 0, "iron", 640);
+        requester(SOUTH, 0, "iron", 1);
+        Train one = onLoop(LOOP[2], LOOP[3], 4.0);
+        Train other = onLoop(LOOP[6], LOOP[7], 4.0);
+        runUntil(() -> kind(one) == Logistics.Kind.TO_UNLOAD, "loaded");
+        // Derailed by a cut Span, or its last car broken.
+        trains.remove(one);
+        runUntil(() -> kind(other) == Logistics.Kind.TO_LOAD, "sent the other Train for the released request");
+    }
+
+    @Test
+    void aRequestCutBeforeLoadingTakesOnlyWhatItNowWants() {
+        line();
+        Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 640);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 3);
+        Train train = shuttle(20.0);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
+        ask(depot, "iron", 1);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+        assertEquals(640 - 64, goods.held(mine, "iron"));
+    }
+
+    @Test
     void aBrokenProviderDropsItsLoadsAndTheEmptyJobIsCancelled() {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
@@ -714,6 +740,18 @@ class LogisticsTest {
         assertEquals(40, goods.held(near, "iron"));
         assertEquals(0, goods.held(far, "iron"));
         assertEquals(0, goods.held(other, "copper"));
+    }
+
+    @Test
+    void aDeliveryCutOffFromItsRequesterIsGivenUpAndTheTrainHolds() {
+        line();
+        requester(DEPOT, 0, "iron", 1);
+        Train train = eastbound(5.0, 1);
+        goods.put(cargo(train, 1), "iron", 40);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "sent to deliver");
+        network.remove(B, C);
+        runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "gave the delivery up");
+        assertEquals(40, goods.held(cargo(train, 1), "iron"));
     }
 
     @Test
