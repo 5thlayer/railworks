@@ -4,6 +4,7 @@
 package io.github._5thlayer.railworks;
 
 import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
@@ -12,16 +13,21 @@ import io.github._5thlayer.groundworks.Refusal;
 import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
- * The {@code /railworks} commands, for operators: what a Gallery pack scene sets the Rail and its
- * cars up with, since no vanilla command strings a Span or makes a Train (libworks ADR 0010).
+ * The {@code /railworks} commands, for operators: what a Gallery pack scene sets the Rail, its cars
+ * and its hatches up with, since no vanilla command strings a Span, makes a Train or reaches what the
+ * level keeps of a hatch or a Train's mode (libworks ADR 0010).
  *
  * <ul>
  *   <li>{@code /railworks span <from> <to>} strings a Span between the Arms of the Pylon columns
@@ -31,6 +37,12 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *       riding it would stand in the block {@code pos}, facing {@code yaw} along it, as the car in
  *       a player's hand would: coupled into a Train at rest when that is where it lands beside one
  *       of the Train's ends, and refused where the item would be.</li>
+ *   <li>{@code /railworks hatch <pos> provider <item> <stacks>} puts {@code stacks} full stacks of
+ *       {@code item} in the provider hatch at {@code pos}, as many as it has room for; with
+ *       {@code requester}, has the requester hatch there ask for that many, a stack at a time as a
+ *       player's uses of the item do. A hatch set by a command a moment before counts.</li>
+ *   <li>{@code /railworks automatic <locomotive>} switches the Locomotive's Train to automatic, as
+ *       its menu's toggle does, so it takes jobs between hatches (ADR 0008).</li>
  * </ul>
  *
  * <p>A refusal is an error, as a vanilla command's is, so a function's trace names it.
@@ -50,6 +62,13 @@ public final class RailworksCommands {
     private static final SimpleCommandExceptionType CAR_NOT_SET =
             new SimpleCommandExceptionType(Component.translatable("commands.railworks.car.not_set"));
 
+    private static final DynamicCommandExceptionType NOT_A_HATCH =
+            new DynamicCommandExceptionType(pos -> Component.translatable("commands.railworks.hatch.not_a_hatch", pos));
+    private static final DynamicCommandExceptionType WRONG_MODE =
+            new DynamicCommandExceptionType(pos -> Component.translatable("commands.railworks.hatch.wrong_mode", pos));
+    private static final SimpleCommandExceptionType NOT_A_LOCOMOTIVE =
+            new SimpleCommandExceptionType(Component.translatable("commands.railworks.automatic.not_a_locomotive"));
+
     private RailworksCommands() {
     }
 
@@ -66,13 +85,24 @@ public final class RailworksCommands {
                             .then(Commands.argument("yaw", FloatArgumentType.floatArg(-180.0F, 360.0F))
                                     .executes(context -> car(context, kind)))));
         }
+        var hatchAt = Commands.argument("pos", BlockPosArgument.blockPos());
+        for (HatchMode mode : HatchMode.values()) {
+            hatchAt.then(Commands.literal(mode.getSerializedName())
+                    .then(Commands.argument("item", ItemArgument.item(event.getBuildContext()))
+                            .then(Commands.argument("stacks", IntegerArgumentType.integer(1))
+                                    .executes(context -> hatch(context, mode)))));
+        }
         event.getDispatcher().register(Commands.literal(Railworks.MOD_ID)
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("span")
                         .then(Commands.argument("from", BlockPosArgument.blockPos())
                                 .then(Commands.argument("to", BlockPosArgument.blockPos())
                                         .executes(RailworksCommands::span))))
-                .then(car));
+                .then(car)
+                .then(Commands.literal("hatch").then(hatchAt))
+                .then(Commands.literal("automatic")
+                        .then(Commands.argument("locomotive", EntityArgument.entity())
+                                .executes(RailworksCommands::automatic))));
     }
 
     private static int span(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
@@ -114,6 +144,50 @@ public final class RailworksCommands {
         }
         context.getSource().sendSuccess(() -> Component.translatable("commands.railworks.car.set",
                 Component.translatable(kind.entityType().getDescriptionId()), pos.toShortString()), true);
+        return 1;
+    }
+
+    /** @return how many stacks the hatch holds of it, or asks for */
+    private static int hatch(CommandContext<CommandSourceStack> context, HatchMode mode) throws CommandSyntaxException {
+        ServerLevel level = context.getSource().getLevel();
+        BlockPos pos = BlockPosArgument.getLoadedBlockPos(context, "pos");
+        if (!(level.getBlockEntity(pos) instanceof HatchBlockEntity entity)) {
+            throw NOT_A_HATCH.create(pos.toShortString());
+        }
+        Hatches.Hatch hatch = entity.hatch().orElseThrow(() -> NOT_A_HATCH.create(pos.toShortString()));
+        if (hatch.mode() != mode) {
+            throw WRONG_MODE.create(pos.toShortString());
+        }
+        ItemResource resource = ItemResource.of(ItemArgument.getItem(context, "item").item());
+        int stacks = IntegerArgumentType.getInteger(context, "stacks");
+        int readied = 0;
+        if (mode == HatchMode.PROVIDER) {
+            try (var transaction = Transaction.openRoot()) {
+                readied = hatch.contents().insert(resource, stacks * resource.getMaxStackSize(), transaction)
+                        / resource.getMaxStackSize();
+                transaction.commit();
+            }
+        } else {
+            hatch.clearRequest();
+            for (int stack = 0; stack < stacks; stack++) {
+                readied = hatch.ask(resource.value()).stacks();
+            }
+        }
+        int told = readied;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.railworks.hatch." + mode.getSerializedName(),
+                pos.toShortString(), told, resource.getHoverName()), true);
+        return readied;
+    }
+
+    private static int automatic(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        if (!(EntityArgument.getEntity(context, "locomotive") instanceof LocomotiveEntity locomotive)
+                || locomotive.train() == null) {
+            throw NOT_A_LOCOMOTIVE.create();
+        }
+        if (!locomotive.train().automatic()) {
+            locomotive.toggleAutomatic();
+        }
+        context.getSource().sendSuccess(() -> Component.translatable("commands.railworks.automatic"), true);
         return 1;
     }
 

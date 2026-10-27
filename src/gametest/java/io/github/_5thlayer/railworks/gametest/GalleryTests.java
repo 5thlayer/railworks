@@ -4,11 +4,13 @@
 package io.github._5thlayer.railworks.gametest;
 
 import java.util.List;
+import java.util.Set;
 
 import io.github._5thlayer.libworks.gallery.GalleryPack;
 import io.github._5thlayer.libworks.testkit.GalleryCheck;
 import io.github._5thlayer.libworks.testkit.GalleryCheck.Layout;
 import io.github._5thlayer.libworks.testkit.GalleryCheck.Scene;
+import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
 import io.github._5thlayer.railworks.Railworks;
@@ -20,17 +22,22 @@ import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The Gallery pack (libworks ADR 0010), through libworks' {@link GalleryCheck}: offered and off, its
  * build running every command without failing, and each scene's key block where it stands, the
  * Stations scene's Stations in the level's Stations under their names. Beyond the build, the
- * coupling scene's sign, clicked, builds it again, leaving one Train and nothing loose. What a
- * scene's Trains do is the mechanics' own game tests' to check, never the Gallery's. Each test turns
+ * coupling scene's sign, clicked, builds it again, leaving one Train and nothing loose, and the two
+ * logistics scenes are built working: each requester's chest gets what it asks for. How a Train
+ * plans and runs its jobs is the mechanics' own game tests' to check, never the Gallery's. Each test turns
  * the pack on, which reloads the server's data, and off again, passing or failing, so each runs in a
  * batch of its own.
  */
@@ -47,6 +54,14 @@ final class GalleryTests {
     private static final BlockPos QUARRY = new BlockPos(4, 2, -7);
     private static final BlockPos SMELTER = new BlockPos(24, 2, -5);
 
+    /** The logistics scenes' provider hatch and requesters' chests, from where each is run. */
+    private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);
+    private static final BlockPos IRON_CHEST = new BlockPos(22, 0, -7);
+    private static final BlockPos COPPER_CHEST = new BlockPos(20, 0, -7);
+    private static final BlockPos GOLD_CHEST = new BlockPos(22, 0, -7);
+    /** The stacks the logistics scene's provider holds once built. */
+    private static final int PROVIDED_STACKS = 8;
+
     /** A test of one scene, run on its own from where the gallery is run, loads only the first plot. */
     private static final int ONE_SCENE = 1;
 
@@ -62,7 +77,9 @@ final class GalleryTests {
                 new Scene("curves", new BlockPos(14, 1, -4), pylon),
                 new Scene("locomotive", new BlockPos(11, 1, -6), pylon),
                 new Scene("coupling", new BlockPos(10, 0, -2), Blocks.CHEST),
-                new Scene("stations", QUARRY, RailworksRegistries.STATION.get()));
+                new Scene("stations", QUARRY, RailworksRegistries.STATION.get()),
+                new Scene("logistics", PROVIDER, RailworksRegistries.HATCH.get()),
+                new Scene("two_loads", PROVIDER, RailworksRegistries.HATCH.get()));
     }
 
     static void register(RailworksGameTests.Registrar tests) {
@@ -70,6 +87,8 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::builds);
         tests.testOnItsOwn("gallery_coupling_sign_clicked_builds_the_scene_again_with_one_train",
                 GalleryCheck.TICKS, GalleryTests::signReplays);
+        tests.testOnItsOwn("gallery_logistics_scenes_deliver_what_each_requester_asks_for",
+                GalleryCheck.TICKS, GalleryTests::logisticsDeliver);
     }
 
     /** libworks' build check, written out to add what no key block shows: the Stations scene's Stations, registered by name. */
@@ -77,7 +96,7 @@ final class GalleryTests {
         var scenes = scenes();
         var at = helper.absolutePos(ORIGIN);
         var functions = helper.getLevel().getServer().getFunctions();
-        var stations = ROWS.sceneOrigin(at, scenes.size() - 1);
+        var stations = ROWS.sceneOrigin(at, indexOf(scenes, "stations"));
         GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, scenes.size(), (source, steps) -> steps
                 .thenExecute(() -> {
                     GalleryCheck.assertLoads(helper, source, Railworks.MOD_ID);
@@ -117,6 +136,50 @@ final class GalleryTests {
             var loose = helper.getLevel().getEntitiesOfClass(ItemEntity.class, AABB.of(plot));
             helper.assertTrue(loose.isEmpty(), "building the scene again left items loose: " + loose.stream().map(ItemEntity::getItem).toList());
         })).thenSucceed();
+    }
+
+    /**
+     * The logistics scene, built twice as its sign rebuilds it, and the two-loads scene on the plot
+     * east of it: the provider holds only what one build gives, and each requester's chest fills with
+     * the item it asks for, carried by the scene's automatic Train.
+     */
+    private static void logisticsDeliver(GameTestHelper helper) {
+        var at = helper.absolutePos(ORIGIN);
+        var second = ROWS.sceneOrigin(at, 1);
+        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, 2, (source, steps) -> steps
+                .thenExecute(() -> {
+                    GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "logistics"));
+                    GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "logistics"));
+                    GalleryCheck.assertRuns(helper, source.withPosition(Vec3.atBottomCenterOf(second)),
+                            GalleryPack.scene(Railworks.MOD_ID, "two_loads"));
+                    var provider = LevelHatches.of(helper.getLevel()).at(at.offset(PROVIDER)).orElseThrow();
+                    long held = 0;
+                    for (int slot = 0; slot < provider.contents().size(); slot++) {
+                        held += provider.contents().getAmountAsLong(slot);
+                    }
+                    helper.assertTrue(held == PROVIDED_STACKS * 64L,
+                            "building the logistics scene twice left its provider holding " + held + " ore, not " + PROVIDED_STACKS * 64);
+                })
+                .thenWaitUntil(() -> {
+                    holds(helper, at.offset(IRON_CHEST), Items.IRON_ORE);
+                    holds(helper, second.offset(COPPER_CHEST), Items.RAW_COPPER);
+                    holds(helper, second.offset(GOLD_CHEST), Items.RAW_GOLD);
+                })).thenSucceed();
+    }
+
+    /** Asserts the chest at {@code pos}, absolute, holds some {@code item}. */
+    private static void holds(GameTestHelper helper, BlockPos pos, Item item) {
+        helper.assertTrue(helper.getLevel().getBlockEntity(pos) instanceof ChestBlockEntity chest && chest.hasAnyOf(Set.of(item)),
+                "the chest at " + pos.toShortString() + " holds no " + item);
+    }
+
+    private static int indexOf(List<Scene> scenes, String name) {
+        for (int index = 0; index < scenes.size(); index++) {
+            if (scenes.get(index).name().equals(name)) {
+                return index;
+            }
+        }
+        throw new IllegalArgumentException("there is no scene " + name);
     }
 
     /** The Station at {@code pos}, absolute, asserting the level's Stations hold it under {@code name}. */

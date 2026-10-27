@@ -78,6 +78,12 @@
   "commands.railworks.car.span_taken": "Another Train already holds that Span",
   "commands.railworks.car.blocked_car": "A block is in the car's way",
   "commands.railworks.car.not_set": "The car could not be set there",
+  "commands.railworks.hatch.provider": "The provider hatch at %s holds %s more stacks of %s",
+  "commands.railworks.hatch.requester": "The requester hatch at %s asks for %s stacks of %s",
+  "commands.railworks.hatch.not_a_hatch": "No hatch stands at %s",
+  "commands.railworks.hatch.wrong_mode": "The hatch at %s is the other kind",
+  "commands.railworks.automatic": "The Train is automatic",
+  "commands.railworks.automatic.not_a_locomotive": "That is no Locomotive on the Rail",
   "railworks.gallery.pack": "Railworks Gallery",
   "railworks.gallery.pack.description": "A scene of each of Railworks' features",
   "railworks.gallery.pylons": "Pylons and Rail",
@@ -103,5 +109,13 @@
   "railworks.gallery.stations": "Stations",
   "railworks.gallery.stations.1": "Each serves the",
   "railworks.gallery.stations.2": "Trains with it",
-  "railworks.gallery.stations.3": "on their side"
+  "railworks.gallery.stations.3": "on their side",
+  "railworks.gallery.logistics": "Logistics",
+  "railworks.gallery.logistics.1": "An automatic",
+  "railworks.gallery.logistics.2": "Train fetches",
+  "railworks.gallery.logistics.3": "what is asked",
+  "railworks.gallery.two_loads": "A Load a Car",
+  "railworks.gallery.two_loads.1": "Each car takes",
+  "railworks.gallery.two_loads.2": "what the hatch",
+  "railworks.gallery.two_loads.3": "at its spot asks"
 }
