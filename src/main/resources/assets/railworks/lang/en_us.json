@@ -82,6 +82,8 @@
   "commands.railworks.hatch.requester": "The requester hatch at %s asks for %s stacks of %s",
   "commands.railworks.hatch.not_a_hatch": "No hatch stands at %s",
   "commands.railworks.hatch.wrong_mode": "The hatch at %s is the other kind",
+  "commands.railworks.hatch.no_room": "The hatch at %s has no room for that many",
+  "commands.railworks.hatch.too_many_stacks": "A requester asks for %s stacks at most",
   "commands.railworks.automatic": "The Train is automatic",
   "commands.railworks.automatic.not_a_locomotive": "That is no Locomotive on the Rail",
   "railworks.gallery.pack": "Railworks Gallery",

@@ -19,6 +19,7 @@ import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.transfer.item.ItemResource;
@@ -38,9 +39,10 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  *       a player's hand would: coupled into a Train at rest when that is where it lands beside one
  *       of the Train's ends, and refused where the item would be.</li>
  *   <li>{@code /railworks hatch <pos> provider <item> <stacks>} puts {@code stacks} full stacks of
- *       {@code item} in the provider hatch at {@code pos}, as many as it has room for; with
+ *       {@code item} in the provider hatch at {@code pos}, refused without room for them all; with
  *       {@code requester}, has the requester hatch there ask for that many, a stack at a time as a
- *       player's uses of the item do. A hatch set by a command a moment before counts.</li>
+ *       player's uses of the item do, refused past its slots. A hatch set by a command a moment
+ *       before counts.</li>
  *   <li>{@code /railworks automatic <locomotive>} switches the Locomotive's Train to automatic, as
  *       its menu's toggle does, so it takes jobs between hatches (ADR 0008).</li>
  * </ul>
@@ -66,6 +68,10 @@ public final class RailworksCommands {
             new DynamicCommandExceptionType(pos -> Component.translatable("commands.railworks.hatch.not_a_hatch", pos));
     private static final DynamicCommandExceptionType WRONG_MODE =
             new DynamicCommandExceptionType(pos -> Component.translatable("commands.railworks.hatch.wrong_mode", pos));
+    private static final DynamicCommandExceptionType NO_ROOM =
+            new DynamicCommandExceptionType(pos -> Component.translatable("commands.railworks.hatch.no_room", pos));
+    private static final DynamicCommandExceptionType TOO_MANY_STACKS =
+            new DynamicCommandExceptionType(slots -> Component.translatable("commands.railworks.hatch.too_many_stacks", slots));
     private static final SimpleCommandExceptionType NOT_A_LOCOMOTIVE =
             new SimpleCommandExceptionType(Component.translatable("commands.railworks.automatic.not_a_locomotive"));
 
@@ -160,23 +166,41 @@ public final class RailworksCommands {
         }
         ItemResource resource = ItemResource.of(ItemArgument.getItem(context, "item").item());
         int stacks = IntegerArgumentType.getInteger(context, "stacks");
-        int readied = 0;
+        int readied;
         if (mode == HatchMode.PROVIDER) {
+            int amount = stacks * resource.getMaxStackSize();
             try (var transaction = Transaction.openRoot()) {
-                readied = hatch.contents().insert(resource, stacks * resource.getMaxStackSize(), transaction)
-                        / resource.getMaxStackSize();
+                if (hatch.contents().insert(resource, amount, transaction) < amount) {
+                    throw NO_ROOM.create(pos.toShortString());
+                }
                 transaction.commit();
             }
+            readied = stacks;
         } else {
-            hatch.clearRequest();
-            for (int stack = 0; stack < stacks; stack++) {
-                readied = hatch.ask(resource.value()).stacks();
+            readied = ask(hatch, resource.value(), stacks);
+            if (readied < stacks) {
+                throw TOO_MANY_STACKS.create(Hatches.slots());
             }
         }
         int told = readied;
         context.getSource().sendSuccess(() -> Component.translatable("commands.railworks.hatch." + mode.getSerializedName(),
                 pos.toShortString(), told, resource.getHoverName()), true);
         return readied;
+    }
+
+    /**
+     * Has the requester {@code hatch} ask for {@code stacks} of {@code item}, afresh, a stack at a time
+     * as a player's uses of the item do, so it asks for no more than it has slots.
+     *
+     * @return how many stacks it asks for
+     */
+    private static int ask(Hatches.Hatch hatch, Item item, int stacks) {
+        hatch.clearRequest();
+        int asked = 0;
+        for (int stack = 0; stack < stacks; stack++) {
+            asked = hatch.ask(item).stacks();
+        }
+        return asked;
     }
 
     private static int automatic(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {

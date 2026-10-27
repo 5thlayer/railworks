@@ -54,11 +54,10 @@ final class GalleryTests {
     private static final BlockPos QUARRY = new BlockPos(4, 2, -7);
     private static final BlockPos SMELTER = new BlockPos(24, 2, -5);
 
-    /** The logistics scenes' provider hatch and requesters' chests, from where each is run. */
+    /** The logistics scenes' first provider hatch, and the chests under the requesters beside their first and second car spots, from where each is run. */
     private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);
-    private static final BlockPos IRON_CHEST = new BlockPos(22, 0, -7);
-    private static final BlockPos COPPER_CHEST = new BlockPos(20, 0, -7);
-    private static final BlockPos GOLD_CHEST = new BlockPos(22, 0, -7);
+    private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(22, 0, -7);
+    private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
     /** The stacks the logistics scene's provider holds once built. */
     private static final int PROVIDED_STACKS = 8;
 
@@ -161,9 +160,9 @@ final class GalleryTests {
                             "building the logistics scene twice left its provider holding " + held + " ore, not " + PROVIDED_STACKS * 64);
                 })
                 .thenWaitUntil(() -> {
-                    holds(helper, at.offset(IRON_CHEST), Items.IRON_ORE);
-                    holds(helper, second.offset(COPPER_CHEST), Items.RAW_COPPER);
-                    holds(helper, second.offset(GOLD_CHEST), Items.RAW_GOLD);
+                    holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE);
+                    holds(helper, second.offset(SECOND_SPOT_CHEST), Items.RAW_COPPER);
+                    holds(helper, second.offset(FIRST_SPOT_CHEST), Items.RAW_GOLD);
                 })).thenSucceed();
     }
 
