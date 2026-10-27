@@ -75,6 +75,14 @@ public final class PylonColumn {
         return found;
     }
 
+    /**
+     * Whether a Pylon segment at {@code pos}, placed or about to be, goes on top of a column and raises
+     * its Arm: a segment below and none above. One with a segment above joins two columns instead.
+     */
+    public static boolean raisesArm(BlockGetter level, BlockPos pos) {
+        return isPylon(level, pos.below()) && !isPylon(level, pos.above());
+    }
+
     /** Whether a Pylon placed at {@code pos} starts a column of its own, with no segment above or below. */
     public static boolean startsColumn(BlockGetter level, BlockPos pos) {
         return !isPylon(level, pos.below()) && !isPylon(level, pos.above());

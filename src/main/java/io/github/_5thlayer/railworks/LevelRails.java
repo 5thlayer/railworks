@@ -322,7 +322,7 @@ public final class LevelRails extends SavedData {
         if (!PylonColumn.isPylon(level, below)) {
             return;
         }
-        if (PylonColumn.isPylon(level, pos.above())
+        if (!PylonColumn.raisesArm(level, pos)
                 || Stringing.raise(network, LevelClearance.blocks(level), PylonColumn.arm(below), PylonColumn.arm(pos)).isPresent()) {
             armLost(level, below);
             return;

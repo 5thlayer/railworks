@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -108,13 +109,14 @@ public final class Stringing {
     }
 
     /**
-     * Whether a new Span from {@code at} to {@code to} bends too sharply against any Span already at
-     * {@code at}. Any, since an Arm takes two Spans and so one line; a Junction's branch leaving beside
-     * its sibling would only need to run on from one of them, judged by the same {@link SpanRules#tooSharp}.
+     * Whether a Span from {@code at} to {@code to} bends too sharply against any other Span at
+     * {@code at}, the one to {@code to} itself left out where it is already strung. Any, since an Arm
+     * takes two Spans and so one line; a Junction's branch leaving beside its sibling would only need to
+     * run on from one of them, judged by the same {@link SpanRules#tooSharp}.
      */
     private static boolean bendsTooSharply(RailNetwork network, Arm at, Arm to) {
         for (Span span : network.spansAt(at)) {
-            if (SpanRules.tooSharp(span.otherEnd(at), at, to)) {
+            if (!span.otherEnd(at).equals(to) && SpanRules.tooSharp(span.otherEnd(at), at, to)) {
                 return true;
             }
         }
@@ -126,18 +128,23 @@ public final class Stringing {
      * a Span already at either Arm, along the curve it would take once the new one bends it there.
      */
     private static Optional<Clearance.Cell> blocked(RailNetwork network, Clearance.Blocks blocks, Arm anchor, Arm target) {
-        Optional<Clearance.Cell> own = Clearance.firstFilled(Clearance.along(RailCurve.between(network, anchor, target)), blocks);
-        if (own.isPresent()) {
-            return own;
-        }
+        List<RailCurve> curves = new ArrayList<>();
+        curves.add(RailCurve.between(network, anchor, target));
         Span added = Span.of(anchor, target, 0);
         for (Arm end : new Arm[] {anchor, target}) {
             for (Span span : network.spansAt(end)) {
-                RailCurve bent = RailCurve.strung(network, added, span.a(), span.b());
-                Optional<Clearance.Cell> filled = Clearance.firstFilled(Clearance.along(bent), blocks);
-                if (filled.isPresent()) {
-                    return filled;
-                }
+                curves.add(RailCurve.strung(network, added, span.a(), span.b()));
+            }
+        }
+        return firstFilled(curves, blocks);
+    }
+
+    /** The first block {@code blocks} says is filled in the Clearance along any of {@code curves}, in their order. */
+    private static Optional<Clearance.Cell> firstFilled(Iterable<RailCurve> curves, Clearance.Blocks blocks) {
+        for (RailCurve curve : curves) {
+            Optional<Clearance.Cell> filled = Clearance.firstFilled(Clearance.along(curve), blocks);
+            if (filled.isPresent()) {
+                return filled;
             }
         }
         return Optional.empty();
@@ -145,7 +152,8 @@ public final class Stringing {
 
     /**
      * What raising the Arm at {@code from} to {@code to}, a segment stacked on its column, would break,
-     * changing nothing: {@code TOO_STEEP} for a raised Span past the grade limit, {@code TOO_SHARP} for
+     * changing nothing: {@code TOO_LONG} for a raised Span past the length limit, {@code TOO_STEEP} for
+     * one past the grade limit, {@code TOO_SHARP} for
      * a bend past the limit through the raised Arm or at a raised Span's far Arm, or {@code BLOCKED},
      * with the block, for a block in the Clearance of a Span the raise bends, the new segment at
      * {@code to} counted as filled. Empty when every Span keeps the rules, as with no Spans at all.
@@ -154,48 +162,27 @@ public final class Stringing {
         if (network.spansAt(from).isEmpty()) {
             return Optional.empty();
         }
-        RailNetwork raised = new RailNetwork();
-        network.all().forEach(raised::add);
+        RailNetwork raised = network.copy();
         raised.rekey(from, to);
         List<Span> atTo = raised.spansAt(to);
         Set<Span> bent = new LinkedHashSet<>(atTo);
         for (Span span : atTo) {
             Arm other = span.otherEnd(to);
+            if (SpanRules.tooLong(to, other)) {
+                return Optional.of(new Outcome(Result.TOO_LONG, 0));
+            }
             if (SpanRules.tooSteep(to, other)) {
                 return Optional.of(new Outcome(Result.TOO_STEEP, 0));
             }
-            if (bendsPastTheLimit(raised, other, span)) {
+            // At the far Arm, against the Spans already there, and at the raised Arm, against each other.
+            if (bendsTooSharply(raised, other, to) || bendsTooSharply(raised, to, other)) {
                 return Optional.of(new Outcome(Result.TOO_SHARP, 0));
             }
             bent.addAll(raised.spansAt(other));
         }
-        if (bendsPastTheLimit(raised, to, null)) {
-            return Optional.of(new Outcome(Result.TOO_SHARP, 0));
-        }
         Clearance.Blocks withSegment = (x, y, z) -> (x == to.x() && y == to.y() && z == to.z()) || blocks.filled(x, y, z);
-        for (Span span : bent) {
-            Optional<Clearance.Cell> filled = Clearance.firstFilled(Clearance.along(raised.curve(span)), withSegment);
-            if (filled.isPresent()) {
-                return Optional.of(new Outcome(Result.BLOCKED, 0, filled.get()));
-            }
-        }
-        return Optional.empty();
-    }
-
-    /** Whether two of the Spans at {@code at} bend too sharply, or, given {@code through}, it and another of them. */
-    private static boolean bendsPastTheLimit(RailNetwork network, Arm at, @Nullable Span through) {
-        List<Span> spans = network.spansAt(at);
-        for (int i = 0; i < spans.size(); i++) {
-            for (int j = i + 1; j < spans.size(); j++) {
-                Span one = spans.get(i);
-                Span other = spans.get(j);
-                if ((through == null || one.equals(through) || other.equals(through))
-                        && SpanRules.tooSharp(one.otherEnd(at), at, other.otherEnd(at))) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return firstFilled(bent.stream().map(raised::curve).toList(), withSegment)
+                .map(cell -> new Outcome(Result.BLOCKED, 0, cell));
     }
 
     /** Whether {@code result} is a refusal: the click changes nothing and spends nothing. */

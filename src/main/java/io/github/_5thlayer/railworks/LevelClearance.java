@@ -34,8 +34,8 @@ import org.jspecify.annotations.Nullable;
  * placed by a player, an item or an Enderman is refused on both sides, the client from its own Spans,
  * so a refused block never shows for a moment; a piston's push, a fluid's block and a growing plant
  * are refused on the server. Left in: a falling block landing, a block a dispenser places (a shulker
- * box), and lava that turns as it arrives beside water, which no NeoForge event reports before the
- * block is set; a tree or a huge mushroom grown from a sapling, growth by bone meal, a melon or a
+ * box), lava that turns as it arrives beside water, and water freezing to ice or snow piling up
+ * under falling snow, which no NeoForge event reports before the block is set; a tree or a huge mushroom grown from a sapling, growth by bone meal, a melon or a
  * pumpkin set beside its stem and a chorus flower branching sideways, whose events come before the
  * blocks they will fill are chosen, so refusing them would be a guess; and a bamboo sapling's first
  * stalk, which fires none.
@@ -83,18 +83,19 @@ public final class LevelClearance {
     }
 
     /**
-     * What a Pylon segment at {@code pos}, on top of the Arm below it, would break, or empty: it would
-     * stand in the Clearance of another Arm's Span, or raise one of its own Arm's Spans past a rule
-     * ({@link Stringing#raise}). The segment need not be there yet; the Placement Preview asks before.
+     * Why a Pylon segment at {@code pos}, on top of the Arm below it, is refused, the action bar's line,
+     * or empty where it may go: it would stand in the Clearance of another Arm's Span, or raise one of
+     * its own Arm's Spans past a rule ({@link Stringing#raise}). The segment need not be there yet; the
+     * Placement Preview asks before.
      */
-    public static Optional<Stringing.Outcome> stacking(Level level, BlockPos pos) {
+    public static Optional<Component> stacking(Level level, BlockPos pos) {
         RailNetwork network = network(level);
         Arm from = PylonColumn.arm(pos.below());
         if (through(network, pos, from).isPresent()) {
-            return Optional.of(new Stringing.Outcome(Stringing.Result.BLOCKED, 0,
-                    new Clearance.Cell(pos.getX(), pos.getY(), pos.getZ())));
+            return Optional.of(Component.translatable("message.railworks.in_clearance"));
         }
-        return Stringing.raise(network, blocks(level), from, PylonColumn.arm(pos));
+        Arm to = PylonColumn.arm(pos);
+        return Stringing.raise(network, blocks(level), from, to).map(outcome -> SpanGesture.reason(outcome, from, to));
     }
 
     /** Whether {@code pos} is within reach of {@code span}'s Clearance at all: a cheap test before the sweep. */

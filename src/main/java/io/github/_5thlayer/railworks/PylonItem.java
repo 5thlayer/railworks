@@ -71,8 +71,7 @@ public final class PylonItem extends BlockItem implements PlansPlacement {
     /** Tells {@code player}, on the server, which rule a segment at {@code pos} would break, on the action bar. */
     static void tellWhy(Level level, @Nullable Player player, BlockPos pos) {
         if (player instanceof ServerPlayer serverPlayer) {
-            LevelClearance.stacking(level, pos).ifPresent(outcome -> serverPlayer.sendSystemMessage(
-                    SpanGesture.reason(outcome, PylonColumn.arm(pos.below()), PylonColumn.arm(pos)), true));
+            LevelClearance.stacking(level, pos).ifPresent(reason -> serverPlayer.sendSystemMessage(reason, true));
         }
     }
 
@@ -82,7 +81,6 @@ public final class PylonItem extends BlockItem implements PlansPlacement {
      * Spans instead, as breaking its Arm does, and is no raise.
      */
     private static boolean raisesPastARule(Level level, BlockPos pos) {
-        return PylonColumn.isArm(level, pos.below()) && !PylonColumn.isPylon(level, pos.above())
-                && LevelClearance.stacking(level, pos).isPresent();
+        return PylonColumn.raisesArm(level, pos) && LevelClearance.stacking(level, pos).isPresent();
     }
 }

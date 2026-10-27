@@ -10,8 +10,8 @@ public enum RailworksRefusal implements Refusal {
     /** A Pylon aimed at a column whose next segment's position is occupied or past the build limit. */
     BLOCKED_TOP,
     /**
-     * A Pylon segment stacked on an Arm that would raise one of its Spans past the grade or bend limit
-     * or into a block, or would stand in another Span's Clearance.
+     * A Pylon segment stacked on an Arm that would raise one of its Spans past the length, grade or
+     * bend limit or into a block, or would stand in another Span's Clearance.
      */
     RAISES_SPAN,
     /** A car aimed at no Span. */
