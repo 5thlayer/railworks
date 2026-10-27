@@ -52,7 +52,7 @@ final class AutoStringTests {
      * Runs a test with the length limit cut to {@code limit} and every Pylon the other tests left
      * standing within reach cleared: the tests share one world, a few blocks apart.
      */
-    private static Consumer<GameTestHelper> within(double limit, Consumer<GameTestHelper> body) {
+    static Consumer<GameTestHelper> within(double limit, Consumer<GameTestHelper> body) {
         return helper -> {
             SpanRules.configure(limit);
             try {
