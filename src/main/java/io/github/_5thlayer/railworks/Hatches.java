@@ -174,8 +174,9 @@ public final class Hatches {
                 return request().map(asked -> ItemResource.of(asked.item())).orElse(ItemResource.EMPTY);
             }
             for (int slot = 0; slot < contents.size(); slot++) {
-                if (!contents.getResource(slot).isEmpty()) {
-                    return contents.getResource(slot);
+                ItemResource resource = contents.getResource(slot);
+                if (!resource.isEmpty()) {
+                    return resource;
                 }
             }
             return ItemResource.EMPTY;

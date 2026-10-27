@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  * player, as by a command, puts itself there, holding nothing, as it loads, as its block's mode says.
  *
  * <p>Its watchers draw one item on its sides ({@link #shown}): a requester's request, or the first
- * stack a provider holds, which the server works out each tick and sends them as it changes.
+ * stack a provider holds. The server works it out each tick and sends it to the watchers as it changes.
  */
 public final class HatchBlockEntity extends BlockEntity {
 
@@ -96,6 +96,7 @@ public final class HatchBlockEntity extends BlockEntity {
         return output.buildResult();
     }
 
+    /** Sent as {@link #shown} changes, carrying {@link #getUpdateTag}. */
     @Override
     public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);

@@ -24,6 +24,7 @@ import io.github._5thlayer.railworks.rail.HatchRequest;
 import io.github._5thlayer.railworks.rail.Platform;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.NbtOps;
@@ -345,7 +346,7 @@ final class HatchTests {
 
     private static void command(GameTestHelper helper) {
         withStation(helper);
-        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+        setHatch(helper, FIRST, HatchMode.REQUESTER);
         BlockPos at = helper.absolutePos(FIRST);
         helper.startSequence()
                 .thenIdle(2)
@@ -366,7 +367,7 @@ final class HatchTests {
         insert(helper, FIRST, new ItemStack(Items.COAL, 3));
         BlockPos at = helper.absolutePos(FIRST);
         helper.getLevel().setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS);
-        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+        setHatch(helper, FIRST, HatchMode.REQUESTER);
         helper.startSequence()
                 .thenIdle(2)
                 .thenExecute(() -> {
@@ -503,7 +504,17 @@ final class HatchTests {
                 })
                 .thenIdle(1)
                 .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
+                // A named stack shows with its name: what it shows keeps the stack's components.
+                .thenExecute(() -> insert(helper, FIRST, named()))
+                .thenIdle(1)
+                .thenExecute(() -> expectShown(helper, FIRST, named()))
                 .thenSucceed();
+    }
+
+    private static ItemStack named() {
+        ItemStack stack = new ItemStack(Items.IRON_INGOT);
+        stack.set(DataComponents.CUSTOM_NAME, Component.literal("Ore"));
+        return stack;
     }
 
     /** A requester asking for iron and holding coal shows the coal once a provider, and nothing once a requester again, its request cleared. */
@@ -547,7 +558,7 @@ final class HatchTests {
         BlockPos at = helper.absolutePos(FIRST);
         helper.getLevel().setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS);
         insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));
-        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        setHatch(helper, FIRST, HatchMode.PROVIDER);
         helper.startSequence()
                 .thenIdle(1)
                 .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
@@ -556,7 +567,7 @@ final class HatchTests {
 
     /** Set by a command where no platform covers it, a provider shows its first stack all the same. */
     private static void showsUnjoined(GameTestHelper helper) {
-        helper.setBlock(FIRST, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        setHatch(helper, FIRST, HatchMode.PROVIDER);
         helper.startSequence()
                 .thenIdle(1)
                 .thenExecute(() -> {
@@ -624,6 +635,11 @@ final class HatchTests {
         if (!place(helper, player, pos).consumesAction() || !helper.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
             throw helper.assertionException(pos, Component.literal("a hatch beside a car spot was refused"));
         }
+    }
+
+    /** A hatch of {@code mode} set at {@code pos} as a command sets one, with no player, registering as it loads. */
+    private static void setHatch(GameTestHelper helper, BlockPos pos, HatchMode mode) {
+        helper.setBlock(pos, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, mode));
     }
 
     /** A click placing the held item at {@code pos}, standing in the air: the click lands in the block itself. */
