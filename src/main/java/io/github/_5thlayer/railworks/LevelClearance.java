@@ -35,10 +35,10 @@ import org.jspecify.annotations.Nullable;
  * so a refused block never shows for a moment; a piston's push, a fluid's block and a growing plant
  * are refused on the server. Left in: a falling block landing, a block a dispenser places (a shulker
  * box), lava that turns as it arrives beside water, and water freezing to ice or snow piling up
- * under falling snow, which no NeoForge event reports before the block is set; a tree or a huge mushroom grown from a sapling, growth by bone meal, a melon or a
- * pumpkin set beside its stem and a chorus flower branching sideways, whose events come before the
- * blocks they will fill are chosen, so refusing them would be a guess; and a bamboo sapling's first
- * stalk, which fires none.
+ * under falling snow, which no NeoForge event reports before the block is set; a tree or a huge
+ * mushroom grown from a sapling, growth by bone meal, a melon or a pumpkin set beside its stem and a
+ * chorus flower branching sideways, whose events come before the blocks they will fill are chosen,
+ * so refusing them would be a guess; and a bamboo sapling's first stalk, which fires none.
  */
 public final class LevelClearance {
 

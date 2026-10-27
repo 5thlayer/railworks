@@ -153,10 +153,10 @@ public final class Stringing {
     /**
      * What raising the Arm at {@code from} to {@code to}, a segment stacked on its column, would break,
      * changing nothing: {@code TOO_LONG} for a raised Span past the length limit, {@code TOO_STEEP} for
-     * one past the grade limit, {@code TOO_SHARP} for
-     * a bend past the limit through the raised Arm or at a raised Span's far Arm, or {@code BLOCKED},
-     * with the block, for a block in the Clearance of a Span the raise bends, the new segment at
-     * {@code to} counted as filled. Empty when every Span keeps the rules, as with no Spans at all.
+     * one past the grade limit, {@code TOO_SHARP} for a bend past the limit at a raised Span's far Arm
+     * or through the raised Arm, or {@code BLOCKED}, with the block, for a block in the Clearance of a
+     * Span the raise bends, the new segment at {@code to} counted as filled. Empty when every Span
+     * keeps the rules, as with no Spans at all.
      */
     public static Optional<Outcome> raise(RailNetwork network, Clearance.Blocks blocks, Arm from, Arm to) {
         if (network.spansAt(from).isEmpty()) {
@@ -174,11 +174,17 @@ public final class Stringing {
             if (SpanRules.tooSteep(to, other)) {
                 return Optional.of(new Outcome(Result.TOO_STEEP, 0));
             }
-            // At the far Arm, against the Spans already there, and at the raised Arm, against each other.
-            if (bendsTooSharply(raised, other, to) || bendsTooSharply(raised, to, other)) {
+            // At the far Arm, against the Spans already there.
+            if (bendsTooSharply(raised, other, to)) {
                 return Optional.of(new Outcome(Result.TOO_SHARP, 0));
             }
             bent.addAll(raised.spansAt(other));
+        }
+        // At the raised Arm, the raised Spans against each other.
+        for (Span span : atTo) {
+            if (bendsTooSharply(raised, to, span.otherEnd(to))) {
+                return Optional.of(new Outcome(Result.TOO_SHARP, 0));
+            }
         }
         Clearance.Blocks withSegment = (x, y, z) -> (x == to.x() && y == to.y() && z == to.z()) || blocks.filled(x, y, z);
         return firstFilled(bent.stream().map(raised::curve).toList(), withSegment)
