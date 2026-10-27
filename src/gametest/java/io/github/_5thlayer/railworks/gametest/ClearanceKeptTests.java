@@ -35,8 +35,9 @@ import net.minecraft.world.phys.Vec3;
  * A strung Span's Clearance kept clear past a player's placed block: a Pylon segment stacked on an
  * Arm is refused where it would raise a Span past the grade limit or into a block, or stand in
  * another Span's Clearance, and one set there anyway cuts the Arm's Spans; a piston pushes no block
- * into a Clearance, nor its head; water reaching lava makes no block in one; and a cactus grows no
- * higher than one. All of these tests share the {@code clearance_kept_} prefix.
+ * into a Clearance, nor its head; water reaching lava makes no block in one; and a cactus or bamboo
+ * grows no higher than one. The length and bend limits on a raise are {@code StringingTest}'s, as the
+ * grade limit's numbers are. All of these tests share the {@code clearance_kept_} prefix.
  */
 final class ClearanceKeptTests {
 
@@ -63,6 +64,7 @@ final class ClearanceKeptTests {
         tests.test("clearance_kept_a_pistons_head_stays_out_of_a_span", 20, ClearanceKeptTests::pistonHead);
         tests.test("clearance_kept_water_meeting_lava_makes_no_block_in_a_span", 20, ClearanceKeptTests::waterMeetsLava);
         tests.test("clearance_kept_a_cactus_grows_no_higher_than_a_span", 20, ClearanceKeptTests::cactus);
+        tests.test("clearance_kept_bamboo_grows_no_higher_than_a_span", 20, ClearanceKeptTests::bamboo);
     }
 
     private static void raisedIntoABlock(GameTestHelper helper) {
@@ -257,6 +259,28 @@ final class ClearanceKeptTests {
      * A's own column, as an absolute position: worked out from the Clearance itself, so the test holds
      * whatever the car's height.
      */
+    private static void bamboo(GameTestHelper helper) {
+        string(helper, A, B);
+        BlockPos under = new BlockPos(5, 1, 3);
+        BlockPos beside = new BlockPos(5, 1, 6);
+        for (BlockPos pos : new BlockPos[] {under, beside}) {
+            helper.setBlock(pos.below(), Blocks.SAND);
+            helper.setBlock(pos, Blocks.BAMBOO);
+            BlockPos absolute = helper.absolutePos(pos);
+            // A stalk grows on a third of its random ticks, and only once while the block above it is filled.
+            for (int i = 0; i < 60; i++) {
+                helper.getBlockState(pos).randomTick(helper.getLevel(), absolute, helper.getLevel().getRandom());
+            }
+        }
+        if (!helper.getBlockState(under.above()).isAir()) {
+            helper.fail("bamboo grew into the Span's Clearance", under.above());
+        }
+        if (!helper.getBlockState(beside.above()).is(Blocks.BAMBOO)) {
+            helper.fail("bamboo clear of the Span did not grow", beside.above());
+        }
+        succeed(helper);
+    }
+
     private static BlockPos raisedOnly(GameTestHelper helper) {
         Arm a = PylonColumn.arm(helper.absolutePos(A));
         Arm b = PylonColumn.arm(helper.absolutePos(B));

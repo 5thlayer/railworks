@@ -34,6 +34,13 @@ public final class RailNetwork {
     /** Each Span's curve, asked for again every tick and frame; any change to the Spans clears it, since one bends its neighbours'. */
     private final Map<List<Arm>, RailCurve> curves = new HashMap<>();
 
+    /** A network of the same Spans, to change without changing this one. */
+    public RailNetwork copy() {
+        RailNetwork copy = new RailNetwork();
+        spans.values().forEach(copy::add);
+        return copy;
+    }
+
     /** Adds a Span; a pair already strung keeps the Span it has. */
     public void add(Span span) {
         if (spans.putIfAbsent(key(span.a(), span.b()), span) == null) {

@@ -367,4 +367,12 @@ class StringingTest {
         assertEquals(Stringing.Result.BLOCKED, broken.result());
         assertTrue(broken.blocked().y() >= 9);
     }
+
+    @Test
+    void raisingAnArmRefusesASpanItWouldStretchPastTheLengthLimit() {
+        Arm atTheLimit = new Arm(limit(), 5, 0);
+        Stringing.click(network, OPEN, A, atTheLimit, 1000);
+        assertEquals(Stringing.Result.TOO_LONG, Stringing.raise(network, OPEN, A, new Arm(0, 6, 0)).orElseThrow().result());
+        assertTrue(network.contains(A, atTheLimit), "asking changes nothing");
+    }
 }
