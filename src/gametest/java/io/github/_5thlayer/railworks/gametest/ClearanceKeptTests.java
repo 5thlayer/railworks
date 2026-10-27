@@ -254,6 +254,7 @@ final class ClearanceKeptTests {
         succeed(helper);
     }
 
+    /** A bamboo stalk under the Rail stays one block high, and one beside it grows. */
     private static void bamboo(GameTestHelper helper) {
         string(helper, A, B);
         BlockPos under = new BlockPos(5, 1, 3);
