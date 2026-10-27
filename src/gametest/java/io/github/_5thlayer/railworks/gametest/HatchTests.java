@@ -5,7 +5,6 @@ package io.github._5thlayer.railworks.gametest;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
@@ -33,6 +32,7 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -47,6 +47,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.HopperBlock;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
+import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -92,7 +93,7 @@ final class HatchTests {
         tests.test("logistics_hatch_requester_asks_for_a_stack_more_and_an_empty_hand_clears_it", 20, HatchTests::requests);
         tests.test("logistics_hatch_provider_gives_an_empty_hand_its_first_stack", 20, HatchTests::gives);
         tests.test("logistics_hatch_saves_its_mode_request_and_contents", 20, HatchTests::saves);
-        tests.test("logistics_hatch_a_hopper_fills_and_empties_it", 100, HatchTests::hoppers);
+        tests.test("logistics_hatch_a_hopper_fills_and_empties_it_and_what_it_shows_follows", 100, HatchTests::hoppers);
         tests.test("logistics_hatch_leaves_and_rejoins_its_station_as_the_platform_goes_and_comes", 20, HatchTests::rejoins);
         tests.test("logistics_hatch_placed_by_a_command_registers_as_it_loads", 20, HatchTests::command);
         tests.test("logistics_hatch_set_over_a_stale_record_of_the_other_mode_drops_it", 20, HatchTests::staleRecord);
@@ -283,7 +284,7 @@ final class HatchTests {
         helper.succeed();
     }
 
-    /** A hopper over the hatch fills it, and one under it empties it, through the block. */
+    /** A hopper over the hatch fills it, and one under it empties it, through the block, what it shows following. */
     private static void hoppers(GameTestHelper helper) {
         ServerPlayer player = withStation(helper);
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
@@ -302,6 +303,7 @@ final class HatchTests {
                         helper.fail("the hopper over the hatch has not filled it yet", FIRST);
                     }
                 })
+                .thenWaitUntil(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
                 .thenExecute(() -> helper.getLevel().setBlockAndUpdate(under, Blocks.HOPPER.defaultBlockState()))
                 .thenWaitUntil(() -> {
                     var hopper = (HopperBlockEntity) helper.getLevel().getBlockEntity(under);
@@ -313,6 +315,7 @@ final class HatchTests {
                         helper.fail("the hopper under the hatch has pulled " + pulled + " so far", FIRST);
                     }
                 })
+                .thenWaitUntil(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
                 .thenSucceed();
     }
 
@@ -583,8 +586,11 @@ final class HatchTests {
                 .thenExecute(() -> {
                     var entity = helper.getBlockEntity(FIRST, HatchBlockEntity.class);
                     var tag = entity.getUpdateTag(registries);
-                    if (!tag.keySet().equals(Set.of("shown"))) {
-                        helper.fail("a hatch's update tag holds " + tag.keySet() + ", not the item it shows alone", FIRST);
+                    var watcher = new HatchBlockEntity(entity.getBlockPos(), entity.getBlockState());
+                    watcher.handleUpdateTag(TagValueInput.create(ProblemReporter.DISCARDING, registries, tag));
+                    if (tag.size() != 1 || !ItemStack.matches(watcher.shown(), new ItemStack(Items.IRON_INGOT))) {
+                        helper.fail("a hatch's update tag holds " + tag.keySet() + ", and a watcher reading it shows "
+                                + watcher.shown() + ", not the iron alone", FIRST);
                     }
                     ItemStack shown = entity.shown();
                     insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));

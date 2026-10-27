@@ -79,24 +79,11 @@ public final class HatchBlockEntity extends BlockEntity {
      * a change made while its chunk was unloaded once the chunk loads again.
      */
     void serverTick(ServerLevel level) {
-        ItemStack now = hatch().map(HatchBlockEntity::toShow).orElse(ItemStack.EMPTY);
-        if (!ItemStack.matches(now, shown)) {
-            shown = now;
+        ItemResource now = hatch().map(Hatches.Hatch::shown).orElse(ItemResource.EMPTY);
+        if (!now.matches(shown)) {
+            shown = now.toStack();
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
-    }
-
-    private static ItemStack toShow(Hatches.Hatch hatch) {
-        if (hatch.mode() == HatchMode.REQUESTER) {
-            return hatch.request().map(asked -> new ItemStack(asked.item())).orElse(ItemStack.EMPTY);
-        }
-        var contents = hatch.contents();
-        for (int slot = 0; slot < contents.size(); slot++) {
-            if (!contents.getResource(slot).isEmpty()) {
-                return contents.getResource(slot).toStack(1);
-            }
-        }
-        return ItemStack.EMPTY;
     }
 
     /** Only what its watchers draw, the item on its sides, never saved, which it works out again each tick. */
