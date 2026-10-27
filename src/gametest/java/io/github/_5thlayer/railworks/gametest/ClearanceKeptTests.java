@@ -254,11 +254,6 @@ final class ClearanceKeptTests {
         succeed(helper);
     }
 
-    /**
-     * A block a car on the Span would pass through once A is raised a segment, and not before, clear of
-     * A's own column, as an absolute position: worked out from the Clearance itself, so the test holds
-     * whatever the car's height.
-     */
     private static void bamboo(GameTestHelper helper) {
         string(helper, A, B);
         BlockPos under = new BlockPos(5, 1, 3);
@@ -281,6 +276,11 @@ final class ClearanceKeptTests {
         succeed(helper);
     }
 
+    /**
+     * A block a car on the Span would pass through once A is raised a segment, and not before, clear of
+     * A's own column, as an absolute position: worked out from the Clearance itself, so the test holds
+     * whatever the car's height.
+     */
     private static BlockPos raisedOnly(GameTestHelper helper) {
         Arm a = PylonColumn.arm(helper.absolutePos(A));
         Arm b = PylonColumn.arm(helper.absolutePos(B));
