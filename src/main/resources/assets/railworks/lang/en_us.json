@@ -120,5 +120,9 @@
   "railworks.gallery.two_loads": "A Load a Car",
   "railworks.gallery.two_loads.1": "Each car takes",
   "railworks.gallery.two_loads.2": "what the hatch",
-  "railworks.gallery.two_loads.3": "at its spot asks"
+  "railworks.gallery.two_loads.3": "at its spot asks",
+  "railworks.gallery.flyover": "Flyover",
+  "railworks.gallery.flyover.1": "Lines cross at",
+  "railworks.gallery.flyover.2": "any height and",
+  "railworks.gallery.flyover.3": "need not join"
 }
