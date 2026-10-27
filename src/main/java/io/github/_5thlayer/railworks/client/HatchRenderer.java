@@ -32,6 +32,11 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     private static final float OFF_FACE = 1 / 16F;
     /** Its size, against an item's own: an item frame's. */
     private static final float SCALE = 0.5F;
+    /**
+     * How far past a side the item can reach: a block item, a block model's half size again at
+     * {@link #SCALE}, is a quarter of a block deep, its middle {@link #OFF_FACE} out, so it reaches 3/16.
+     */
+    private static final double REACH = 0.25;
 
     @Override
     public RenderState createRenderState() {
@@ -73,15 +78,15 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         }
     }
 
-    /** The block and the items standing off its sides, so none is culled while it is still in view. */
+    /** The block and as far past its sides as an item can reach, so none is culled while it is still in view. */
     @Override
     public AABB getRenderBoundingBox(HatchBlockEntity hatch) {
-        return new AABB(hatch.getBlockPos()).inflate(OFF_FACE, 0, OFF_FACE);
+        return new AABB(hatch.getBlockPos()).inflate(REACH, 0, REACH);
     }
 
     static final class RenderState extends BlockEntityRenderState {
         private @Nullable ItemStackRenderState item;
         /** Each side's light, by its {@link Direction#get2DDataValue()}. */
-        private final int[] light = new int[4];
+        private final int[] light = new int[Direction.Plane.HORIZONTAL.length()];
     }
 }

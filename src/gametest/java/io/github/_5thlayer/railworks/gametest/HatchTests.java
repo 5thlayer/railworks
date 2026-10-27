@@ -504,10 +504,32 @@ final class HatchTests {
                 })
                 .thenIdle(1)
                 .thenExecute(() -> expectShown(helper, FIRST, ItemStack.EMPTY))
-                // A named stack shows with its name: what it shows keeps the stack's components.
-                .thenExecute(() -> insert(helper, FIRST, named()))
+                // Plain iron first, named iron after it: once the plain is taken, the named shows, with its
+                // name, though the item is the same, and a watcher reading the update tag sees the name too.
+                .thenExecute(() -> {
+                    insert(helper, FIRST, new ItemStack(Items.IRON_INGOT));
+                    insert(helper, FIRST, named());
+                })
                 .thenIdle(1)
-                .thenExecute(() -> expectShown(helper, FIRST, named()))
+                .thenExecute(() -> expectShown(helper, FIRST, new ItemStack(Items.IRON_INGOT)))
+                .thenExecute(() -> {
+                    try (var transaction = Transaction.openRoot()) {
+                        record(helper, FIRST).contents().extract(ItemResource.of(Items.IRON_INGOT), 1, transaction);
+                        transaction.commit();
+                    }
+                })
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    expectShown(helper, FIRST, named());
+                    var entity = helper.getBlockEntity(FIRST, HatchBlockEntity.class);
+                    var registries = helper.getLevel().registryAccess();
+                    var watcher = new HatchBlockEntity(entity.getBlockPos(), entity.getBlockState());
+                    watcher.handleUpdateTag(TagValueInput.create(ProblemReporter.DISCARDING, registries,
+                            entity.getUpdateTag(registries)));
+                    if (!ItemStack.matches(watcher.shown(), named())) {
+                        helper.fail("a watcher reading the update tag shows " + watcher.shown() + ", not the named iron", FIRST);
+                    }
+                })
                 .thenSucceed();
     }
 
