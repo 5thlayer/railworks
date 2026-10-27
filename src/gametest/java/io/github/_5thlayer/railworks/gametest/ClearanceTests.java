@@ -38,7 +38,8 @@ final class ClearanceTests {
     static void register(RailworksGameTests.Registrar tests) {
         tests.test("clearance_a_span_through_a_block_is_refused_and_spends_nothing", 20, ClearanceTests::spanRefused);
         tests.test("clearance_blocks_beside_and_under_the_rail_leave_it_clear", 20, ClearanceTests::besideAndUnder);
-        tests.testOnItsOwn("clearance_a_placed_pylon_strings_no_span_through_a_block", 20, ClearanceTests::placedPylonRefused);
+        tests.testOnItsOwn("clearance_a_placed_pylon_strings_no_span_through_a_block", 20,
+                AutoStringTests.within(9.0, ClearanceTests::placedPylonRefused));
         tests.test("clearance_a_block_placed_into_a_spans_clearance_is_refused", 20, ClearanceTests::blockRefused);
         tests.test("clearance_a_block_placed_beside_a_span_stays", 20, ClearanceTests::blockBesideStays);
         tests.test("clearance_a_pylon_stacked_on_an_arm_is_not_in_the_way", 20, ClearanceTests::stackingAllowed);
