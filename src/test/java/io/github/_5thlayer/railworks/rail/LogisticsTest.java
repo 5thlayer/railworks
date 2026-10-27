@@ -571,6 +571,21 @@ class LogisticsTest {
     }
 
     @Test
+    void aTrainCoupledToReleasesItsClaims() {
+        loop();
+        provider(NORTH, 0, "iron", 640);
+        requester(SOUTH, 0, "iron", 3);
+        Train one = onLoop(LOOP[2], LOOP[3], 4.0);
+        Train other = onLoop(LOOP[6], LOOP[7], 4.0);
+        runUntil(() -> kind(one) == Logistics.Kind.LOADING && goods.held(cargo(one, 1), "iron") > 0, "loading");
+        Place behind = one.slot(network, Train.End.BACK, CargoCar.LENGTH);
+        if (trains.couple(network, new Trains.Slot(one, Train.End.BACK, behind), CargoCar.create(), false) == null) {
+            throw new AssertionError("could not couple a car to " + one);
+        }
+        runUntil(() -> kind(other) == Logistics.Kind.TO_LOAD, "sent the other Train for the released request");
+    }
+
+    @Test
     void aTrainGoneFromTheRailReleasesItsClaims() {
         loop();
         provider(NORTH, 0, "iron", 640);
@@ -752,6 +767,31 @@ class LogisticsTest {
         network.remove(B, C);
         runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "gave the delivery up");
         assertEquals(40, goods.held(cargo(train, 1), "iron"));
+    }
+
+    @Test
+    void aJobCutOffFromItsRequesterIsGivenUpAndWhatItCarriesALeftover() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        requester(DEPOT, 0, "iron", 1);
+        Train train = eastbound(5.0, 1);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        network.remove(B, C);
+        runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "gave the job up");
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+    }
+
+    @Test
+    void twoLoadsToOneRequesterTakeNoMoreBetweenThemThanItNowWants() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        provider(QUARRY, 0, "iron", 64);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
+        Train train = eastbound(5.0, 1);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
+        ask(depot, "iron", 1);
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
     }
 
     @Test
