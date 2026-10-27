@@ -424,8 +424,13 @@ public final class Logistics<I> {
     private static <I> long wanted(Load<I> load, List<Hatch<I>> hatches, Goods<I> goods) {
         return asItStands(load.requester, hatches).flatMap(Hatch::request)
                 .filter(request -> request.item().equals(load.item))
-                .map(request -> (long) request.stacks() * goods.stackSize(load.item) - goods.held(load.requester, load.item))
+                .map(request -> shortOf(load.requester, request, goods))
                 .orElse(0L);
+    }
+
+    /** How far short of {@code request} {@code requester} is: what it asks for less what it holds of it. */
+    private static <I> long shortOf(Hatch<I> requester, HatchRequest<I> request, Goods<I> goods) {
+        return (long) request.stacks() * goods.stackSize(request.item()) - goods.held(requester, request.item());
     }
 
     /**
@@ -713,7 +718,7 @@ public final class Logistics<I> {
                 onItsWay += load.amount - load.unloaded;
             }
         }
-        return (long) request.stacks() * goods.stackSize(item) - goods.held(requester, item) - onItsWay;
+        return shortOf(requester, request, goods) - onItsWay;
     }
 
     /** What {@code provider} holds of {@code item} that no load has claimed and still to take. */
