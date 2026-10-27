@@ -15,7 +15,7 @@ public final class SpanRules {
     /** The longest Span, in blocks, unless {@code railworks-server.toml} says otherwise: a Transmission Pole's reach in Wireworks. */
     public static final double DEFAULT_LENGTH_LIMIT = 32.0;
 
-    /** How many Spans an Arm takes until Junctions arrive: every Line is a simple chain. */
+    /** How many Spans an Arm takes: there are no Junctions (ADR 0003), so every Line is a chain or a loop. */
     public static final int SPANS_PER_ARM = 2;
 
     /**

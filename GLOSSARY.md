@@ -27,11 +27,11 @@ The beam a Train rides on top of, straddling it, strung Span by Span over Pylons
 _Avoid_: track, monorail, girder, beam
 
 **Pylon**:
-The column that holds the Rail up, stacked segment by segment to the height the player chooses. Its top segment carries one Arm, or, on a T Pylon, a cross-head with two.
+The column that holds the Rail up, stacked segment by segment to the height the player chooses. Its top segment carries one Arm.
 _Avoid_: pillar, support, pole (Wireworks'), post, Γ Pylon (when the Arm stuck out sideways)
 
 **Arm**:
-The top of a Pylon, where the Rail rests and its Spans meet. A T Pylon's two carry two lines side by side that never join.
+The top of a Pylon, where the Rail rests and its Spans meet. It takes two Spans at most, so a Line never branches.
 _Avoid_: bracket, node, attachment point
 
 **Span**:
@@ -41,10 +41,6 @@ _Avoid_: segment (a Pylon's), section, block (Factorio's rail block), link
 **Line**:
 Spans joined Arm to Arm that a Train can run along without leaving the Rail. A line's end is an Arm with one Span.
 _Avoid_: route, track
-
-**Junction**:
-An Arm with three or more Spans. Any two of them that bend gently enough are a way through it; nothing is switched.
-_Avoid_: switch, points, fork
 
 **Clearance**:
 The space above a Span, and down both sides of the Rail, that a car straddling it passes through, which no block may fill.
