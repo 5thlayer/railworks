@@ -81,11 +81,11 @@ The side of the Rail a Station stands on to serve a Train, seen the way the Trai
 _Avoid_: handedness, traffic side
 
 **Platform**:
-The Straight leg behind a Station, up to four cars long, where a Train stopped there stands; no two Stations' platforms overlap.
+The Straight leg behind a Station where a Train stopped there stands: its leading car's place at the Station, and up to four car spots behind it; no two Stations' platforms overlap.
 _Avoid_: siding, bay, loading area
 
 **Car spot**:
-The two blocks of a platform a stopped car stands over, counted back from the Station, the first its leading car's.
+The two blocks of a platform where a stopped car behind the leading car stands, counted back from the leading car; the first is the place of the car coupled to it. The leading car, usually a Locomotive, has no car spot, so no hatch stands beside it.
 _Avoid_: slot (an inventory's), position, bay
 
 **Automatic**:

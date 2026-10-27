@@ -59,7 +59,7 @@ public final class StationBlock extends Block implements EntityBlock {
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         BlockPos pos = context.getClickedPos();
-        return serving(StationItem.networkOf(context.getLevel()), pos)
+        return serving(PlatformsNear.network(context.getLevel()), pos)
                 .map(way -> defaultBlockState().setValue(FACING, way))
                 .orElse(defaultBlockState());
     }

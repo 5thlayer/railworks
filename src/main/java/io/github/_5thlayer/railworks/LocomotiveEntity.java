@@ -95,6 +95,11 @@ public final class LocomotiveEntity extends CarEntity {
 
     // ---- the drive ----
 
+    /** Whether a player sits in it to drive it, pressing a key or not. */
+    boolean driven() {
+        return getFirstPassenger() instanceof Player;
+    }
+
     /** Its driver's keys: forward or back the way this car faces. */
     Throttle throttle() {
         if (getFirstPassenger() instanceof ServerPlayer driver) {

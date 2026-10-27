@@ -1,0 +1,38 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:alternatives",
+          "children": [
+            {
+              "type": "minecraft:item",
+              "name": "railworks:requester_hatch",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "railworks:hatch",
+                  "properties": {
+                    "mode": "requester"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "railworks:hatch"
+            }
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "railworks:blocks/hatch"
+}

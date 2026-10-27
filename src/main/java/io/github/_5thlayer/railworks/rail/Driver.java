@@ -9,8 +9,8 @@ import java.util.function.ToLongFunction;
 /**
  * Drives a Train to one Station and stops it there, as an automatic Train is taken to its job's
  * Stations (ADR 0008): it runs on, brakes in time and stops with its leading car, its
- * first car the way it runs, within {@link #ARRIVE} of the Station's {@link Platform#leadMark}, the
- * middle of its first car spot, well within the Station's {@link Station#STRETCH}.
+ * first car the way it runs, within {@link #ARRIVE} of the Station's {@link Platform#leadMark}, where
+ * the leading car's middle stands, well within the Station's {@link Station#STRETCH}.
  *
  * <p>With no Junctions a Train reaches a Station only along its own Line, either way: round a
  * closed loop, or back the way it came when it carries a Locomotive facing that way, and only

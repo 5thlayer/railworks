@@ -3,21 +3,14 @@
 
 package io.github._5thlayer.railworks;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
-import io.github._5thlayer.railworks.client.ClientRails;
-import io.github._5thlayer.railworks.rail.Platform;
-import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
@@ -40,40 +33,10 @@ public final class StationItem extends BlockItem implements PlansPlacement {
         super(block, properties);
     }
 
-    static RailNetwork networkOf(Level level) {
-        return level instanceof ServerLevel server ? LevelRails.of(server).network() : ClientRails.network();
-    }
-
-    /**
-     * The Stations whose platform a Station at {@code pos} could overlap: the level's, on a server,
-     * and on a client the Station blocks in the chunks loaded within a platform's reach.
-     */
-    private static Iterable<Station> stationsNear(Level level, BlockPos pos) {
-        if (level instanceof ServerLevel server) {
-            return LevelStations.of(server).stations().all();
-        }
-        // Two platforms overlap from as far apart as both their lengths, each Station a block or two off the Rail.
-        int reach = (int) Math.ceil(2 * Platform.MAX_CARS * Platform.SPOT) + 3;
-        List<Station> near = new ArrayList<>();
-        for (int cx = SectionPos.blockToSectionCoord(pos.getX() - reach); cx <= SectionPos.blockToSectionCoord(pos.getX() + reach); cx++) {
-            for (int cz = SectionPos.blockToSectionCoord(pos.getZ() - reach); cz <= SectionPos.blockToSectionCoord(pos.getZ() + reach); cz++) {
-                var chunk = level.getChunkSource().getChunkNow(cx, cz);
-                if (chunk != null) {
-                    chunk.getBlockEntities().values().forEach(entity -> {
-                        if (entity instanceof StationBlockEntity station) {
-                            near.add(station.station());
-                        }
-                    });
-                }
-            }
-        }
-        return near;
-    }
-
     private static Optional<StationPlacement.Refused> refusal(BlockPlaceContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
-        return StationPlacement.refusal(networkOf(level), stationsNear(level, pos), pos);
+        return StationPlacement.refusal(PlatformsNear.network(level), PlatformsNear.stations(level, pos), pos);
     }
 
     @Override

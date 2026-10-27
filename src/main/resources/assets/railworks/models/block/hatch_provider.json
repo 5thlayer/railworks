@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "railworks:block/hatch_casing",
+    "down": "railworks:block/hatch_casing",
+    "up": "railworks:block/hatch_casing",
+    "north": "railworks:block/hatch_provider",
+    "east": "railworks:block/hatch_provider",
+    "south": "railworks:block/hatch_provider",
+    "west": "railworks:block/hatch_provider"
+  }
+}

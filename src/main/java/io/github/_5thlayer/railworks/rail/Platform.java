@@ -11,10 +11,12 @@ import java.util.OptionalInt;
 /**
  * A Station's platform (ADR 0008): the Straight leg behind it on its serving way, where a Train
  * stopped there stands. A Train stops with its leading car at the Station, the car's front at the
- * Station block's front edge, and its cars stand back along the platform at car spots
- * {@link #SPOT} blocks apart, the first its leading car's. The platform runs back up to
+ * Station block's front edge, and the cars behind it stand back along the platform at car spots
+ * {@link #SPOT} blocks apart, the first the place of the car coupled behind the leading car. The leading car,
+ * usually a Locomotive, has no spot, so no hatch stands beside it. The platform runs back up to
  * {@link #cars()} spots, ending where the Straight leg ends, at a bend or a line's end, so no spot is
- * where a car stands on a bend.
+ * where a car stands on a bend. A Station at a line's end has its spots too: the leading car's front
+ * stands over the end Arm, half a block past it, as a car runs on until its middle meets the end.
  *
  * <p>Asked afresh of the network each time, as a Station's Span is, so a Span strung or cut later
  * lengthens or shortens it.
@@ -27,13 +29,44 @@ public final class Platform {
     public static final int MAX_CARS = 4;
     /** How long a car spot is along the Line, in blocks: a car's pitch, coupling to coupling. */
     public static final double SPOT = 2.0;
+    /** How far a block beside a platform's car spots may be from its Station along x, y or z, in blocks: the leading car and the spots, and a block or two across. */
+    public static final double REACH = (MAX_CARS + 1) * SPOT + 3.0;
+    /** How far the Station block's front edge is ahead of its centre along the Line, in blocks. */
+    private static final double FRONT = 0.5;
     /** Slack for the floating point, so pieces that only touch end to end do not overlap. */
     private static final double EPSILON = 1e-6;
 
     private static volatile int cars = MAX_CARS;
 
-    /** A car spot: its place in the platform, 0 the leading car's, and its middle, facing the serving way. */
+    /** A car spot: its place in the platform, 0 the one behind the leading car's, and its middle, facing the serving way. */
     public record CarSpot(int index, Place middle) {
+    }
+
+    /** A hatch's place: the Station whose platform it stands beside, and the car spot it is beside. */
+    public record Joined(Station station, int spot) {
+    }
+
+    /** A block beside a car spot, where a hatch may stand: the spot's index and the block's position. */
+    public record Beside(int spot, int x, int y, int z) {
+    }
+
+    /**
+     * The blocks beside one car spot on one side of the Rail, the two a hatch may stand in there,
+     * and whether the Line runs along x there, rather than z.
+     */
+    public record Side(List<Beside> blocks, boolean alongX) {
+
+        /** A side has at least one block, which says its spot. */
+        public Side {
+            if (blocks.isEmpty()) {
+                throw new IllegalArgumentException("a side with no blocks");
+            }
+        }
+
+        /** The car spot it is beside. */
+        public int spot() {
+            return blocks.getFirst().spot();
+        }
     }
 
     /** Some of one Span the platform covers, as how far along it from its first end, low to high. */
@@ -96,41 +129,51 @@ public final class Platform {
             return Optional.empty();
         }
         Place at = foot.get().facing(end.get());
-        // The Station block's front edge, half a block on from its centre.
-        Place.Moved front = at.move(network, 0.5);
-        Place leadMark = front.place().move(network, -SPOT / 2.0).place();
+        // The Station block's front edge, half a block on from its centre. Measured from the centre,
+        // since the edge may lie past a line's end: a car runs on until its middle meets the end, so
+        // the leading car stands there with its front over the end Arm.
+        Place.Moved front = at.move(network, FRONT);
+        Place leadMark = at.move(network, FRONT - SPOT / 2.0).place();
+        Place.Moved leadBack = at.move(network, FRONT - SPOT);
+        // The leading car's place, from its back edge forward, so it ends at a line's end ahead; or,
+        // with no room for it, the Station block's own length.
+        boolean leads = !leadBack.stopped() && StraightLeg.under(network, leadMark, SPOT);
+        List<Piece> covered = new ArrayList<>(leads ? cover(network, leadBack.place().turned(), SPOT)
+                : cover(network, front.place(), 1.0));
         List<CarSpot> spots = new ArrayList<>();
         List<List<Piece>> spotPieces = new ArrayList<>();
-        // A line's end within half a block ahead leaves no room for the leading car: no spots.
-        for (int i = 0; !front.stopped() && i < cars; i++) {
-            Place.Moved back = front.place().move(network, -SPOT * (i + 1));
-            Place middle = front.place().move(network, -SPOT * (i + 0.5)).place();
+        for (int i = 0; leads && i < cars; i++) {
+            Place.Moved back = at.move(network, FRONT - SPOT * (i + 2));
+            Place middle = at.move(network, FRONT - SPOT * (i + 1.5)).place();
             if (back.stopped() || !StraightLeg.under(network, middle, SPOT)) {
                 break;
             }
             spots.add(new CarSpot(i, middle));
-            spotPieces.add(cover(network, front.place().move(network, -SPOT * i).place(), SPOT));
+            spotPieces.add(cover(network, back.place().turned(), SPOT));
+            covered.addAll(spotPieces.getLast());
         }
-        List<Piece> covered = cover(network, front.place(), Math.max(SPOT * spots.size(), 1.0));
         return Optional.of(new Platform(station, front.place(), leadMark, List.copyOf(spots),
-                List.copyOf(spotPieces), covered));
+                List.copyOf(spotPieces), List.copyOf(covered)));
     }
 
     public Station station() {
         return station;
     }
 
-    /** The Station block's front edge on the Line, facing its serving way: where the leading car's front stops. */
+    /**
+     * The Station block's front edge on the Line, facing its serving way: where the leading car's
+     * front stops. At a line's end it is the end, which the edge lies past.
+     */
     public Place front() {
         return front;
     }
 
-    /** Where the leading car's middle stands at rest, facing the serving way: the middle of the first car spot. */
+    /** Where the leading car's middle stands at rest, facing the serving way: a car's length ahead of the first car spot's. */
     public Place leadMark() {
         return leadMark;
     }
 
-    /** Its car spots, the leading car's first; none where the Straight leg ends at the Station. */
+    /** Its car spots, behind the leading car's place, the nearest first; none where the Straight leg ends at the Station or the leading car. */
     public List<CarSpot> spots() {
         return spots;
     }
@@ -175,6 +218,86 @@ public final class Platform {
         return OptionalInt.empty();
     }
 
+    /**
+     * Every block beside one of its car spots, where a hatch may stand: two each side of the Rail for
+     * each spot, spot by spot. None is beside the leading car's place, the Station's own block among them.
+     */
+    public List<Beside> besideBlocks(RailNetwork network) {
+        List<Beside> beside = new ArrayList<>();
+        for (CarSpot spot : spots) {
+            // The middle of the spot as a block position; the blocks beside it are within two of it.
+            Place.Point middle = spot.middle().point(network);
+            int mx = (int) Math.floor(middle.x() + RailGeometry.ATTACH_X);
+            int my = (int) Math.floor(middle.y() + RailGeometry.ATTACH_Y);
+            int mz = (int) Math.floor(middle.z() + RailGeometry.ATTACH_Z);
+            for (int x = mx - 2; x <= mx + 2; x++) {
+                for (int y = my - 1; y <= my + 1; y++) {
+                    for (int z = mz - 2; z <= mz + 2; z++) {
+                        if (spotBeside(x, y, z).equals(OptionalInt.of(spot.index()))) {
+                            beside.add(new Beside(spot.index(), x, y, z));
+                        }
+                    }
+                }
+            }
+        }
+        return List.copyOf(beside);
+    }
+
+    /** Its {@link #besideBlocks} side by side: for each car spot, the blocks beside it on each side of the Rail. */
+    public List<Side> sides(RailNetwork network) {
+        List<Side> sides = new ArrayList<>();
+        if (spots.isEmpty()) {
+            return sides;
+        }
+        // A Straight leg runs along x or z, so every spot runs the way the first does.
+        Span leg = spots.getFirst().middle().span();
+        boolean alongX = Math.abs(leg.b().x() - leg.a().x()) >= Math.abs(leg.b().z() - leg.a().z());
+        List<Beside> left = new ArrayList<>(besideBlocks(network));
+        while (!left.isEmpty()) {
+            Beside one = left.removeFirst();
+            List<Beside> side = new ArrayList<>(List.of(one));
+            // Its pair: the next block along the Line beside the same spot.
+            left.stream()
+                    .filter(b -> b.spot() == one.spot() && b.y() == one.y()
+                            && (alongX ? b.z() == one.z() && Math.abs(b.x() - one.x()) == 1
+                                       : b.x() == one.x() && Math.abs(b.z() - one.z()) == 1))
+                    .findFirst()
+                    .ifPresent(pair -> {
+                        left.remove(pair);
+                        side.add(pair);
+                    });
+            sides.add(new Side(List.copyOf(side), alongX));
+        }
+        return sides;
+    }
+
+    /** Whether a block at {@code x}, {@code y}, {@code z} is near enough {@code station} to stand beside its platform. */
+    public static boolean near(Station station, int x, int y, int z) {
+        return Math.abs(station.x() - x) <= REACH && Math.abs(station.y() - y) <= REACH && Math.abs(station.z() - z) <= REACH;
+    }
+
+    /**
+     * Which of {@code stations} a hatch at {@code x}, {@code y}, {@code z} joins, and at which car spot:
+     * the one whose platform it stands beside, of which there is at most one, since no two platforms
+     * overlap. Empty beside no platform's car spot. Asked afresh, so a Station broken or a platform
+     * bent away leaves it joining nothing until a platform covers it again.
+     */
+    public static Optional<Joined> joined(RailNetwork network, Iterable<Station> stations, int x, int y, int z) {
+        for (Station station : stations) {
+            if (!near(station, x, y, z)) {
+                continue;
+            }
+            Optional<Platform> platform = of(network, station);
+            if (platform.isPresent()) {
+                OptionalInt spot = platform.get().spotBeside(x, y, z);
+                if (spot.isPresent()) {
+                    return Optional.of(new Joined(station, spot.getAsInt()));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /** Whether {@code block}, footed at {@code foot}, stands a block to the side of the Rail at a car's floor. */
     private static boolean beside(Station block, Station.Foot foot) {
         Place.Point off = block.fromFoot(foot);
@@ -184,7 +307,7 @@ public final class Platform {
     }
 
     /**
-     * Whether this platform and {@code other} share any of the Line: their car spots, or the Station
+     * Whether this platform and {@code other} share any of the Line: their leading car's place and car spots, or the Station
      * block's own length for one with none. Two Stations may not have overlapping platforms, so a
      * block beside a platform belongs to one Station only.
      */

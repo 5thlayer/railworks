@@ -470,24 +470,42 @@ public final class Train {
         return placeOf(network, cars.getLast());
     }
 
+    /**
+     * Moves it {@code by} blocks while it stays at rest, positive along its heading, as far as the
+     * Rail and {@code taken} let it: how a Train settles onto a Station's mark. Returns whether it moved.
+     */
+    boolean nudge(RailNetwork network, double by, Predicate<Span> taken) {
+        Place was = head;
+        run(network, by, taken);
+        return !head.equals(was);
+    }
+
     private void advance(RailNetwork network, Predicate<Span> taken) {
-        if (speed > 0.0) {
-            double by = Math.min(speed, room(network, 1, speed, taken));
+        if (speed != 0.0 && run(network, speed, taken)) {
+            speed = 0.0;
+        }
+    }
+
+    /**
+     * Runs it {@code want} blocks, positive along its heading, as far as a line's end and the Spans
+     * {@code taken} says are held let it. Returns whether it was stopped short.
+     */
+    private boolean run(RailNetwork network, double want, Predicate<Span> taken) {
+        if (want > 0.0) {
+            double by = Math.min(want, room(network, 1, want, taken));
             Place.Moved moved = head.move(network, by);
             head = moved.place();
-            if (moved.stopped() || by < speed) {
-                speed = 0.0;
-            }
-        } else if (speed < 0.0) {
+            return moved.stopped() || by < want;
+        }
+        if (want < 0.0) {
             // Backing, the last car meets a line's end first.
-            double by = -Math.min(-speed, room(network, -1, -speed, taken));
+            double by = -Math.min(-want, room(network, -1, -want, taken));
             Place.Moved moved = tail(network).move(network, by);
             double length = length();
             head = length == 0.0 ? moved.place() : moved.place().move(network, length).place();
-            if (moved.stopped() || by > speed) {
-                speed = 0.0;
-            }
+            return moved.stopped() || by > want;
         }
+        return false;
     }
 
     @Override

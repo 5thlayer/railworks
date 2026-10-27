@@ -83,6 +83,11 @@ public record Station(int x, int y, int z, String name) {
         return name.isEmpty() ? Optional.empty() : Optional.of(name);
     }
 
+    /** Whether {@code other} stands at this Station's block, whatever either is called. */
+    public boolean samePlace(Station other) {
+        return x == other.x && y == other.y && z == other.z;
+    }
+
     public Station withName(String name) {
         return new Station(x, y, z, name);
     }
