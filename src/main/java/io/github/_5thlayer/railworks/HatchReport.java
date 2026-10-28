@@ -57,9 +57,9 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, 
      * fluid: the action bar's line and Jade's.
      */
     public static Component requesting(Optional<HatchRequest<Ware>> request) {
-        return request.map(asked -> Component.translatable(asked.item().kind() == Goods.Kind.FLUID
+        return request.map(asked -> Component.translatable(asked.goods().kind() == Goods.Kind.FLUID
                         ? "message.railworks.hatch.requesting_fluid" : "message.railworks.hatch.requesting",
-                        asked.count(), asked.item().name()))
+                        asked.count(), asked.goods().name()))
                 .orElseGet(() -> Component.translatable("message.railworks.hatch.requesting_nothing"));
     }
 

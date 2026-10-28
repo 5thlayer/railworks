@@ -121,7 +121,7 @@ public final class Logistics<I> {
     }
 
     /** So many of an item, or millibuckets of a fluid, as a status line counts what a Train carries. */
-    public record Cargo<I>(I item, long count) {
+    public record Cargo<I>(I goods, long count) {
     }
 
     /**
@@ -583,15 +583,15 @@ public final class Logistics<I> {
     /** What {@code load}'s requester, as it stands, wants of its item: its request less what it holds; none once it asks for another. */
     private static <I> long wanted(Load<I> load, List<Hatch<I>> hatches, Goods<I> goods) {
         return asItStands(load.requester, hatches).flatMap(Hatch::request)
-                .filter(request -> request.item().equals(load.item))
+                .filter(request -> request.goods().equals(load.item))
                 .map(request -> shortOf(load.requester, request, goods))
                 .orElse(0L);
     }
 
     /** How far short of {@code request} {@code requester} is: what it asks for less what it holds of it. */
     private static <I> long shortOf(Hatch<I> requester, HatchRequest<I> request, Goods<I> goods) {
-        long each = requester.holds() == Goods.Kind.FLUID ? MILLIBUCKETS_PER_BUCKET : goods.stackSize(request.item());
-        return request.count() * each - goods.held(requester, request.item());
+        long each = requester.holds() == Goods.Kind.FLUID ? MILLIBUCKETS_PER_BUCKET : goods.stackSize(request.goods());
+        return request.count() * each - goods.held(requester, request.goods());
     }
 
     /** How much of {@code item} a hatch of {@code kind} moves in one turn: a stack of an item, {@link #FLUID_BUCKETS_PER_STEP} buckets of a fluid. */
@@ -636,7 +636,7 @@ public final class Logistics<I> {
             if (requester.provider() || requester.request().isEmpty()) {
                 continue;
             }
-            I item = requester.request().get().item();
+            I item = requester.request().get().goods();
             if (need(requester, hatches, goods) <= 0) {
                 continue;
             }
@@ -764,7 +764,7 @@ public final class Logistics<I> {
             }
             GoodsCar car = goodsAt(train, way, hatch.spot(), hatch.holds());
             if (car != null) {
-                asking.add(new Asking<>(hatch, hatch.request().get().item(), car));
+                asking.add(new Asking<>(hatch, hatch.request().get().goods(), car));
             }
         }
         return asking;
@@ -885,7 +885,7 @@ public final class Logistics<I> {
     /** What {@code requester} still needs: its request less what it holds and what is on its way to it. */
     private long need(Hatch<I> requester, List<Hatch<I>> hatches, Goods<I> goods) {
         HatchRequest<I> request = requester.request().orElseThrow();
-        I item = request.item();
+        I item = request.goods();
         long onItsWay = 0;
         for (Load<I> load : loads()) {
             if (load.requester.samePlace(requester) && load.item.equals(item)) {

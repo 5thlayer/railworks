@@ -39,7 +39,7 @@ public final class StatusLine {
     public static List<ItemStack> icons(Logistics.Status<Ware> status) {
         List<ItemStack> icons = new ArrayList<>();
         for (Logistics.Cargo<Ware> load : status.cargo().subList(0, Math.min(ICONS, status.cargo().size()))) {
-            icons.add(load.item().icon(load.count()));
+            icons.add(load.goods().icon(load.count()));
         }
         return icons;
     }
