@@ -13,11 +13,11 @@ import com.mojang.serialization.MapCodec;
 /**
  * One car of a {@link Train}: what it weighs and how long it is along the Line, and the id its
  * entity finds it by in whatever Train it is coupled into. A {@link Locomotive} is the car that
- * pulls and brakes; a {@link CargoCar} carries items.
+ * pulls and brakes; a {@link CargoCar} carries items, and a {@link FluidCar} one fluid.
  *
  * <p>Pure: no Minecraft types.
  */
-public sealed interface Car permits Locomotive, CargoCar {
+public sealed interface Car permits Locomotive, GoodsCar {
 
     /** A UUID as its string, the way a car's id is saved. */
     Codec<UUID> ID_CODEC = Codec.STRING.comapFlatMap(text -> {
@@ -47,6 +47,7 @@ public sealed interface Car permits Locomotive, CargoCar {
             case Locomotive.KIND -> Locomotive.MAP_CODEC;
             case Locomotive.ELECTRIC_KIND -> Locomotive.ELECTRIC_MAP_CODEC;
             case CargoCar.KIND -> CargoCar.MAP_CODEC;
+            case FluidCar.KIND -> FluidCar.MAP_CODEC;
             default -> null;
         };
     }

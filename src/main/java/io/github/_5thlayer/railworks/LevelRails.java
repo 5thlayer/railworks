@@ -418,7 +418,7 @@ public final class LevelRails extends SavedData {
         for (Hatches.Hatch hatch : LevelHatches.of(level).all()) {
             BlockPos pos = hatch.pos();
             PlatformsNear.joined(level, pos).ifPresent(at -> joined.add(new Logistics.Hatch<>(pos.getX(), pos.getY(),
-                    pos.getZ(), at.station(), at.spot(), hatch.mode() == HatchMode.PROVIDER, hatch.request())));
+                    pos.getZ(), at.station(), at.spot(), hatch.mode() == HatchMode.PROVIDER, Goods.Kind.ITEMS, hatch.request())));
         }
         return List.copyOf(joined);
     }

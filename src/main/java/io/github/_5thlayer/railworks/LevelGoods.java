@@ -8,7 +8,9 @@ import java.util.Map;
 
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.ChargeSpec;
+import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Goods;
+import io.github._5thlayer.railworks.rail.GoodsCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Logistics;
 import net.minecraft.core.BlockPos;
@@ -58,13 +60,13 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public long held(CargoCar car, Item item) {
+    public long held(GoodsCar car, Item item) {
         SimpleContainer cargo = cargo(car);
         return cargo == null ? 0 : cargo.countItem(item);
     }
 
     @Override
-    public Map<Item, Long> contents(CargoCar car) {
+    public Map<Item, Long> contents(GoodsCar car) {
         SimpleContainer cargo = cargo(car);
         Map<Item, Long> contents = new LinkedHashMap<>();
         for (int slot = 0; cargo != null && slot < cargo.getContainerSize(); slot++) {
@@ -77,7 +79,7 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public boolean empty(CargoCar car) {
+    public boolean empty(GoodsCar car) {
         SimpleContainer cargo = cargo(car);
         return cargo != null && cargo.isEmpty();
     }
@@ -88,7 +90,12 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public long load(Logistics.Hatch<Item> from, CargoCar into, Item item, long most) {
+    public long tank(FluidCar car) {
+        return 0;
+    }
+
+    @Override
+    public long load(Logistics.Hatch<Item> from, GoodsCar into, Item item, long most) {
         ItemStacksResourceHandler contents = hatchContents(from);
         SimpleContainer cargo = cargo(into);
         if (contents == null || cargo == null) {
@@ -118,7 +125,7 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public long unload(CargoCar from, Logistics.Hatch<Item> into, Item item, long most) {
+    public long unload(GoodsCar from, Logistics.Hatch<Item> into, Item item, long most) {
         ItemStacksResourceHandler contents = hatchContents(into);
         SimpleContainer cargo = cargo(from);
         if (contents == null || cargo == null) {
@@ -263,7 +270,7 @@ final class LevelGoods implements Goods<Item> {
                 .orElse(null);
     }
 
-    private @Nullable SimpleContainer cargo(CargoCar car) {
+    private @Nullable SimpleContainer cargo(GoodsCar car) {
         return LevelCarRecords.of(level).of(car.id()).orElse(null);
     }
 
