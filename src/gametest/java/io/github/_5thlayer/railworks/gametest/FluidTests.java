@@ -119,6 +119,7 @@ final class FluidTests {
         tests.test("fluid_hatch_a_pipe_fills_and_empties_it_through_its_fluid_capability", 20, FluidTests::pipe);
         tests.test("fluid_hatch_shows_its_fluid_as_a_filled_bucket", 40, FluidTests::shows);
         tests.test("fluid_tanks_are_kept_through_a_save", 20, FluidTests::saved);
+        tests.test("fluid_command_fluid_hatch_fills_a_provider_and_sets_a_requesters_request", 1, FluidTests::command);
         // Each runs its line out past the structure.
         tests.testOnItsOwn("fluid_a_job_carries_fluid_from_a_provider_fluid_hatch_to_a_requester_one", 1_200, FluidTests::job);
         tests.testOnItsOwn("fluid_a_leftover_poured_in_by_hand_is_delivered_once_a_requester_asks_for_it", 1_200,
@@ -307,6 +308,32 @@ final class FluidTests {
                             "the requester shows " + asked + " and the provider " + held + ", not their fluids' buckets");
                 })
                 .thenSucceed();
+    }
+
+    // ---- the command ----
+
+    /**
+     * {@code /railworks fluid_hatch} pours buckets into a provider and has a requester ask for so many,
+     * eight at a time; past the tank, at a hatch of the other mode, or at a hatch of items, it is refused.
+     */
+    private static void command(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.PROVIDER));
+        helper.setBlock(LONE.east(2), fluidHatch(HatchMode.REQUESTER));
+        helper.setBlock(LONE.east(4), RailworksRegistries.HATCH.get().defaultBlockState());
+        CommandTests.run(helper, "railworks fluid_hatch %s provider minecraft:lava 5", LONE);
+        expectTank(helper, record(helper, LONE).tank(), Fluids.LAVA, 5 * BUCKET, "the command poured lava in");
+        CommandTests.run(helper, "railworks fluid_hatch %s requester minecraft:water 12", LONE.east(2));
+        var request = record(helper, LONE.east(2)).request();
+        if (!request.equals(Optional.of(new HatchRequest<>(Ware.of(Fluids.WATER), 16)))) {
+            helper.fail("the command left the requester asking for " + request + ", not 16 buckets of water", LONE.east(2));
+        }
+        CommandTests.refused(helper, "railworks fluid_hatch %s provider minecraft:lava " + (Hatches.tankBuckets() + 1), LONE);
+        CommandTests.refused(helper, "railworks fluid_hatch %s requester minecraft:water " + (Hatches.tankBuckets() + 1),
+                LONE.east(2));
+        CommandTests.refused(helper, "railworks fluid_hatch %s requester minecraft:water 8", LONE);
+        CommandTests.refused(helper, "railworks fluid_hatch %s provider minecraft:water 1", LONE.east(4));
+        CommandTests.refused(helper, "railworks hatch %s provider minecraft:iron_ingot 1", LONE);
+        helper.succeed();
     }
 
     // ---- saving ----

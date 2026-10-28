@@ -95,6 +95,9 @@
   "commands.railworks.hatch.wrong_mode": "The hatch at %s is the other kind",
   "commands.railworks.hatch.no_room": "The hatch at %s has no room for that many",
   "commands.railworks.hatch.too_many_stacks": "A requester asks for %s stacks at most",
+  "commands.railworks.fluid_hatch.provider": "The provider Fluid hatch at %s holds %s more buckets of %s",
+  "commands.railworks.fluid_hatch.requester": "The requester Fluid hatch at %s asks for %s buckets of %s",
+  "commands.railworks.fluid_hatch.too_many_buckets": "A requester Fluid hatch asks for %s buckets at most",
   "commands.railworks.automatic": "The Train is automatic",
   "commands.railworks.automatic.not_a_locomotive": "That is no Locomotive on the Rail",
   "railworks.gallery.pack": "Railworks Gallery",
@@ -155,5 +158,9 @@
   "railworks.gallery.charge": "Charge",
   "railworks.gallery.charge.1": "A Charger fills",
   "railworks.gallery.charge.2": "the Electric",
-  "railworks.gallery.charge.3": "Train standing by"
+  "railworks.gallery.charge.3": "Train standing by",
+  "railworks.gallery.fluid": "Fluid Car",
+  "railworks.gallery.fluid.1": "A Fluid car",
+  "railworks.gallery.fluid.2": "carries lava",
+  "railworks.gallery.fluid.3": "hatch to hatch"
 }

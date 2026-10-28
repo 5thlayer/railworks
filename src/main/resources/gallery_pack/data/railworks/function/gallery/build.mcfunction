@@ -4,7 +4,7 @@
 # run. The third row is logistics, Trains running jobs from provider hatches to requesters, and then
 # the flyover; the fourth begins with a Train fuelled at its Station, then one charged at its Stations,
 # and ends with one whose line runs out east past the gallery and the chunks loaded around it, last in
-# its row so that line crosses no other plot.
+# its row so that line crosses no other plot. The fifth begins with a Fluid car carrying lava.
 function railworks:gallery/pylons
 execute positioned ~24 ~ ~ run function railworks:gallery/limits
 execute positioned ~48 ~ ~ run function railworks:gallery/curves
@@ -17,3 +17,4 @@ execute positioned ~48 ~ ~-32 run function railworks:gallery/flyover
 execute positioned ~ ~ ~-48 run function railworks:gallery/refuel
 execute positioned ~24 ~ ~-48 run function railworks:gallery/charge
 execute positioned ~48 ~ ~-48 run function railworks:gallery/far_away
+execute positioned ~ ~ ~-64 run function railworks:gallery/fluid
