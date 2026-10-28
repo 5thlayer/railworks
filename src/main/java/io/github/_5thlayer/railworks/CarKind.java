@@ -5,6 +5,8 @@ package io.github._5thlayer.railworks;
 
 import java.util.function.Supplier;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
@@ -34,6 +36,12 @@ public enum CarKind {
         this.create = create;
         this.entityType = entityType;
     }
+
+    /** A kind as it is saved: its model car's {@link Car#kind()}. */
+    static final Codec<CarKind> CODEC = Codec.STRING.comapFlatMap(model -> {
+        CarKind kind = of(model);
+        return kind != null ? DataResult.success(kind) : DataResult.error(() -> "no car kind " + model);
+    }, CarKind::model);
 
     /** The kind whose model car's {@link Car#kind()} is {@code model}; null for none. */
     static @Nullable CarKind of(String model) {

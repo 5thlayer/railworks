@@ -48,7 +48,6 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
-import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -58,7 +57,7 @@ import org.jspecify.annotations.Nullable;
  * A level's Spans and its Trains, saved with it. The rules are {@link Stringing}'s and the storage
  * {@link RailNetwork}'s and {@link Trains}'; this is where they meet a world. Every Train ticks from
  * the level's tick, in view or not (ADR 0004, amended in #6), and an abstract Train is simply one
- * with none of its cars in view. The level shows a car where its Train puts it once that spot ticks
+ * with none of its cars in view. The level shows a car where its Train puts it once that place ticks
  * entities, as {@link Views} says, and knows each car's view, so a Train's tick can read its drivers'
  * keys and move every car it has in view; its cars' cargo and fuel are their records in
  * {@link LevelCarRecords}, in view or not. Trains never keep a chunk loaded. Its {@link Logistics},
@@ -79,13 +78,13 @@ public final class LevelRails extends SavedData {
 
     /**
      * A car of a Train that fell off the Rail out of view (#6), standing where it was, {@code at} in the
-     * world, until its spot ticks and it comes off the Rail there.
+     * world, until its place ticks entities and it comes off the Rail there.
      */
-    record Fallen(UUID car, String kind, Vec3 at) {
+    record Fallen(UUID car, CarKind kind, Vec3 at) {
 
         static final Codec<Fallen> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Car.ID_CODEC.fieldOf("car").forGetter(Fallen::car),
-                Codec.STRING.fieldOf("kind").forGetter(Fallen::kind),
+                CarKind.CODEC.fieldOf("kind").forGetter(Fallen::kind),
                 Vec3.CODEC.fieldOf("at").forGetter(Fallen::at)
         ).apply(i, Fallen::new));
     }
@@ -153,7 +152,7 @@ public final class LevelRails extends SavedData {
     }
 
     /** {@code entity} was added to the level as no car's view: the level's next tick drops it, or breaks it. */
-    void stale(CarEntity entity) {
+    void markStale(CarEntity entity) {
         stale.add(entity);
     }
 
@@ -165,7 +164,7 @@ public final class LevelRails extends SavedData {
 
     /**
      * The level ticked: every Train, once, in view or not, then its views, shown and taken away as
-     * their spots tick or stop ticking. Frozen by {@code /tick freeze}, as entities are.
+     * their places tick entities or stop. Frozen by {@code /tick freeze}, as entities are.
      */
     private void tickTrains(ServerLevel level) {
         dropStale(level);
@@ -212,9 +211,9 @@ public final class LevelRails extends SavedData {
     }
 
     /**
-     * Shows each car whose spot ticks entities and that has no view, and takes away each view whose
-     * spot does not, but one a player rides, which it ticks itself where the level did not, so its
-     * rider is never frozen or left behind. A fallen car comes off the Rail once its spot ticks.
+     * Shows each car whose place ticks entities and that has no view, and takes away each view whose
+     * place does not, but one a player rides, which it ticks itself where the level did not, so its
+     * rider is never frozen or left behind. A fallen car comes off the Rail once its place ticks.
      */
     private void showViews(ServerLevel level) {
         Set<UUID> viewed = new LinkedHashSet<>();
@@ -250,10 +249,7 @@ public final class LevelRails extends SavedData {
             if (!ticks(level, car.at())) {
                 return false;
             }
-            CarKind kind = CarKind.of(car.kind());
-            if (kind != null) {
-                CarEntity.fallOff(level, kind, car.car(), car.at());
-            }
+            CarEntity.fallOff(level, car);
             return true;
         })) {
             setDirty();
@@ -279,8 +275,8 @@ public final class LevelRails extends SavedData {
     }
 
     /**
-     * Keeps in each car's record the mob riding its view, as the level is saved, so one riding as the
-     * server stops, which no chunk saves with the view, rides on when it starts again.
+     * Keeps in each car's record the mob riding its view now, as the server stops, so it rides on, as
+     * it is, when the server starts again: no chunk saves it with the view.
      */
     void keepRiders(ServerLevel level) {
         views.values().stream().filter(view -> !view.isRemoved()).toList().forEach(view -> view.keepRider(level));
@@ -289,13 +285,6 @@ public final class LevelRails extends SavedData {
     /** The server is stopping: each level keeps its views' riders before it is saved for the last time. */
     public static void onServerStopping(ServerStoppingEvent event) {
         event.getServer().getAllLevels().forEach(level -> of(level).keepRiders(level));
-    }
-
-    /** A level was saved: it keeps its views' riders for its next save, should the server stop without one. */
-    public static void onLevelSaved(LevelEvent.Save event) {
-        if (event.getLevel() instanceof ServerLevel level) {
-            of(level).keepRiders(level);
-        }
     }
 
     /**
@@ -415,7 +404,7 @@ public final class LevelRails extends SavedData {
 
     /**
      * {@code train} fell off the Rail: it is gone, and each of its cars in view breaks, dropping itself
-     * and what it holds. Each out of view stands where it was until its spot ticks, so nothing drops
+     * and what it holds. Each out of view stands where it was until its place ticks, so nothing drops
      * into a chunk that is not loaded and no car is lost.
      */
     void derail(ServerLevel level, Train train) {
@@ -427,7 +416,10 @@ public final class LevelRails extends SavedData {
                 view.breakOff(level);
             } else {
                 Vec3 at = standing.get(car.id());
-                fallen.add(new Fallen(car.id(), car.kind(), at != null ? at : CarPlacement.railPoint(train.head().point(network))));
+                CarKind kind = CarKind.of(car.kind());
+                if (kind != null) {
+                    fallen.add(new Fallen(car.id(), kind, at != null ? at : CarPlacement.railPoint(train.head().point(network))));
+                }
             }
         }
     }

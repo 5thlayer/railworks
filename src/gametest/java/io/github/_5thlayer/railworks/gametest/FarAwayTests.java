@@ -53,7 +53,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Trains far away (#6, ADR 0004 amended): every Train ticks from the level's tick, in view or not,
- * and the level shows a car only where its spot ticks entities. A line runs from the structure east
+ * and the level shows a car only where its place ticks entities. A line runs from the structure east
  * past the chunks the runner loads, out to a Station 240 blocks off, which the tests bring into view
  * and out of it with a chunk ticket of their own ({@link RailworksGameTests#IN_VIEW}). An automatic
  * Train runs its job out there as an abstract Train and its views come back where it stands; a
@@ -147,7 +147,7 @@ final class FarAwayTests {
 
     /**
      * The shuttle loads at the Mine, runs out of view to the Depot, unloads there with no chunk of it
-     * loaded and waits: every tick the Train moves once, each car is shown where its spot ticks and
+     * loaded and waits: every tick the Train moves once, each car is shown where its place ticks and
      * only there, at most once. The Depot's chunks brought into view, its three cars are seen where it
      * stands; let go of, unloaded and loaded again, they are seen again, and no car was saved with them.
      */
@@ -195,7 +195,7 @@ final class FarAwayTests {
 
     /**
      * A player rides the shuttle's first car on its run out to the Depot: its view is never taken away,
-     * though its spot stops ticking, and the rider stays in it, moved with it, until they get off there,
+     * though its place stops ticking, and the rider stays in it, moved with it, until they get off there,
      * when it goes.
      */
     private static void carriesRider(GameTestHelper helper) {
@@ -243,7 +243,7 @@ final class FarAwayTests {
         inView(helper, YARD, true);
         UUID[] pig = new UUID[1];
         helper.startSequence()
-                // Never placed, it is shown once its spot ticks.
+                // Never placed, it is shown once its place ticks.
                 .thenWaitUntil(() -> expectInView(helper, train))
                 .thenExecute(() -> {
                     CarEntity view = LevelRails.of(helper.getLevel()).view(car);
@@ -252,28 +252,34 @@ final class FarAwayTests {
                     helper.getLevel().addFreshEntity(mob);
                     helper.assertTrue(mob.startRiding(view, true, false), "the pig could not get in");
                     pig[0] = mob.getUUID();
+                    // Kept from the moment it gets in, so a server stopping without a save brings it back once.
+                    helper.assertTrue(riderKept(helper, car), "the car's record does not keep the pig that got in");
                     inView(helper, YARD, false);
                 })
                 .thenWaitUntil(() -> {
                     expectOutOfView(helper, train);
                     helper.assertTrue(helper.getLevel().getEntity(pig[0]) == null, "the pig stayed in the world without its car");
-                    helper.assertTrue(LevelCarRecords.of(helper.getLevel()).of(car.id()).map(r -> r.rider() != null).orElse(false),
-                            "the car's record keeps no rider");
+                    helper.assertTrue(riderKept(helper, car), "the car's record keeps no rider");
                 })
                 .thenExecute(() -> inView(helper, YARD, true))
                 .thenWaitUntil(() -> {
                     CarEntity view = LevelRails.of(helper.getLevel()).view(car);
                     helper.assertTrue(view != null && view.getFirstPassenger() instanceof Pig back && back.getUUID().equals(pig[0]),
                             "the pig is not seated in the car's view: " + (view == null ? "no view" : view.getPassengers()));
-                    helper.assertTrue(LevelCarRecords.of(helper.getLevel()).of(car.id()).map(r -> r.rider() == null).orElse(false),
-                            "the car's record still keeps its rider, now seated");
+                    helper.assertTrue(riderKept(helper, car), "the car's record lost the pig seated again");
                 })
                 .thenExecute(() -> {
                     LevelRails.of(helper.getLevel()).view(car).getFirstPassenger().discard();
+                    helper.assertFalse(riderKept(helper, car), "the car's record still keeps the pig gone");
                     inView(helper, YARD, false);
                     clearAway(helper, train);
                 })
                 .thenSucceed();
+    }
+
+    /** Whether {@code car}'s record keeps a mob riding it. */
+    private static boolean riderKept(GameTestHelper helper, Car car) {
+        return LevelCarRecords.of(helper.getLevel()).of(car.id()).map(record -> record.rider() != null).orElse(false);
     }
 
     // ---- off the Rail ----
@@ -382,13 +388,13 @@ final class FarAwayTests {
         /** Whether it was ever wholly out of view, and ever part in and part out. */
         boolean abstracted;
         boolean split;
-        /** Whether the ridden car was ever where its spot did not tick. */
+        /** Whether the ridden car was ever where its place did not tick. */
         boolean riddenOut;
         @Nullable Vec3 headWas;
     }
 
     /**
-     * Checks {@code train} after every tick: each car shown where its spot ticks, but {@code ridden}
+     * Checks {@code train} after every tick: each car shown where its place ticks, but {@code ridden}
      * wherever, and nowhere else, at most one entity a car, each view where the Train puts its car, and
      * the Train moved at most once, as far as its speed, or a settling step at rest.
      */
@@ -413,12 +419,12 @@ final class FarAwayTests {
                 if (view != null) {
                     shown++;
                     helper.assertTrue(view.position().distanceTo(at) < 1e-6, "the view is at " + view.position() + ", its car at " + at);
-                    helper.assertTrue(ticks(level, at) || isRidden, "a view stands where its spot does not tick, at " + at);
+                    helper.assertTrue(ticks(level, at) || isRidden, "a view stands where its place does not tick, at " + at);
                     if (isRidden && !ticks(level, at)) {
                         watch.riddenOut = true;
                     }
                 } else {
-                    helper.assertFalse(ticks(level, at), "no view stands where the car's spot ticks, at " + at);
+                    helper.assertFalse(ticks(level, at), "no view stands where the car's place ticks, at " + at);
                 }
             }
             if (shown == 0) {
@@ -444,7 +450,7 @@ final class FarAwayTests {
             CarEntity view = rails.view(car);
             Vec3 at = rails.standing(car.id());
             helper.assertTrue(view != null && at != null && view.position().distanceTo(at) < 1e-6,
-                    "the car " + car + " is not shown where it stands, " + at + ", its spot ticking " + (at != null && ticks(helper.getLevel(), at))
+                    "the car " + car + " is not shown where it stands, " + at + ", its place ticking " + (at != null && ticks(helper.getLevel(), at))
                             + ": " + view);
             helper.assertTrue(entitiesOf(helper.getLevel(), car.id()) == 1, "the car " + car + " is shown more than once");
         }

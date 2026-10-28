@@ -21,6 +21,7 @@ import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Locomotive;
+import io.github._5thlayer.railworks.rail.Train;
 import io.github._5thlayer.railworks.rail.Logistics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
@@ -70,6 +71,7 @@ final class CarRecordTests {
         tests.test("record_a_cargo_car_saved_with_its_cargo_hands_it_over_once", 20, CarRecordTests::legacyCargo);
         tests.test("record_a_locomotive_saved_with_its_cab_hands_it_over_once", 20, CarRecordTests::legacyCab);
         tests.test("record_data_merge_sets_what_a_car_holds", 20, CarRecordTests::dataMerge);
+        tests.test("far_a_train_saved_with_each_of_its_cars_takes_in_each_cars_cab_once", 20, CarRecordTests::legacyTrain);
         tests.test("record_goes_with_a_car_copied_into_another_level", 20, CarRecordTests::otherLevel);
         tests.test("record_a_locomotive_out_of_view_burns_its_slots_fuel", 20, CarRecordTests::burnsOutOfView);
         tests.test("record_a_locomotive_out_of_view_leaves_a_lava_bucket_for_its_view", 20, CarRecordTests::lavaWaits);
@@ -246,6 +248,67 @@ final class CarRecordTests {
         LocomotiveEntity again = load(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), tag);
         LocomotiveTests.expectSlots(helper, again, cab);
         helper.succeed();
+    }
+
+    /**
+     * Two Locomotives of one Train, each saved, as a world from before the level held Trains saved
+     * them, with the whole Train on it, its own place in it and its cab (#6): the first loaded takes the
+     * Train in and is its car's view; the second hands its cab to its car's record and goes, the level
+     * showing its car by a view of its own. Neither drops anything, and each car has one view.
+     */
+    private static void legacyTrain(GameTestHelper helper) {
+        Pair pair = pair(helper);
+        Train train = pair.ahead().train();
+        List<LocomotiveEntity> cars = List.of(pair.ahead(), pair.behind());
+        List<ItemStack> cabs = List.of(new ItemStack(Items.COAL, 7), new ItemStack(Items.CHARCOAL, 3));
+        List<CompoundTag> tags = new java.util.ArrayList<>();
+        for (int i = 0; i < cars.size(); i++) {
+            CompoundTag tag = saved(cars.get(i));
+            tag.remove("car_id");
+            tag.put("train", Train.CODEC.encodeStart(NbtOps.INSTANCE, train).getOrThrow());
+            tag.putInt("car", train.cars().indexOf(cars.get(i).car()));
+            var old = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
+            old.list("cab", ItemStack.OPTIONAL_CODEC).add(cabs.get(i));
+            tag.put("cab", old.buildResult().get("cab"));
+            tags.add(tag);
+        }
+        List<UUID> ids = cars.stream().map(CarEntity::carId).toList();
+        // As that world loads: no Train in the level, no records and no views.
+        LevelRails rails = LevelRails.of(helper.getLevel());
+        CarRecords records = LevelCarRecords.of(helper.getLevel());
+        rails.trains().remove(train);
+        for (LocomotiveEntity car : cars) {
+            records.remove(car.carId());
+            car.remove(Entity.RemovalReason.UNLOADED_TO_CHUNK);
+        }
+        tags.forEach(tag -> helper.getLevel().addFreshEntity(load(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), tag)));
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    Train back = rails.trains().of(ids.get(0));
+                    if (back == null || rails.trains().of(ids.get(1)) != back) {
+                        helper.fail("the two Locomotives came back in " + back + " and " + rails.trains().of(ids.get(1)), STAND);
+                    }
+                    for (int i = 0; i < ids.size(); i++) {
+                        LocomotiveEntity view = (LocomotiveEntity) rails.view(back.car(ids.get(i)));
+                        if (view == null) {
+                            helper.fail("the Locomotive " + i + " has no view", STAND);
+                            return;
+                        }
+                        LocomotiveTests.expectSlots(helper, view, List.of(cabs.get(i), ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY));
+                        UUID id = ids.get(i);
+                        long entities = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class, LocomotiveTests.searchBox(helper))
+                                .stream().filter(car -> id.equals(car.carId())).count();
+                        if (entities != 1) {
+                            helper.fail("the Locomotive " + i + " has " + entities + " entities", STAND);
+                        }
+                    }
+                    List<ItemEntity> drops = helper.getLevel().getEntitiesOfClass(ItemEntity.class, LocomotiveTests.searchBox(helper));
+                    if (!drops.isEmpty()) {
+                        helper.fail("loading the old Train dropped " + drops.stream().map(ItemEntity::getItem).toList(), STAND);
+                    }
+                })
+                .thenSucceed();
     }
 
     private static void dataMerge(GameTestHelper helper) {

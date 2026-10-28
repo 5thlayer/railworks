@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 
 /**
  * Which cars a level shows (ADR 0004, amended in #6): a car has a view where its Train puts it once
- * that spot can show one, and loses it once the spot no longer can, unless a player rides it, since
+ * that place can show one, and loses it once the place no longer can, unless a player rides it, since
  * a Locomotive can outrun the chunks loading under its rider. A car no Train holds has no view. A
  * Train is ticked whether its cars are in view or not, so this only says what the level shows, never
  * where a car is.
@@ -34,9 +34,9 @@ public final class Views {
     }
 
     /**
-     * What to show and take away: every car of {@code trains} whose spot {@code showable} says can show
+     * What to show and take away: every car of {@code trains} whose place {@code showable} says can show
      * a view and that has none in {@code viewed} is shown; every car in {@code viewed} that no Train
-     * holds, or whose spot cannot show it and that no player rides, as {@code ridden} says, is taken away.
+     * holds, or whose place cannot show it and that no player rides, as {@code ridden} says, is taken away.
      */
     public static Change plan(RailNetwork network, Trains trains, Predicate<Place.Point> showable, Set<UUID> viewed,
                               Set<UUID> ridden) {
