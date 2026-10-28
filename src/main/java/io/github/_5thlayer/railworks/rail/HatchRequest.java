@@ -14,10 +14,10 @@ import java.util.Optional;
  *
  * <p>Pure: no Minecraft types. {@code I} is the goods' kind, the game's {@code Item} or {@code Fluid}.
  *
- * @param item  the kind of item or fluid it asks for
+ * @param goods the goods it asks for: an item's kind or a fluid
  * @param count how many of it: stacks of an item, each full by the item's stack size, or buckets of a fluid
  */
-public record HatchRequest<I>(I item, int count) {
+public record HatchRequest<I>(I goods, int count) {
 
     /** How many buckets more a Fluid requester asks for each time it is used with a fluid. */
     public static final int BUCKETS_PER_ASK = 8;
@@ -39,7 +39,7 @@ public record HatchRequest<I>(I item, int count) {
     }
 
     private static <I> HatchRequest<I> asked(Optional<HatchRequest<I>> current, I item, int more, int most) {
-        int count = current.filter(asked -> asked.item().equals(item))
+        int count = current.filter(asked -> asked.goods().equals(item))
                 .map(asked -> asked.count() + more)
                 .orElse(more);
         return new HatchRequest<>(item, Math.min(count, most));

@@ -216,8 +216,8 @@ final class FarAwayTests {
         RailNetwork network = line(helper);
         LogisticsTests.station(helper, MINE);
         LogisticsTests.station(helper, DEPOT);
-        helper.setBlock(PROVIDER, RailworksRegistries.FLUID_HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
-        helper.setBlock(REQUESTER, RailworksRegistries.FLUID_HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+        helper.setBlock(PROVIDER, FluidTests.fluidHatch(HatchMode.PROVIDER));
+        helper.setBlock(REQUESTER, FluidTests.fluidHatch(HatchMode.REQUESTER));
         LogisticsTests.expectJoined(helper, PROVIDER, MINE);
         LogisticsTests.expectJoined(helper, REQUESTER, DEPOT);
         try (var transaction = Transaction.openRoot()) {

@@ -598,7 +598,7 @@ final class FluidTests {
         }
     }
 
-    private static BlockState fluidHatch(HatchMode mode) {
+    static BlockState fluidHatch(HatchMode mode) {
         return RailworksRegistries.FLUID_HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, mode);
     }
 

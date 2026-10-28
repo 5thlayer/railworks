@@ -49,28 +49,28 @@ public final class Hatches {
 
     /** An item hatch's request as it is saved: the item by its id, and the stacks. */
     private static final Codec<HatchRequest<Item>> ITEM_REQUEST_CODEC = RecordCodecBuilder.create(i -> i.group(
-            BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(HatchRequest::item),
+            BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(HatchRequest::goods),
             Codec.intRange(1, Integer.MAX_VALUE).fieldOf("stacks").forGetter(HatchRequest::count)
     ).apply(i, HatchRequest::new));
 
     /** A Fluid hatch's request as it is saved: the fluid by its id, and the buckets. */
     private static final Codec<HatchRequest<Fluid>> FLUID_REQUEST_CODEC = RecordCodecBuilder.create(i -> i.group(
-            BuiltInRegistries.FLUID.byNameCodec().fieldOf("fluid").forGetter(HatchRequest::item),
+            BuiltInRegistries.FLUID.byNameCodec().fieldOf("fluid").forGetter(HatchRequest::goods),
             Codec.intRange(1, Integer.MAX_VALUE).fieldOf("buckets").forGetter(HatchRequest::count)
     ).apply(i, HatchRequest::new));
 
     /** A request as it is saved: an item's, as hatches saved it before Fluid hatches, or a fluid's. */
     public static final Codec<HatchRequest<Ware>> REQUEST_CODEC = Codec.either(ITEM_REQUEST_CODEC, FLUID_REQUEST_CODEC).xmap(
-            either -> either.map(asked -> new HatchRequest<>(Ware.of(asked.item()), asked.count()),
-                    asked -> new HatchRequest<>(Ware.of(asked.item()), asked.count())),
-            asked -> switch (asked.item()) {
+            either -> either.map(asked -> new HatchRequest<>(Ware.of(asked.goods()), asked.count()),
+                    asked -> new HatchRequest<>(Ware.of(asked.goods()), asked.count())),
+            asked -> switch (asked.goods()) {
                 case Ware.OfItem item -> Either.left(new HatchRequest<>(item.item(), asked.count()));
                 case Ware.OfFluid fluid -> Either.right(new HatchRequest<>(fluid.fluid(), asked.count()));
             });
 
     /** A request as it is sent to a client. */
     public static final StreamCodec<RegistryFriendlyByteBuf, HatchRequest<Ware>> REQUEST_STREAM_CODEC = StreamCodec.composite(
-            Ware.STREAM_CODEC, HatchRequest::item,
+            Ware.STREAM_CODEC, HatchRequest::goods,
             ByteBufCodecs.VAR_INT, HatchRequest::count,
             HatchRequest::new);
 
@@ -185,7 +185,7 @@ public final class Hatches {
             this.pos = pos;
             this.holds = holds;
             this.mode = mode;
-            this.request = request.filter(asked -> asked.item().kind() == holds);
+            this.request = request.filter(asked -> asked.goods().kind() == holds);
             this.contents = new Contents(stacks, hatches);
             this.tank = new Tank(tankCapacity, held, () -> hatches.onChange.run());
             this.hatches = hatches;
@@ -226,7 +226,7 @@ public final class Hatches {
          */
         public ItemResource shown() {
             if (mode == HatchMode.REQUESTER) {
-                return request().map(asked -> ItemResource.of(asked.item().icon(1))).orElse(ItemResource.EMPTY);
+                return request().map(asked -> ItemResource.of(asked.goods().icon(1))).orElse(ItemResource.EMPTY);
             }
             if (holds == Goods.Kind.FLUID) {
                 return tank.fluid().isEmpty() ? ItemResource.EMPTY
