@@ -50,13 +50,13 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
     private static final int[] SLOTS = {FUEL};
 
     private NonNullList<ItemStack> items = NonNullList.withSize(1, ItemStack.EMPTY);
-    private final BurnerGenerator generator = new BurnerGenerator();
+    private final BurnerGenerator burnerGenerator = new BurnerGenerator();
     private final Energy energy = new Energy();
     private final ContainerData data = new ContainerData() {
         @Override
         public int get(int index) {
-            long capacity = generator.fuel().gaugeCapacity();
-            return index == DATA_LIT && capacity > 0L ? (int) (generator.fuel().storedJoules() * LIT_STEPS / capacity) : 0;
+            long capacity = burnerGenerator.fuel().gaugeCapacity();
+            return index == DATA_LIT && capacity > 0L ? (int) (burnerGenerator.fuel().storedJoules() * LIT_STEPS / capacity) : 0;
         }
 
         @Override
@@ -75,7 +75,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
 
     /** What it holds to give, in FE. */
     public long stored() {
-        return generator.stored();
+        return burnerGenerator.stored();
     }
 
     /** Its energy handler, on every side: extract only. */
@@ -90,7 +90,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
 
     /** One tick on the server: it burns what it can into its buffer, lit while it burns, and gives its FE to the blocks beside it. */
     void serverTick(ServerLevel level) {
-        boolean burnt = generator.tick(this::ignite);
+        boolean burnt = burnerGenerator.tick(this::ignite);
         if (burnt) {
             setChanged();
         }
@@ -115,7 +115,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
     /** Gives what it holds to the energy handlers on its six sides, in turn. */
     private void push(ServerLevel level) {
         for (Direction side : Direction.values()) {
-            if (generator.stored() <= 0L) {
+            if (burnerGenerator.stored() <= 0L) {
                 return;
             }
             EnergyHandler beside = level.getCapability(Capabilities.Energy.BLOCK, worldPosition.relative(side), side.getOpposite());
@@ -123,10 +123,10 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
                 continue;
             }
             try (Transaction transaction = Transaction.openRoot()) {
-                int given = beside.insert((int) Math.min(Integer.MAX_VALUE, generator.stored()), transaction);
+                int given = beside.insert((int) Math.min(Integer.MAX_VALUE, burnerGenerator.stored()), transaction);
                 transaction.commit();
                 if (given > 0) {
-                    generator.extract(given);
+                    burnerGenerator.extract(given);
                     setChanged();
                 }
             }
@@ -188,7 +188,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
         super.loadAdditional(input);
         items = NonNullList.withSize(getContainerSize(), ItemStack.EMPTY);
         ContainerHelper.loadAllItems(input, items);
-        generator.load(input.getLongOr("stored", 0L), input.getLongOr("joules", 0L),
+        burnerGenerator.load(input.getLongOr("stored", 0L), input.getLongOr("joules", 0L),
                 input.getLongOr("fuel", 0L), input.getLongOr("last_lit", 0L));
     }
 
@@ -196,10 +196,10 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
     protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
         ContainerHelper.saveAllItems(output, items);
-        output.putLong("stored", generator.stored());
-        output.putLong("joules", generator.joules());
-        output.putLong("fuel", generator.fuel().storedJoules());
-        output.putLong("last_lit", generator.fuel().lastLitJoules());
+        output.putLong("stored", burnerGenerator.stored());
+        output.putLong("joules", burnerGenerator.joules());
+        output.putLong("fuel", burnerGenerator.fuel().storedJoules());
+        output.putLong("last_lit", burnerGenerator.fuel().lastLitJoules());
     }
 
     /** The extract-only handler over its buffer, which rolls back with a transaction. */
@@ -207,7 +207,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
 
         @Override
         public long getAmountAsLong() {
-            return generator.stored();
+            return burnerGenerator.stored();
         }
 
         @Override
@@ -225,23 +225,23 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
         @Override
         public int extract(int amount, TransactionContext transaction) {
             TransferPreconditions.checkNonNegative(amount);
-            int extracted = (int) Math.min(amount, generator.stored());
+            int extracted = (int) Math.min(amount, burnerGenerator.stored());
             if (extracted <= 0) {
                 return 0;
             }
             updateSnapshots(transaction);
-            generator.extract(extracted);
+            burnerGenerator.extract(extracted);
             return extracted;
         }
 
         @Override
         protected Long createSnapshot() {
-            return generator.stored();
+            return burnerGenerator.stored();
         }
 
         @Override
         protected void revertToSnapshot(Long snapshot) {
-            generator.load(snapshot, generator.joules(), generator.fuel().storedJoules(), generator.fuel().lastLitJoules());
+            burnerGenerator.load(snapshot, burnerGenerator.joules(), burnerGenerator.fuel().storedJoules(), burnerGenerator.fuel().lastLitJoules());
         }
 
         @Override
