@@ -51,9 +51,6 @@ public final class LocomotiveEntity extends CarEntity {
     private static final EntityDataAccessor<Component> DATA_STATUS =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.COMPONENT);
 
-    /** One past its last fuel slot in the cab. */
-    private static final int FUEL_END = LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS;
-
     /** What the cab holds, which the menu shows: the fuel slots. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
         @Override
@@ -138,11 +135,11 @@ public final class LocomotiveEntity extends CarEntity {
         return cab.getItem(LocomotiveMenu.FUEL + slot).copy();
     }
 
-    /** The first of its fuel slots holding fuel; -1 for none. */
+    /** The cab slot of the first of its fuel slots holding fuel; -1 for none. */
     private int firstFuelled() {
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END; slot++) {
-            if (fuelValue(level(), cab.getItem(slot)) > 0L) {
-                return slot;
+        for (int i = 0; i < Locomotive.FUEL_SLOTS; i++) {
+            if (fuelValue(level(), cab.getItem(LocomotiveMenu.FUEL + i)) > 0L) {
+                return LocomotiveMenu.FUEL + i;
             }
         }
         return -1;
@@ -197,16 +194,18 @@ public final class LocomotiveEntity extends CarEntity {
         int[] shares = shares(stack, stack.getCount());
         int added = 0;
         for (int i = 0; i < Locomotive.FUEL_SLOTS; i++) {
-            if (shares[i] <= 0) {
+            int share = shares[i];
+            if (share <= 0) {
                 continue;
             }
-            ItemStack in = cab.getItem(LocomotiveMenu.FUEL + i);
+            int slot = LocomotiveMenu.FUEL + i;
+            ItemStack in = cab.getItem(slot);
             if (in.isEmpty()) {
-                cab.setItem(LocomotiveMenu.FUEL + i, stack.copyWithCount(shares[i]));
+                cab.setItem(slot, stack.copyWithCount(share));
             } else {
-                in.grow(shares[i]);
+                in.grow(share);
             }
-            added += shares[i];
+            added += share;
         }
         if (added > 0) {
             cab.setChanged();
