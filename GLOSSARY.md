@@ -64,6 +64,14 @@ _Avoid_: engine (Wireworks' steam engine), loco
 A car that carries items, loaded and unloaded by the hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand through what it holds, which using it opens. Nobody rides one.
 _Avoid_: wagon, freight car
 
+**View**:
+A car's entity in a loaded chunk, showing where its Train puts it and what it holds. The Train, the car and its cargo and fuel are the level's; the view only shows them, and a car out of view has none.
+_Avoid_: car entity (for the car itself)
+
+**Abstract Train**:
+A Train with none of its cars in view, run by the level on the same tick and the same Spans as every other Train. It keeps its cargo, fuel, job, claims and riders, and its views reappear where it stands once its chunks load.
+_Avoid_: ghost train, virtual train, unloaded train
+
 **Straight leg**:
 Rail without a bend, square to the blocks: Spans each in line through both their Arms, or ending there, running along x or z. A Cargo car loads only on one, and a Station is placed only by one (ADR 0007).
 _Avoid_: straight track
