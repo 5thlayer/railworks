@@ -63,12 +63,13 @@ public class LocomotiveJadePlugin implements IWailaPlugin {
             if (!(accessor.getEntity() instanceof LocomotiveEntity car)) {
                 return;
             }
-            tooltip.add(car.statusSeen());
+            // Jade lays a line's elements out from the top, so the words would sit above the icons' middle.
+            tooltip.add(JadeUI.text(car.statusSeen()).alignSelfCenter());
             for (ItemStack icon : car.statusIconsSeen()) {
-                tooltip.append(JadeUI.item(icon, 1.0F, StatusLine.amount(icon.getCount())));
+                tooltip.append(JadeUI.item(icon, 1.0F, StatusLine.amount(icon.getCount())).alignSelfCenter());
             }
             if (car.statusMoreSeen() > 0) {
-                tooltip.append(JadeUI.text(StatusLine.more(car.statusMoreSeen())));
+                tooltip.append(JadeUI.text(StatusLine.more(car.statusMoreSeen())).alignSelfCenter());
             }
             double speed = car.speedPerSecond();
             tooltip.add(Component.translatable("tooltip.railworks.locomotive.jade.speed",
