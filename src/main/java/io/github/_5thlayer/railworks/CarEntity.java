@@ -53,6 +53,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.ItemAbilities;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -496,6 +497,22 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
             probe.move(0, -1, 0);
         }
         return super.getDismountLocationForPassenger(passenger);
+    }
+
+    // ---- logging out ----
+
+    /**
+     * A rider logging out is put off the car first, as a sneak would, before vanilla saves them and
+     * takes a vehicle with its one player aboard out of the world with them: the car stays its Train's,
+     * and they log back in where they got off.
+     */
+    public static void onRiderLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        Player player = event.getEntity();
+        // The root, as vanilla looks there: one riding a mob in the car gets off the mob, as a sneak
+        // would, and the car then carries no player.
+        if (player.getRootVehicle() instanceof CarEntity) {
+            player.stopRiding();
+        }
     }
 
     // ---- breaking it ----

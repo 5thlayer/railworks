@@ -18,6 +18,7 @@ import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -27,10 +28,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.entity.vehicle.boat.Boat;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -48,7 +52,8 @@ import net.minecraft.world.phys.Vec3;
  * numbers are {@code TrainTest}'s; what only a server can show is that the keys, the fuel slots
  * and the Rail reach the model and that the entity ends up where the model says. These tests share
  * the {@code locomotive_} prefix, but for the four fuel slots' (#53), which share {@code refuel_}
- * with the refuelling tests.
+ * with the refuelling tests, and for a rider logging out (#56), whose names share {@code logout_}
+ * with {@code LogisticsTests}' Train on its job.
  */
 final class LocomotiveTests {
 
@@ -89,6 +94,8 @@ final class LocomotiveTests {
         tests.test("locomotive_saved_before_trains_had_cars_loads_in_place", 20, LocomotiveTests::loadsLegacySave);
         tests.test("locomotive_cab_seats_its_rider_forward_facing_east", 20, helper -> seatsForward(helper, -45.0F, 1));
         tests.test("locomotive_cab_seats_its_rider_forward_facing_west", 20, helper -> seatsForward(helper, 45.0F, -1));
+        tests.test("logout_leaves_a_train_at_rest_where_it_stands", 60, LocomotiveTests::riderLogsOutAtRest);
+        tests.test("logout_takes_a_vehicle_that_is_no_car_out_with_its_rider", 20, LocomotiveTests::boaterLogsOut);
     }
 
     // ---- placing ----
@@ -628,6 +635,44 @@ final class LocomotiveTests {
     /** An Arm as the old record wrote it: its three coordinates. */
     private static IntArrayTag arm(Arm arm) {
         return new IntArrayTag(new int[] {arm.x(), arm.y(), arm.z()});
+    }
+
+    // ---- logging out ----
+
+    /** A rider logging out of a Train at rest, driven by hand, leaves it where it stands. */
+    private static void riderLogsOutAtRest(GameTestHelper helper) {
+        LocomotiveEntity locomotive = fuelled(helper);
+        Train train = locomotive.train();
+        var start = train.head();
+        ServerPlayer rider = board(helper, locomotive);
+        helper.getLevel().getServer().getPlayerList().remove(rider);
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    if (locomotive.isRemoved() || locomotive.isVehicle()) {
+                        helper.fail("the rider took their car out of the world, or is still in it", STAND);
+                    }
+                    if (!train.head().equals(start) || train.speed() != 0.0) {
+                        helper.fail("a Train at rest moved from " + start + " to " + train.head() + " as its rider logged out",
+                                STAND);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /** A vehicle that is no car goes with its one player as they log out, as vanilla has it. */
+    private static void boaterLogsOut(GameTestHelper helper) {
+        Boat boat = helper.spawn(EntityType.OAK_BOAT, STAND.above());
+        ServerPlayer rider = helper.makeMockServerPlayerInLevel();
+        if (!rider.startRiding(boat, true, false)) {
+            helper.fail("the player could not board the boat", STAND);
+            return;
+        }
+        helper.getLevel().getServer().getPlayerList().remove(rider);
+        if (boat.getRemovalReason() != Entity.RemovalReason.UNLOADED_WITH_PLAYER) {
+            helper.fail("the boat stayed behind its rider: " + boat.getRemovalReason(), STAND);
+        }
+        helper.succeed();
     }
 
     // ---- setup ----

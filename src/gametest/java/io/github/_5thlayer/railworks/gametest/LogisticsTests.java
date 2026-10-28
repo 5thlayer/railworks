@@ -32,10 +32,12 @@ import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -57,7 +59,8 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * planned, stacks moved, claims broken and fuel moved is {@code LogisticsTest}'s. These tests share
  * the {@code logistics_} prefix, but for a provider beside the leading car's place filling an
  * automatic Train's Locomotive with fuel that leaves nothing behind (#53), whose names share
- * {@code refuel_}.
+ * {@code refuel_}, and for a rider logging out of a Train on its job (#56), whose names share
+ * {@code logout_} with {@code LocomotiveTests}' logging out.
  */
 final class LogisticsTests {
 
@@ -91,6 +94,7 @@ final class LogisticsTests {
                 LogisticsTests::refuels);
         tests.testOnItsOwn("refuel_a_manual_train_is_left_alone", 200, LogisticsTests::refuelsNoManualTrain);
         tests.testOnItsOwn("refuel_a_stack_the_fuel_slots_cannot_take_is_passed_over", 400, LogisticsTests::refuelsPastAStack);
+        tests.testOnItsOwn("logout_leaves_the_riders_car_in_its_train_on_its_job", 1_200, LogisticsTests::riderLogsOut);
     }
 
     // ---- the mode ----
@@ -345,6 +349,63 @@ final class LogisticsTests {
                 .filter(pos -> !pos.equals(station))
                 .findFirst()
                 .orElseThrow(() -> helper.assertionException(station, Component.literal("nothing beside its leading car's place")));
+    }
+
+    // ---- logging out ----
+
+    /**
+     * A rider seated in the shuttle's leading Locomotive, its first car, logs out: they are put off it
+     * first and saved where they got off, and the car stays in the world, so its Train goes on with
+     * its job.
+     */
+    private static void riderLogsOut(GameTestHelper helper) {
+        Shuttle shuttle = running(helper);
+        LocomotiveEntity leading = shuttle.leading();
+        ServerPlayer rider = LocomotiveTests.board(helper, leading);
+        helper.startSequence()
+                // Logged out on the way to the Depot, its stack loaded and claimed.
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.to_unload"))
+                .thenExecute(() -> expectPutOffAsTheyLogOut(helper, rider, leading))
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.waiting"))
+                .thenExecute(() -> {
+                    if (leading.isRemoved() || held(record(helper, REQUESTER)) != 64) {
+                        helper.fail("the Train did not go on to deliver its stack to the Depot", DEPOT);
+                    }
+                })
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    /**
+     * Logs {@code rider} out of {@code car}, failing unless they were put off first, where the car's
+     * dismount rule puts them, and saved there.
+     */
+    private static void expectPutOffAsTheyLogOut(GameTestHelper helper, ServerPlayer rider, LocomotiveEntity car) {
+        Vec3 dismount = car.getDismountLocationForPassenger(rider);
+        PlayerList players = helper.getLevel().getServer().getPlayerList();
+        players.remove(rider);
+        if (car.isRemoved()) {
+            helper.fail("the rider took their car out of the world as they logged out: " + car.getRemovalReason(), MINE);
+        }
+        if (car.isVehicle()) {
+            helper.fail("the car still carries " + car.getPassengers() + " after its rider logged out", MINE);
+        }
+        if (!car.train().cars().getFirst().id().equals(car.carId())) {
+            helper.fail("the car is no longer its Train's first: " + car.train(), MINE);
+        }
+        CompoundTag saved = players.loadPlayerData(rider.nameAndId())
+                .orElseThrow(() -> helper.assertionException(MINE, Component.literal("the rider's data was not saved")));
+        // Vanilla's key for the vehicle a player is saved riding, to be put back in at login.
+        if (saved.contains("RootVehicle")) {
+            helper.fail("the rider was saved riding, to log back in in their car", MINE);
+        }
+        Vec3 off = rider.position();
+        Vec3 savedAt = saved.read("Pos", Vec3.CODEC)
+                .orElseThrow(() -> helper.assertionException(MINE, Component.literal("the rider was saved with no position")));
+        if (savedAt.distanceToSqr(off) > 1e-6 || off.distanceToSqr(dismount) > 1e-6) {
+            helper.fail("the rider was saved at " + savedAt + " and put off at " + off + ", not where the car puts a rider off, "
+                    + dismount, MINE);
+        }
     }
 
     // ---- setup ----
