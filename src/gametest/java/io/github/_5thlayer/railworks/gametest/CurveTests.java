@@ -94,7 +94,7 @@ final class CurveTests {
         Vec3 at = car.position();
         boolean crossed = false;
         for (int tick = 0; tick < 80 && !crossed; tick++) {
-            car.tick();
+            LocomotiveTests.step(car);
             float turned = Math.abs(Mth.wrapDegrees(car.getYRot() - yaw));
             double moved = car.position().distanceTo(at);
             // A tick moves a car well under a block, and the bend turns it a few degrees a block.

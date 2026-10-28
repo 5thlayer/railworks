@@ -483,7 +483,7 @@ final class LogisticsTests {
     }
 
     /** Places a Station at {@code pos}, which must go, by a player beside it. */
-    private static void station(GameTestHelper helper, BlockPos pos) {
+    static void station(GameTestHelper helper, BlockPos pos) {
         // Past the structure's floor there is nothing to click on.
         helper.setBlock(pos.below(), Blocks.STONE);
         ServerPlayer player = near(helper, pos.north(2));
@@ -500,7 +500,7 @@ final class LogisticsTests {
         return near(helper, LocomotiveTests.STAND);
     }
 
-    private static ServerPlayer near(GameTestHelper helper, BlockPos pos) {
+    static ServerPlayer near(GameTestHelper helper, BlockPos pos) {
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         BlockPos stand = helper.absolutePos(pos);
@@ -509,7 +509,7 @@ final class LogisticsTests {
     }
 
     /** {@code train} on the Rail, if it is not yet, and an entity of {@code type} viewing {@code car} of it. */
-    private static <T extends CarEntity> T spawn(GameTestHelper helper, EntityType<T> type, Train train, Car car) {
+    static <T extends CarEntity> T spawn(GameTestHelper helper, EntityType<T> type, Train train, Car car) {
         LevelRails rails = LevelRails.of(helper.getLevel());
         if (rails.trains().of(car.id()) == null) {
             rails.add(train);
@@ -521,19 +521,19 @@ final class LogisticsTests {
     }
 
     /** The hatch's record in the level's hatches, which its block puts there if it has not yet as it loads. */
-    private static Hatches.Hatch record(GameTestHelper helper, BlockPos pos) {
+    static Hatches.Hatch record(GameTestHelper helper, BlockPos pos) {
         return helper.getBlockEntity(pos, HatchBlockEntity.class).hatch()
                 .orElseThrow(() -> helper.assertionException(pos, Component.literal("no hatch in the level's hatches")));
     }
 
-    private static void insert(Hatches.Hatch hatch, ItemStack stack) {
+    static void insert(Hatches.Hatch hatch, ItemStack stack) {
         try (var transaction = Transaction.openRoot()) {
             ResourceHandlerUtil.insertStacking(hatch.contents(), ItemResource.of(stack), stack.getCount(), transaction);
             transaction.commit();
         }
     }
 
-    private static long held(Hatches.Hatch hatch) {
+    static long held(Hatches.Hatch hatch) {
         long held = 0;
         for (int slot = 0; slot < hatch.contents().size(); slot++) {
             held += hatch.contents().getAmountAsLong(slot);
@@ -542,7 +542,7 @@ final class LogisticsTests {
     }
 
     /** The hatch at {@code pos} joins the Station at {@code station}, at its first car spot. */
-    private static void expectJoined(GameTestHelper helper, BlockPos pos, BlockPos station) {
+    static void expectJoined(GameTestHelper helper, BlockPos pos, BlockPos station) {
         Optional<Platform.Joined> joined = PlatformsNear.joined(helper.getLevel(), helper.absolutePos(pos));
         BlockPos at = helper.absolutePos(station);
         if (joined.isEmpty() || joined.get().spot() != 0 || joined.get().station().x() != at.getX()

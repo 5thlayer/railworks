@@ -224,8 +224,8 @@ final class CargoCarTests {
         LocomotiveTests.press(driver, true, false);
         double cargoAt = cargo.getX();
         for (int i = 0; i < 10; i++) {
-            locomotive.tick();
-            cargo.tick();
+            LocomotiveTests.step(locomotive);
+            LocomotiveTests.step(cargo);
         }
         if (cargo.getX() != cargoAt || locomotive.train().speed() <= 0.0) {
             helper.fail("the uncoupled car moved with the Locomotive, or the Locomotive did not move", STAND);
@@ -334,9 +334,9 @@ final class CargoCarTests {
         LocomotiveTests.press(driver, true, false);
         double spacing = (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0;
         double start = cargo.getX();
-        // Only the first car's tick runs the Train, and it moves the car behind with it.
+        // The Train ticks once, and moves the car behind with it.
         for (int i = 0; i < 15; i++) {
-            locomotive.tick();
+            LocomotiveTests.step(locomotive);
             if (Math.abs(locomotive.getX() - cargo.getX() - spacing) > 1e-6) {
                 helper.fail("on tick " + i + " the car behind is " + (locomotive.getX() - cargo.getX()) + " back", STAND);
             }
@@ -414,7 +414,7 @@ final class CargoCarTests {
         CargoCarEntity cargo = placeCargoBeside(helper, locomotive, -1);
         var network = LevelRails.of(helper.getLevel()).network();
         network.remove(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))), PylonColumn.arm(helper.absolutePos(B.above(HEIGHT - 1))));
-        cargo.tick();
+        LocomotiveTests.step(cargo);
         if (!locomotive.isRemoved() || !cargo.isRemoved()) {
             helper.fail("a Train whose Span was cut left a car in the world", STAND);
         }

@@ -2,7 +2,8 @@
 # of its own, 24 blocks wide and 13 deep. The scenes stand in rows of three, read west to east and
 # then north, each row 16 blocks north of the one before, so the whole gallery stays near where it is
 # run. The third row is logistics, Trains running jobs from provider hatches to requesters, and then
-# the flyover; the fourth begins with a Train fuelled at its Station.
+# the flyover; the fourth begins with a Train fuelled at its Station, and then one whose line runs out
+# east past the gallery and the chunks loaded around it.
 function railworks:gallery/pylons
 execute positioned ~24 ~ ~ run function railworks:gallery/limits
 execute positioned ~48 ~ ~ run function railworks:gallery/curves
@@ -13,3 +14,4 @@ execute positioned ~ ~ ~-32 run function railworks:gallery/logistics
 execute positioned ~24 ~ ~-32 run function railworks:gallery/two_loads
 execute positioned ~48 ~ ~-32 run function railworks:gallery/flyover
 execute positioned ~ ~ ~-48 run function railworks:gallery/refuel
+execute positioned ~24 ~ ~-48 run function railworks:gallery/far_away

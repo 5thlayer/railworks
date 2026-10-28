@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import com.mojang.logging.LogUtils;
 import io.github._5thlayer.railworks.rail.Impact;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -21,6 +22,7 @@ import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -31,6 +33,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -38,6 +41,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.InterpolationHandler;
@@ -49,6 +53,7 @@ import net.minecraft.world.entity.vehicle.VehicleEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
@@ -56,13 +61,17 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
 
 /**
  * A car in the world: the view of its {@link Car}, coupled into a {@link Train} that
  * {@link LevelRails} owns. The model holds the place, speed and heading (the Train's) and which way
  * the car faces in it; this entity rides the Rail where the model puts its car and mirrors what a
  * client needs (the renderer's heading, Jade, the Placement Preview's coupling) into synched data.
- * The view of a Train's first car runs the Train's tick and moves the other cars' views with it.
+ * It never runs its Train: the level ticks every Train, in view or not, and moves each view after
+ * (ADR 0004, amended in #6). The level makes a car's view where its Train puts it once that spot
+ * ticks entities and takes it away, breaking nothing, once it does not, so a view is never saved with
+ * its chunk; one found in a chunk saved before is only a record to hand over, and goes.
  *
  * <p>Using a car boards it. Sneaking at it opens its menu, as does the inventory key while riding;
  * sneaking gets off. A kind of car nobody rides, the Cargo car, opens its menu when used instead. Shears uncouple it from the car on the side used, parting a Train at rest in
@@ -71,6 +80,8 @@ import org.jspecify.annotations.Nullable;
  * on is cut.
  */
 public abstract class CarEntity extends VehicleEntity implements HasCustomInventoryScreen {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     public static final float WIDTH = (float) CarBody.WIDTH;
     public static final float HEIGHT = (float) CarBody.HEIGHT;
@@ -107,6 +118,10 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     private @Nullable UUID carId;
     /** What a view with no car's record holds: on a client, or before it is set as a car's view. Saved nowhere. */
     private @Nullable SimpleContainer loose;
+    /** The game time it last ticked, so the level ticks a view a player rides where the level would not. */
+    private long tickedAt = -1L;
+    /** Taken out of the world without breaking: by the level, as a view goes or a stale one is dropped. */
+    private boolean quiet;
 
     protected CarEntity(EntityType<? extends CarEntity> type, Level level) {
         super(type, level);
@@ -216,31 +231,12 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         }
         super.tick();
         interpolation.interpolate();
-        if (level() instanceof ServerLevel server) {
-            tickServer(server);
-        }
+        tickedAt = level().getGameTime();
     }
 
-    private void tickServer(ServerLevel level) {
-        LevelRails rails = LevelRails.of(level);
-        Train train = train();
-        if (train == null) {
-            // No Train holds its car: a world saved between the two, or the car was dropped.
-            destroy(level, damageSources().generic());
-            return;
-        }
-        rails.bind(this);
-        if (!train.onRail(rails.network())) {
-            // A Span it stood on was cut, or its Arm moved: the whole Train falls off the Rail.
-            rails.derail(level, train);
-            return;
-        }
-        // The first car's view runs its Train's tick, a Train moving once a tick whatever its length.
-        if (train.cars().getFirst().id().equals(carId)) {
-            rails.tick(level, train);
-        }
-        moveToModel(train);
-        syncFromModel(train);
+    /** Whether it ticked this game tick, as the level ticks the entities of the chunks that tick them. */
+    boolean tickedThisTick() {
+        return tickedAt == level().getGameTime();
     }
 
     /** Sets the entity where the model says its car is: on the Rail, facing its own way. */
@@ -518,15 +514,131 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         }
     }
 
+    // ---- coming and going ----
+
+    /** Never saved with its chunk: the level's Trains hold the car, and the level makes its view. */
+    @Override
+    public boolean shouldBeSaved() {
+        return false;
+    }
+
+    /**
+     * Tracked and kept on the level's ticking list wherever it is, as a player is: a Locomotive can
+     * outrun the chunks loading under its rider, and a view the level keeps for its rider must stay seen.
+     * A constant, as the level's entity sections ask it whenever they like.
+     */
+    @Override
+    public boolean isAlwaysTicking() {
+        return true;
+    }
+
+    /** Whether a player rides it, whom the level never takes the view away from. */
+    boolean riddenByPlayer() {
+        return getPassengers().stream().anyMatch(passenger -> passenger instanceof Player);
+    }
+
+    /**
+     * Taken out of the world as its spot stops ticking, breaking nothing: a mob riding it rides on in
+     * its car's record, as its saved entity data, and is taken out with it; whoever else rides it gets off.
+     */
+    void takeAway(ServerLevel level) {
+        Entity mob = mobRider();
+        if (keepRider(level) && mob != null) {
+            List<Entity> riding = mob.getSelfAndPassengers().toList();
+            mob.stopRiding();
+            riding.forEach(entity -> entity.remove(RemovalReason.UNLOADED_TO_CHUNK));
+        }
+        drop();
+    }
+
+    /** The mob riding it, not a player; null for none. */
+    private @Nullable Entity mobRider() {
+        return getPassengers().stream().filter(passenger -> !(passenger instanceof Player)).findFirst().orElse(null);
+    }
+
+    /**
+     * Keeps in its car's record the mob riding it, as its saved entity data, or that none does; whether
+     * a mob was kept.
+     */
+    boolean keepRider(ServerLevel level) {
+        if (carId == null || LevelCarRecords.of(level).of(carId).isEmpty()) {
+            return false;
+        }
+        Entity mob = mobRider();
+        CompoundTag rider = mob == null ? null : saved(mob);
+        LevelCarRecords.of(level).ensure(carId, recordSlots()).setRider(rider);
+        return rider != null;
+    }
+
+    /** Taken out of the world, breaking nothing and dropping nothing. */
+    void drop() {
+        quiet = true;
+        LevelRails.of((ServerLevel) level()).unbind(this);
+        remove(RemovalReason.UNLOADED_TO_CHUNK);
+    }
+
+    /** {@code entity} with what rides it as its chunk would save it; null for one that is not saved. */
+    private static @Nullable CompoundTag saved(Entity entity) {
+        try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(entity.problemPath(), LOGGER)) {
+            TagValueOutput output = TagValueOutput.createWithContext(reporter, entity.registryAccess());
+            return entity.saveAsPassenger(output) ? output.buildResult() : null;
+        }
+    }
+
+    /** Seats again the mob its car's record says rode it out of view, as the view comes back. */
+    void seatRider(ServerLevel level) {
+        Entity rider = takeRider(level, position());
+        if (rider != null) {
+            rider.startRiding(this, true, false);
+        }
+    }
+
+    /**
+     * The mob {@code car}'s record says rode it out of view, put back in the world at {@code at} and
+     * taken out of the record; null for none, or for one whose entity is somehow still in the world.
+     */
+    private static @Nullable Entity takeRider(ServerLevel level, UUID car, Vec3 at) {
+        var record = LevelCarRecords.of(level).of(car).orElse(null);
+        if (record == null || record.rider() == null) {
+            return null;
+        }
+        CompoundTag saved = record.rider();
+        record.setRider(null);
+        Entity rider = EntityType.loadEntityRecursive(saved, level, EntitySpawnReason.LOAD, entity -> {
+            entity.snapTo(at.x, at.y, at.z, entity.getYRot(), entity.getXRot());
+            return entity;
+        });
+        return rider != null && level.tryAddFreshEntityWithPassengers(rider) ? rider : null;
+    }
+
+    private @Nullable Entity takeRider(ServerLevel level, Vec3 at) {
+        return carId == null ? null : takeRider(level, carId, at);
+    }
+
+    /**
+     * A car of a Train that fell off the Rail out of view comes off it now its spot ticks: it drops
+     * itself and what it holds at {@code at}, and the mob that rode it gets out there.
+     */
+    static void fallOff(ServerLevel level, CarKind kind, UUID car, Vec3 at) {
+        CarEntity view = kind.entityType().create(level, EntitySpawnReason.LOAD);
+        if (view == null) {
+            return;
+        }
+        view.carId = car;
+        view.setPos(at.x, at.y, at.z);
+        takeRider(level, car, at);
+        view.breakOff(level);
+    }
+
     // ---- breaking it ----
 
     /**
      * Gone for good, broken, dropped or discarded rather than unloaded: what it holds drops, and its
-     * Train closes up without it.
+     * Train closes up without it. Taken away by the level, it keeps its car.
      */
     @Override
     public void remove(RemovalReason reason) {
-        if (level() instanceof ServerLevel server && reason.shouldDestroy()) {
+        if (level() instanceof ServerLevel server && reason.shouldDestroy() && !quiet) {
             dropContents(server);
             if (carId != null) {
                 LevelRails.of(server).carGone(carId);
@@ -535,13 +647,22 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         super.remove(reason);
     }
 
+    /**
+     * The level's own view of its car is bound already, and its record is made with it, so a car in a
+     * Train has one in view or not. Any other, found in a chunk saved before views were never saved, or
+     * summoned, or copied in from another level, is stale: the level drops it, or breaks it when no
+     * Train holds its car.
+     */
     @Override
     public void onAddedToLevel() {
         super.onAddedToLevel();
-        if (carId != null && level() instanceof ServerLevel server) {
-            LevelRails.of(server).bind(this);
-            // Its record is made with its view, so a car in a Train has one in view or not.
-            record();
+        if (level() instanceof ServerLevel server) {
+            LevelRails rails = LevelRails.of(server);
+            if (carId != null && rails.viewOf(carId) == this) {
+                record();
+            } else {
+                rails.stale(this);
+            }
         }
     }
 
@@ -559,14 +680,16 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     }
 
     /**
-     * Copied into another level, as an entity is through a portal or {@code /tp}: its record goes with
-     * it, so the copy, finding no Train there, breaks dropping what the car held.
+     * Copied into another level, as an entity is through a portal or {@code /tp}: the car leaves its
+     * Train there, which closes up without it, so the level shows it no more, and its record goes with
+     * it, so the copy, finding no Train, breaks dropping what the car held.
      */
     @Override
     public void restoreFrom(Entity oldEntity) {
         super.restoreFrom(oldEntity);
         if (carId != null && oldEntity.level() instanceof ServerLevel from && level() instanceof ServerLevel to
                 && from != to) {
+            LevelRails.of(from).carGone(carId);
             LevelCarRecords.of(from).remove(carId)
                     .ifPresent(record -> LevelCarRecords.of(to).handOver(carId, recordSlots(), record.getItems()));
         }
@@ -660,7 +783,12 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
                 || !(level() instanceof ServerLevel server)) {
             return;
         }
-        LevelRails.of(server).add(train);
+        LevelRails rails = LevelRails.of(server);
+        if (train.cars().stream().anyMatch(car -> rails.trains().of(car.id()) != null)) {
+            // Taken in already, from another of its cars' saved entities.
+            return;
+        }
+        rails.add(train);
         Car car = train.cars().get(index);
         // Before the view shows it, which would make the car an empty record.
         LevelCarRecords.of(server).handOver(car.id(), recordSlots(), saved);

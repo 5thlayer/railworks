@@ -131,5 +131,9 @@
   "railworks.gallery.refuel": "Refuel",
   "railworks.gallery.refuel.1": "A provider of",
   "railworks.gallery.refuel.2": "coal fuels the",
-  "railworks.gallery.refuel.3": "Train standing by"
+  "railworks.gallery.refuel.3": "Train standing by",
+  "railworks.gallery.far_away": "Far Away",
+  "railworks.gallery.far_away.1": "Its Train runs",
+  "railworks.gallery.far_away.2": "on out of view",
+  "railworks.gallery.far_away.3": "and comes back"
 }

@@ -8,6 +8,7 @@ import java.util.List;
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.railworks.LevelCarRecords;
+import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.LocomotiveMenu;
@@ -25,6 +26,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntArrayTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
@@ -379,7 +381,7 @@ final class LocomotiveTests {
         press(driver, true, false);
         double start = car.getX();
         for (int tick = 0; tick < 25; tick++) {
-            car.tick();
+            step(car);
             driver.rideTick();
             // Seated in the cab, forward of the car's middle; the car faces east.
             if (Math.abs(driver.getX() - (car.getX() + 0.3)) > 0.01 || Math.abs(driver.getZ() - car.getZ()) > 0.01) {
@@ -467,7 +469,7 @@ final class LocomotiveTests {
         LocomotiveEntity car = fuelled(helper);
         var network = LevelRails.of(helper.getLevel()).network();
         network.remove(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))), PylonColumn.arm(helper.absolutePos(B.above(HEIGHT - 1))));
-        car.tick();
+        step(car);
         if (!car.isRemoved()) {
             helper.fail("a car whose Span was cut stayed in the world", STAND);
         }
@@ -498,7 +500,7 @@ final class LocomotiveTests {
         }
         Span moved = Span.of(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))),
                 PylonColumn.arm(helper.absolutePos(B.above(HEIGHT))), 8);
-        car.tick();
+        step(car);
         if (car.isRemoved() || !car.holds(moved)) {
             helper.fail("a car on a Span whose Arm moved should stay on it, removed=" + car.isRemoved(), STAND);
         }
@@ -768,7 +770,16 @@ final class LocomotiveTests {
 
     static void run(LocomotiveEntity car, int ticks) {
         for (int i = 0; i < ticks; i++) {
-            car.tick();
+            step(car);
+        }
+    }
+
+    /** One tick of {@code car}'s Train, as the level ticks it, on top of the level's own. */
+    static void step(CarEntity car) {
+        ServerLevel level = (ServerLevel) car.level();
+        Train train = car.train();
+        if (train != null) {
+            LevelRails.of(level).step(level, train);
         }
     }
 

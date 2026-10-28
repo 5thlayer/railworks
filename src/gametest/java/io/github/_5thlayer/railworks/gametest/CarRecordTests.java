@@ -281,6 +281,10 @@ final class CarRecordTests {
                 || there.isEmpty() || !ItemStack.matches(there.get().getItem(2), new ItemStack(Items.IRON_ORE, 12))) {
             helper.fail("the record did not go with the car into the Nether: " + there, STAND);
         }
+        // Nor does the car stay in its Train here, where the level would show it again, holding nothing.
+        if (LevelRails.of(helper.getLevel()).trains().of(cargo.carId()) != null) {
+            helper.fail("the car stayed in its Train in the level it left", STAND);
+        }
         LevelCarRecords.of(nether).remove(cargo.carId());
         helper.succeed();
     }

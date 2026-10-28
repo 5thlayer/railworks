@@ -30,12 +30,14 @@ import io.github._5thlayer.railworks.rail.Stringing;
 import io.github._5thlayer.railworks.rail.Throttle;
 import io.github._5thlayer.railworks.rail.Train;
 import io.github._5thlayer.railworks.rail.Trains;
+import io.github._5thlayer.railworks.rail.Views;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -46,44 +48,70 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A level's Spans and its Trains, saved with it. The rules are {@link Stringing}'s and the storage
- * {@link RailNetwork}'s and {@link Trains}'; this is where they meet a world. It also knows each car's
- * loaded entity, its view, so a Train's tick can read its drivers' keys and move every car it has
- * in view; its Locomotives' fuel slots are their records in {@link LevelCarRecords}, in view or
- * not. Its {@link Logistics}, which runs the automatic Trains' jobs between the level's hatches,
- * ticks with the level and is not saved.
+ * {@link RailNetwork}'s and {@link Trains}'; this is where they meet a world. Every Train ticks from
+ * the level's tick, in view or not (ADR 0004, amended in #6), and an abstract Train is simply one
+ * with none of its cars in view. The level shows a car where its Train puts it once that spot ticks
+ * entities, as {@link Views} says, and knows each car's view, so a Train's tick can read its drivers'
+ * keys and move every car it has in view; its cars' cargo and fuel are their records in
+ * {@link LevelCarRecords}, in view or not. Trains never keep a chunk loaded. Its {@link Logistics},
+ * which runs the automatic Trains' jobs between the level's hatches, ticks with the level and is not
+ * saved.
  */
 public final class LevelRails extends SavedData {
 
     private static final Codec<LevelRails> CODEC = RecordCodecBuilder.create(i -> i.group(
             RailNetwork.CODEC.fieldOf("spans").forGetter(data -> data.network),
-            Trains.CODEC.optionalFieldOf("trains").forGetter(data -> Optional.of(data.trains))
-    ).apply(i, (network, trains) -> new LevelRails(network, trains.orElseGet(Trains::new))));
+            Trains.CODEC.optionalFieldOf("trains").forGetter(data -> Optional.of(data.trains)),
+            Fallen.CODEC.listOf().optionalFieldOf("fallen", List.of()).forGetter(data -> List.copyOf(data.fallen))
+    ).apply(i, (network, trains, fallen) -> new LevelRails(network, trains.orElseGet(Trains::new), fallen)));
 
     public static final SavedDataType<LevelRails> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(Railworks.MOD_ID, "spans"),
             LevelRails::new, CODEC);
 
+    /**
+     * A car of a Train that fell off the Rail out of view (#6), standing where it was, {@code at} in the
+     * world, until its spot ticks and it comes off the Rail there.
+     */
+    record Fallen(UUID car, String kind, Vec3 at) {
+
+        static final Codec<Fallen> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Car.ID_CODEC.fieldOf("car").forGetter(Fallen::car),
+                Codec.STRING.fieldOf("kind").forGetter(Fallen::kind),
+                Vec3.CODEC.fieldOf("at").forGetter(Fallen::at)
+        ).apply(i, Fallen::new));
+    }
+
     private final RailNetwork network;
     private final Trains trains;
-    /** Each loaded car's entity, by its car's id. */
+    private final List<Fallen> fallen;
+    /** Each car's view, by its car's id. */
     private final Map<UUID, CarEntity> views = new HashMap<>();
+    /** Entities added to the level that are no car's view, dropped or broken at its next tick. */
+    private final List<CarEntity> stale = new ArrayList<>();
+    /** Where each car of a Train stood in the world after the level's last tick. */
+    private Map<UUID, Vec3> standing = Map.of();
     private final Logistics<Item> logistics = new Logistics<>();
     /** The hatches that join a Station as logistics last asked, in the order they were placed; asked afresh once a plan. */
     private List<Logistics.Hatch<Item>> joined = List.of();
     private int ticks;
 
     public LevelRails() {
-        this(new RailNetwork(), new Trains());
+        this(new RailNetwork(), new Trains(), List.of());
     }
 
-    private LevelRails(RailNetwork network, Trains trains) {
+    private LevelRails(RailNetwork network, Trains trains, List<Fallen> fallen) {
         this.network = network;
         this.trains = trains;
+        this.fallen = new ArrayList<>(fallen);
     }
 
     public static LevelRails of(ServerLevel level) {
@@ -100,7 +128,7 @@ public final class LevelRails extends SavedData {
 
     // ---- the Trains ----
 
-    /** {@code car} is in view: its Train's tick moves it. */
+    /** {@code car} is its car's view: its Train's tick moves it. */
     void bind(CarEntity car) {
         if (car.carId() != null) {
             views.put(car.carId(), car);
@@ -113,10 +141,20 @@ public final class LevelRails extends SavedData {
         }
     }
 
-    /** The loaded entity of {@code car}, or null when it has none in view. */
-    public CarEntity view(Car car) {
-        CarEntity view = views.get(car.id());
+    /** The view of {@code car}, or null when it has none. */
+    public @Nullable CarEntity view(Car car) {
+        return viewOf(car.id());
+    }
+
+    /** The view of the car with this id, or null when it has none. */
+    @Nullable CarEntity viewOf(UUID car) {
+        CarEntity view = views.get(car);
         return view == null || view.isRemoved() ? null : view;
+    }
+
+    /** {@code entity} was added to the level as no car's view: the level's next tick drops it, or breaks it. */
+    void stale(CarEntity entity) {
+        stale.add(entity);
     }
 
     /** A new Train, set on the Rail: it is saved and ticks from now on. */
@@ -126,7 +164,142 @@ public final class LevelRails extends SavedData {
     }
 
     /**
-     * One tick of {@code train}, from its first car's view: the keys of the first player driving one
+     * The level ticked: every Train, once, in view or not, then its views, shown and taken away as
+     * their spots tick or stop ticking. Frozen by {@code /tick freeze}, as entities are.
+     */
+    private void tickTrains(ServerLevel level) {
+        dropStale(level);
+        for (Train train : trains.all()) {
+            // Not one a Train before it this tick has parted from or closed up into.
+            if (trains.of(train.cars().getFirst().id()) == train) {
+                step(level, train);
+            }
+        }
+        showViews(level);
+    }
+
+    /**
+     * One tick of {@code train}, as the level ticks it: off the Rail when a Span it stands on was cut or
+     * its Arm moved, else its {@link #tick}.
+     */
+    public void step(ServerLevel level, Train train) {
+        if (!train.onRail(network)) {
+            derail(level, train);
+            return;
+        }
+        tick(level, train);
+    }
+
+    /**
+     * Each entity added as no car's view goes: dropped, breaking nothing, when a Train holds its car,
+     * which the level shows by a view of its own; broken, dropping itself and what its car held, when
+     * none does, as a car whose Train is gone, or one summoned with no car.
+     */
+    private void dropStale(ServerLevel level) {
+        List<CarEntity> found = List.copyOf(stale);
+        stale.clear();
+        for (CarEntity entity : found) {
+            if (entity.isRemoved()) {
+                continue;
+            }
+            UUID car = entity.carId();
+            if (car != null && trains.of(car) != null) {
+                entity.drop();
+            } else {
+                entity.breakOff(level);
+            }
+        }
+    }
+
+    /**
+     * Shows each car whose spot ticks entities and that has no view, and takes away each view whose
+     * spot does not, but one a player rides, which it ticks itself where the level did not, so its
+     * rider is never frozen or left behind. A fallen car comes off the Rail once its spot ticks.
+     */
+    private void showViews(ServerLevel level) {
+        Set<UUID> viewed = new LinkedHashSet<>();
+        Set<UUID> ridden = new LinkedHashSet<>();
+        views.forEach((car, view) -> {
+            if (!view.isRemoved()) {
+                viewed.add(car);
+                if (view.riddenByPlayer()) {
+                    ridden.add(car);
+                }
+            }
+        });
+        Views.Change change = Views.plan(network, trains, point -> ticks(level, CarPlacement.railPoint(point)), viewed, ridden);
+        Map<UUID, Vec3> now = new HashMap<>();
+        change.at().forEach((car, point) -> now.put(car, CarPlacement.railPoint(point)));
+        standing = now;
+        for (UUID car : change.takeAway()) {
+            CarEntity view = viewOf(car);
+            if (view != null) {
+                view.takeAway(level);
+            }
+        }
+        for (Views.Shown shown : change.show()) {
+            show(level, shown.train(), shown.car());
+        }
+        for (UUID car : ridden) {
+            CarEntity view = viewOf(car);
+            if (view != null && !view.tickedThisTick()) {
+                level.guardEntityTick(level::tickNonPassenger, view);
+            }
+        }
+        if (fallen.removeIf(car -> {
+            if (!ticks(level, car.at())) {
+                return false;
+            }
+            CarKind kind = CarKind.of(car.kind());
+            if (kind != null) {
+                CarEntity.fallOff(level, kind, car.car(), car.at());
+            }
+            return true;
+        })) {
+            setDirty();
+        }
+    }
+
+    /** Whether {@code at} ticks entities, its chunk's saved ones loaded, so a view there is shown and moves. */
+    private static boolean ticks(ServerLevel level, Vec3 at) {
+        BlockPos pos = BlockPos.containing(at);
+        return level.isPositionEntityTicking(pos) && level.areEntitiesActuallyLoadedAndTicking(ChunkPos.containing(pos));
+    }
+
+    /** Makes {@code car}'s view where {@code train} puts it, with the mob its record says rode it. */
+    private void show(ServerLevel level, Train train, Car car) {
+        CarKind kind = CarKind.of(car.kind());
+        CarEntity view = kind == null ? null : kind.entityType().create(level, EntitySpawnReason.LOAD);
+        if (view == null) {
+            return;
+        }
+        view.setCar(train, car);
+        level.addFreshEntity(view);
+        view.seatRider(level);
+    }
+
+    /**
+     * Keeps in each car's record the mob riding its view, as the level is saved, so one riding as the
+     * server stops, which no chunk saves with the view, rides on when it starts again.
+     */
+    void keepRiders(ServerLevel level) {
+        views.values().stream().filter(view -> !view.isRemoved()).toList().forEach(view -> view.keepRider(level));
+    }
+
+    /** The server is stopping: each level keeps its views' riders before it is saved for the last time. */
+    public static void onServerStopping(ServerStoppingEvent event) {
+        event.getServer().getAllLevels().forEach(level -> of(level).keepRiders(level));
+    }
+
+    /** A level was saved: it keeps its views' riders for its next save, should the server stop without one. */
+    public static void onLevelSaved(LevelEvent.Save event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            of(level).keepRiders(level);
+        }
+    }
+
+    /**
+     * One tick of {@code train}, from the level's tick: the keys of the first player driving one
      * of its Locomotives, or, with no driver pressing one, its job while it is automatic; each
      * Locomotive's fuel slot; and every car it has in view set where the model now puts it. A driver's
      * keys switch an automatic Train to manual, as in Factorio. Left at rest by a Station with nobody
@@ -207,10 +380,17 @@ public final class LevelRails extends SavedData {
         return new LevelGoods(level);
     }
 
-    /** The level ticked: its logistics too, with the hatches that join a Station asked afresh once a plan. */
+    /**
+     * The level ticked: its Trains, unless the game is frozen, and its logistics, with the hatches that
+     * join a Station asked afresh once a plan.
+     */
     public static void onLevelTick(LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            of(level).tickLogistics(level);
+            LevelRails rails = of(level);
+            if (level.tickRateManager().runsNormally()) {
+                rails.tickTrains(level);
+            }
+            rails.tickLogistics(level);
         }
     }
 
@@ -233,7 +413,11 @@ public final class LevelRails extends SavedData {
         return List.copyOf(joined);
     }
 
-    /** {@code train} fell off the Rail: it is gone, and each of its cars in view breaks, dropping itself and what it holds. */
+    /**
+     * {@code train} fell off the Rail: it is gone, and each of its cars in view breaks, dropping itself
+     * and what it holds. Each out of view stands where it was until its spot ticks, so nothing drops
+     * into a chunk that is not loaded and no car is lost.
+     */
     void derail(ServerLevel level, Train train) {
         trains.remove(train);
         setDirty();
@@ -241,8 +425,21 @@ public final class LevelRails extends SavedData {
             CarEntity view = view(car);
             if (view != null) {
                 view.breakOff(level);
+            } else {
+                Vec3 at = standing.get(car.id());
+                fallen.add(new Fallen(car.id(), car.kind(), at != null ? at : CarPlacement.railPoint(train.head().point(network))));
             }
         }
+    }
+
+    /** Where the car with this id stood in the world after the level's last tick, in view or not; null for no car of a Train. */
+    public @Nullable Vec3 standing(UUID car) {
+        return standing.get(car);
+    }
+
+    /** The cars that fell off the Rail out of view and have not yet come off it, by id. */
+    public List<UUID> fallen() {
+        return fallen.stream().map(Fallen::car).toList();
     }
 
     /** Parts {@code train} at coupler {@code at}; null, changing nothing, while it moves. */

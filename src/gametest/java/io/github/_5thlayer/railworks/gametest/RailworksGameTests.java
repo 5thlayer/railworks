@@ -15,12 +15,14 @@ import net.minecraft.gametest.framework.GameTestInstance;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.block.Rotation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
@@ -41,6 +43,16 @@ public final class RailworksGameTests {
     private static final DeferredRegister<MapCodec<? extends TestEnvironmentDefinition<?>>> ENVIRONMENT_TYPES =
             DeferredRegister.create(Registries.TEST_ENVIRONMENT_DEFINITION_TYPE, Railworks.MOD_ID);
 
+    private static final DeferredRegister<TicketType> TICKET_TYPES = DeferredRegister.create(Registries.TICKET_TYPE, Railworks.MOD_ID);
+
+    /**
+     * A chunk ticket of the tests' own, which loads and simulates the chunks it is on: a test adds and
+     * removes it around a stretch it wants in view and out, never a forced chunk, which the runner
+     * lets go of whenever a batch ends.
+     */
+    static final DeferredHolder<TicketType, TicketType> IN_VIEW = TICKET_TYPES.register("in_view",
+            () -> new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION));
+
     static {
         TEST_TYPES.register("code", () -> CodeGameTest.CODEC);
         ENVIRONMENT_TYPES.register("left_drive", () -> LeftDrive.CODEC);
@@ -57,6 +69,7 @@ public final class RailworksGameTests {
     public static void register(IEventBus modBus) {
         TEST_TYPES.register(modBus);
         ENVIRONMENT_TYPES.register(modBus);
+        TICKET_TYPES.register(modBus);
         // Posted only when game tests are enabled, which a production game never is.
         modBus.addListener(RailworksGameTests::registerTests);
     }
@@ -67,6 +80,7 @@ public final class RailworksGameTests {
         var leftDrive = event.registerEnvironment(id("left_drive"), new LeftDrive());
         var tests = new Registrar(event, environment, leftDrive);
         HeardSounds.listen();
+        FarAwayTests.listen();
         LoadTests.register(tests);
         GameTestPackTests.register(tests);
         CreativeTabTests.register(tests);
@@ -88,6 +102,7 @@ public final class RailworksGameTests {
         CollisionTests.register(tests);
         ClearanceTests.register(tests);
         ClearanceKeptTests.register(tests);
+        FarAwayTests.register(tests);
     }
 
     private static Identifier id(String path) {

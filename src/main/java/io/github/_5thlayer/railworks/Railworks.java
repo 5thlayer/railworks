@@ -36,6 +36,8 @@ public final class Railworks {
         modBus.addListener(Railworks::registerPayloads);
         NeoForge.EVENT_BUS.addListener(LevelRails::onChunkSent);
         NeoForge.EVENT_BUS.addListener(LevelRails::onLevelTick);
+        NeoForge.EVENT_BUS.addListener(LevelRails::onLevelSaved);
+        NeoForge.EVENT_BUS.addListener(LevelRails::onServerStopping);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(SpanGesture::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(LevelClearance::onBlockPlaced);

@@ -11,6 +11,7 @@ import io.github._5thlayer.railworks.rail.Locomotive;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import org.jspecify.annotations.Nullable;
 
 /** The cars an item sets on the Rail: the model's car, its entity, and the block its Placement Preview draws. */
 public enum CarKind {
@@ -32,6 +33,16 @@ public enum CarKind {
         this.preview = preview;
         this.create = create;
         this.entityType = entityType;
+    }
+
+    /** The kind whose model car's {@link Car#kind()} is {@code model}; null for none. */
+    static @Nullable CarKind of(String model) {
+        for (CarKind kind : values()) {
+            if (kind.model.equals(model)) {
+                return kind;
+            }
+        }
+        return null;
     }
 
     /** The {@link Car#kind()} of its model car. */
