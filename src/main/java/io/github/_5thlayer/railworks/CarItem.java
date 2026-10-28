@@ -8,7 +8,9 @@ import io.github._5thlayer.groundworks.PlansPlacement;
 import io.github._5thlayer.railworks.client.ClientRails;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Train;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -36,6 +38,9 @@ public final class CarItem extends Item implements PlansPlacement {
     /** An iron block's place sound pitched down, as vanilla's {@code BlockItem} pitches a block's, for a heavy thing set on the Rail. */
     private static final float PLACE_PITCH = 0.8F;
 
+    /** The action-bar line for a car refused as {@link RailworksRefusal#LOCOMOTIVE_BETWEEN_CARS}. */
+    static final String BETWEEN_CARS = "message.railworks.locomotive_between_cars";
+
     private final CarKind kind;
 
     public CarItem(CarKind kind, Item.Properties properties) {
@@ -60,6 +65,10 @@ public final class CarItem extends Item implements PlansPlacement {
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         var result = CarPlacement.plan(level, networkOf(level), player, player.blockPosition(), kind);
         if (result == null || result.car() == null || (result.train() == null && result.slot() == null)) {
+            if (result != null && result.plan().refusal() == RailworksRefusal.LOCOMOTIVE_BETWEEN_CARS
+                    && player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.sendSystemMessage(Component.translatable(BETWEEN_CARS), true);
+            }
             return InteractionResult.FAIL;
         }
         if (level instanceof ServerLevel server) {

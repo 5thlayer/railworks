@@ -61,6 +61,7 @@
   "block.railworks.fluid_hatch": "Fluid Hatch",
   "item.railworks.fluid_hatch": "Provider Fluid Hatch",
   "item.railworks.requester_fluid_hatch": "Requester Fluid Hatch",
+  "message.railworks.locomotive_between_cars": "Locomotives stand only at a Train's ends: that car would leave one between other cars",
   "message.railworks.hatch_off_platform": "A hatch goes beside a Station's platform, at a car's floor beside a car spot or the leading car",
   "message.railworks.hatch.requesting": "Requesting %s stacks of %s",
   "message.railworks.hatch.requesting_fluid": "Requesting %s buckets of %s",

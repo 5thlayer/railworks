@@ -99,6 +99,9 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     private static final byte LAST = 2;
     private static final byte REVERSED = 4;
     private static final byte AT_REST = 8;
+    /** At its end of the Train, coupling a Locomotive, or a Cargo car, would leave a Locomotive between other cars. */
+    private static final byte REFUSES_LOCOMOTIVE = 16;
+    private static final byte REFUSES_CARGO = 32;
 
     private static final EntityDataAccessor<BlockPos> DATA_SPAN_A =
             SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -216,6 +219,14 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return (links() & AT_REST) != 0;
     }
 
+    /**
+     * Whether a client sees that a car of {@code kind} coupled at its end of the Train would keep
+     * Locomotives at the Train's ends, as {@code Train.takes} says on the server.
+     */
+    boolean seenTaking(CarKind kind) {
+        return (links() & (kind == CarKind.LOCOMOTIVE ? REFUSES_LOCOMOTIVE : REFUSES_CARGO)) == 0;
+    }
+
     private byte links() {
         return entityData.get(DATA_LINKS);
     }
@@ -312,6 +323,16 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         }
         if (train.speed() == 0.0) {
             links |= AT_REST;
+        }
+        if ((links & (FIRST | LAST)) != 0) {
+            // A car at both ends is a Train of one, which takes either car at either end.
+            Train.End end = (links & FIRST) != 0 ? Train.End.FRONT : Train.End.BACK;
+            if (!train.takes(end, true)) {
+                links |= REFUSES_LOCOMOTIVE;
+            }
+            if (!train.takes(end, false)) {
+                links |= REFUSES_CARGO;
+            }
         }
         entityData.set(DATA_LINKS, links);
         syncCar(server, train, car);

@@ -121,12 +121,13 @@ public final class Trains {
 
     /**
      * Couples {@code car} into {@code slot}'s Train, facing against it when {@code reversed}, and
-     * returns the Train it is now in; null, changing nothing, when it does not fit there or would
-     * stand on a Span another Train holds.
+     * returns the Train it is now in; null, changing nothing, when it does not fit there, would
+     * stand on a Span another Train holds or would leave a Locomotive between other cars
+     * ({@link Train#takes}).
      */
     public Train couple(RailNetwork network, Slot slot, Car car, boolean reversed) {
         Train coupled = slot.train().coupled(network, slot.end(), car, reversed);
-        if (coupled == null || !trains.contains(slot.train())) {
+        if (coupled == null || !trains.contains(slot.train()) || !slot.train().takes(slot.end(), car)) {
             return null;
         }
         Predicate<Span> taken = takenFrom(network, slot.train());

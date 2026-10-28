@@ -283,6 +283,9 @@ public final class RailworksCommands {
         if (refusal == RailworksRefusal.SPAN_TAKEN) {
             return "commands.railworks.car.span_taken";
         }
+        if (refusal == RailworksRefusal.LOCOMOTIVE_BETWEEN_CARS) {
+            return CarItem.BETWEEN_CARS;
+        }
         if (refusal == RailworksRefusal.BLOCKED_CAR) {
             return "commands.railworks.car.blocked_car";
         }
