@@ -483,15 +483,10 @@ public final class Logistics<I> {
         run.sinceFuel = 0;
         run.moreFuel = false;
         boolean moved = false;
-        Map<Station, Integer> standing = new HashMap<>();
+        Beside beside = new Beside(network, train, job);
         for (Hatch<I> hatch : hatches) {
-            if (!hatch.provider() || job != null && !hatch.station().samePlace(job.stoppedAt())) {
-                continue;
-            }
-            // Stopped on its job, it came the job's way; waiting, the way it stands there, if it does.
-            Integer way = standing.computeIfAbsent(hatch.station(),
-                    station -> job != null ? job.wayThere() : Driver.wayAt(network, train, station));
-            if (way == 0 || !(carAt(train, way, hatch.spot()) instanceof Locomotive locomotive) || locomotive.isElectric()) {
+            Locomotive locomotive = hatch.provider() ? beside.locomotive(hatch.station(), hatch.spot()) : null;
+            if (locomotive == null || locomotive.isElectric()) {
                 continue;
             }
             for (I item : goods.contents(hatch).keySet()) {
@@ -520,14 +515,10 @@ public final class Logistics<I> {
         }
         boolean moved = false;
         Set<Locomotive> charged = new HashSet<>();
-        Map<Station, Integer> standing = new HashMap<>();
+        Beside beside = new Beside(network, train, job);
         for (Charger charger : chargers) {
-            if (job != null && !charger.station().samePlace(job.stoppedAt())) {
-                continue;
-            }
-            Integer way = standing.computeIfAbsent(charger.station(),
-                    station -> job != null ? job.wayThere() : Driver.wayAt(network, train, station));
-            if (way == 0 || !(carAt(train, way, charger.spot()) instanceof Locomotive locomotive) || !locomotive.isElectric()) {
+            Locomotive locomotive = beside.locomotive(charger.station(), charger.spot());
+            if (locomotive == null || !locomotive.isElectric()) {
                 continue;
             }
             long room = ChargeSpec.locomotiveCapacity() - goods.charge(locomotive);
@@ -897,6 +888,34 @@ public final class Logistics<I> {
     }
 
     // ---- car spots ----
+
+    /**
+     * Which of a Train's Locomotives, at rest, stands beside a car spot of a Station, for a provider
+     * fuelling it or a Charger charging it: stopped on its {@code job}, only at the job's Station and
+     * as it came there; with none, at any Station it stands at, the way it stands there.
+     */
+    private static final class Beside {
+
+        private final RailNetwork network;
+        private final Train train;
+        private final Job<?> job;
+        private final Map<Station, Integer> ways = new HashMap<>();
+
+        Beside(RailNetwork network, Train train, Job<?> job) {
+            this.network = network;
+            this.train = train;
+            this.job = job;
+        }
+
+        /** The Locomotive standing at {@code spot} of {@code station}; null for none, or another car there. */
+        Locomotive locomotive(Station station, int spot) {
+            if (job != null && !station.samePlace(job.stoppedAt())) {
+                return null;
+            }
+            int way = ways.computeIfAbsent(station, at -> job != null ? job.wayThere() : Driver.wayAt(network, train, at));
+            return way != 0 && carAt(train, way, spot) instanceof Locomotive locomotive ? locomotive : null;
+        }
+    }
 
     /** Its cars from the one leading running {@code way}, +1 its heading and -1 against it. */
     private static List<Car> fromLead(Train train, int way) {

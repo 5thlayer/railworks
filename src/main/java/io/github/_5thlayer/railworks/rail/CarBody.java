@@ -169,7 +169,7 @@ public record CarBody(List<Part> parts, List<Box> chests) {
     /** The Electric Locomotive: the Burner's body, its nose band copper rather than deep red. Placeholder. */
     private static CarBody electric() {
         List<Part> parts = new ArrayList<>();
-        for (Part part : locomotive().parts()) {
+        for (Part part : LOCOMOTIVE.parts()) {
             parts.add(part.paint() == Paint.DEEP_RED ? new Part(Paint.COPPER, part.box()) : part);
         }
         return new CarBody(List.copyOf(parts), List.of());

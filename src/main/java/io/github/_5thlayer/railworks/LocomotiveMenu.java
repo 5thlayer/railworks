@@ -72,7 +72,7 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     }
 
     /** An Electric Locomotive's client menu, with no cab slots. */
-    public static LocomotiveMenu electric(int containerId, Inventory inventory) {
+    public static LocomotiveMenu electricClient(int containerId, Inventory inventory) {
         return new LocomotiveMenu(containerId, inventory, true);
     }
 

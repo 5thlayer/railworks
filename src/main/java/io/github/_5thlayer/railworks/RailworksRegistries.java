@@ -131,7 +131,7 @@ public final class RailworksRegistries {
             MENUS.register("burner_locomotive", () -> new MenuType<>(LocomotiveMenu::new, FeatureFlags.VANILLA_SET));
     /** The Electric Locomotive's menu, with a charge gauge in place of fuel slots. */
     public static final DeferredHolder<MenuType<?>, MenuType<LocomotiveMenu>> ELECTRIC_LOCOMOTIVE_MENU =
-            MENUS.register("electric_locomotive", () -> new MenuType<>(LocomotiveMenu::electric, FeatureFlags.VANILLA_SET));
+            MENUS.register("electric_locomotive", () -> new MenuType<>(LocomotiveMenu::electricClient, FeatureFlags.VANILLA_SET));
     /** The Burner Generator's menu. */
     public static final DeferredHolder<MenuType<?>, MenuType<BurnerGeneratorMenu>> BURNER_GENERATOR_MENU =
             MENUS.register(BurnerGeneratorBlock.BLOCK_NAME, () -> new MenuType<>(BurnerGeneratorMenu::new, FeatureFlags.VANILLA_SET));

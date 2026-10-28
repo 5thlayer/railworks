@@ -264,7 +264,7 @@ public final class LocomotiveEntity extends CarEntity {
 
     @Override
     protected Item getDropItem() {
-        return electric() ? RailworksRegistries.ELECTRIC_LOCOMOTIVE.get() : RailworksRegistries.LOCOMOTIVE.get();
+        return carKind().item();
     }
 
     // ---- saving ----
