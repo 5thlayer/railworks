@@ -96,6 +96,10 @@ _Avoid_: slot (an inventory's), position, bay
 A Train taking jobs, as against one driven by hand, which is manual.
 _Avoid_: autopilot, scheduled, unattended
 
+**Status line**:
+What a Train is doing, as a player reads it in its Locomotive's menu and in Jade: manual, waiting for a job, heading for or at a Station to load or unload, unable to reach one, or holding cargo with nowhere to deliver. When it heads to unload or has nowhere to deliver, the line also shows the items it carries.
+_Avoid_: state, status text, train info
+
 ### Logistics
 
 **Hatch**:
