@@ -178,6 +178,15 @@ final class HatchTests {
                 || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {
             helper.fail("the free car spots are drawn as " + spots, STATION);
         }
+        // The two beside the leading car's place, one each side of the Rail, are told apart.
+        List<AABB> leading = ownFreeSpots(helper).stream()
+                .filter(PlatformsNear.FreeSpot::leading).map(PlatformsNear.FreeSpot::box).toList();
+        AABB leader = new AABB(helper.absolutePos(LEADER)).deflate(0.01);
+        AABB across = new AABB(helper.absolutePos(LEADER).south(2)).deflate(0.01);
+        if (leading.size() != 2 || leading.stream().noneMatch(box -> box.intersects(leader))
+                || leading.stream().noneMatch(box -> box.intersects(across))) {
+            helper.fail("the free blocks beside the leading car's place are drawn as " + leading, LEADER);
+        }
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
         List<AABB> left = ownSpots(helper);
         if (left.size() != 6 || left.stream().filter(box -> Math.abs(box.getXsize() - 0.9) < 1e-6).count() != 1
@@ -187,11 +196,16 @@ final class HatchTests {
         helper.succeed();
     }
 
-    /** The free car spots drawn in this test's own plot: a server asks every Station of the level. */
+    /** The free car spots' boxes drawn in this test's own plot. */
     private static List<AABB> ownSpots(GameTestHelper helper) {
+        return ownFreeSpots(helper).stream().map(PlatformsNear.FreeSpot::box).toList();
+    }
+
+    /** The free car spots drawn in this test's own plot: a server asks every Station of the level. */
+    private static List<PlatformsNear.FreeSpot> ownFreeSpots(GameTestHelper helper) {
         Vec3 station = Vec3.atCenterOf(helper.absolutePos(STATION));
         return PlatformsNear.freeSpots(helper.getLevel(), helper.absolutePos(STATION)).stream()
-                .filter(box -> box.getCenter().distanceTo(station) < 7.0)
+                .filter(spot -> spot.box().getCenter().distanceTo(station) < 7.0)
                 .toList();
     }
 

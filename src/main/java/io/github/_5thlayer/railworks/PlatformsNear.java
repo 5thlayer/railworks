@@ -30,6 +30,13 @@ public final class PlatformsNear {
     /** Half the gap between two coupled cars' bodies, by which a drawn car spot falls short of each of its ends. */
     private static final double HALF_GAP = (CarBody.PITCH - CarBody.LENGTH) / 2.0;
 
+    /**
+     * What a held hatch draws: the free blocks beside one car spot on one side of the Rail, as a
+     * box, and whether the spot is the leading car's place.
+     */
+    public record FreeSpot(AABB box, boolean leading) {
+    }
+
     private PlatformsNear() {
     }
 
@@ -73,11 +80,12 @@ public final class PlatformsNear {
      * Where a hatch could go near {@code pos}, as a held hatch draws it, car spot by car spot: the
      * free blocks beside a spot of the platform of a Station near, empty enough to place in, the two
      * on one side of the Rail as one box, or the one of them still free, each falling half a car gap
-     * short of its spot's ends, so the spots read as the cars that will stand there.
+     * short of its spot's ends, so the spots read as the cars that will stand there. Those beside
+     * the leading car's place, where a provider fuels the Locomotive that usually leads, say so.
      */
-    public static List<AABB> freeSpots(Level level, BlockPos pos) {
+    public static List<FreeSpot> freeSpots(Level level, BlockPos pos) {
         RailNetwork network = network(level);
-        List<AABB> boxes = new ArrayList<>();
+        List<FreeSpot> boxes = new ArrayList<>();
         for (Station station : stations(level, pos)) {
             Platform.of(network, station).ifPresent(platform -> {
                 for (Platform.Side side : platform.sides(network)) {
@@ -91,10 +99,11 @@ public final class PlatformsNear {
                     List<Platform.Beside> free = side.blocks().stream()
                             .filter(beside -> level.getBlockState(block(beside)).canBeReplaced())
                             .toList();
+                    boolean leading = side.spot() == Platform.LEADING;
                     if (free.size() == side.blocks().size()) {
-                        boxes.add(drawn);
+                        boxes.add(new FreeSpot(drawn, leading));
                     } else {
-                        free.forEach(beside -> boxes.add(new AABB(block(beside)).intersect(drawn)));
+                        free.forEach(beside -> boxes.add(new FreeSpot(new AABB(block(beside)).intersect(drawn), leading)));
                     }
                 }
             });
