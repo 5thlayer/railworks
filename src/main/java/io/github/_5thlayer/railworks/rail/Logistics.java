@@ -188,8 +188,8 @@ public final class Logistics<I> {
 
     /**
      * An automatic Train's state: its job, and stopped at a Station, how long since a stack moved and
-     * since anything did; and at rest, how long since its fuel last moved, whether it moved this tick
-     * and whether there is more to move.
+     * since anything did; and at rest, how long since its fuel last moved and whether there is more
+     * fuel to move.
      */
     private static final class Run<I> {
 
@@ -197,8 +197,7 @@ public final class Logistics<I> {
         int sinceStack;
         int stalled;
         int sinceFuel = hatchTicksPerStack;
-        boolean fuelMoved;
-        boolean fuelling;
+        boolean moreFuel;
     }
 
     /** How a Train comes to a job's Stations: the way it arrives at each, and how far it is from the provider. */
@@ -253,12 +252,10 @@ public final class Logistics<I> {
             }
         }
         for (var entry : runs.entrySet()) {
-            fuel(network, entry.getKey(), entry.getValue(), hatches, goods);
-        }
-        for (var entry : runs.entrySet()) {
             Run<I> run = entry.getValue();
+            boolean fuelMoved = fuel(network, entry.getKey(), run, hatches, goods);
             if (run.job != null && run.job.stopped()) {
-                trade(network, entry.getKey(), run, hatches, goods);
+                trade(network, entry.getKey(), run, fuelMoved, hatches, goods);
             }
         }
         if (++ticks % PLAN_TICKS == 0) {
@@ -379,8 +376,12 @@ public final class Logistics<I> {
 
     // ---- at a Station ----
 
-    /** One tick of {@code train} stopped on its job: each hatch moves a stack when its time comes, and the Train leaves when done or stalled. */
-    private void trade(RailNetwork network, Train train, Run<I> run, List<Hatch<I>> hatches, Goods<I> goods) {
+    /**
+     * One tick of {@code train} stopped on its job: each hatch moves a stack when its time comes, and
+     * the Train leaves when done, its fuel too, or stalled, nothing moving, {@code fuelMoved} included.
+     */
+    private void trade(RailNetwork network, Train train, Run<I> run, boolean fuelMoved, List<Hatch<I>> hatches,
+                       Goods<I> goods) {
         Job<I> job = run.job;
         boolean loading = job.leg == Leg.AT_PROVIDER;
         boolean moved = false;
@@ -392,7 +393,7 @@ public final class Logistics<I> {
             for (Load<I> load : job.loads) {
                 Hatch<I> hatch = loading ? load.provider : load.requester;
                 long left = left(job, load, loading, hatches, goods);
-                if (left <= 0 || turned.stream().anyMatch(hatch::samePlace) || carAt(train, way, hatch.spot()) != load.car) {
+                if (left <= 0 || turned.stream().anyMatch(hatch::samePlace) || cargoAt(train, way, hatch.spot()) != load.car) {
                     continue;
                 }
                 long most = Math.min(goods.stackSize(load.item), left);
@@ -409,8 +410,8 @@ public final class Logistics<I> {
                 }
             }
         }
-        run.stalled = moved || run.fuelMoved ? 0 : run.stalled + 1;
-        boolean done = !run.fuelling && job.loads.stream().allMatch(load -> left(job, load, loading, hatches, goods) <= 0);
+        run.stalled = moved || fuelMoved ? 0 : run.stalled + 1;
+        boolean done = !run.moreFuel && job.loads.stream().allMatch(load -> left(job, load, loading, hatches, goods) <= 0);
         // Stalled only once a hatch's turn has come round and moved nothing, however slow the turns.
         if (done || run.stalled >= Math.max(stallSeconds * LocomotiveSpec.TICKS_PER_SECOND, hatchTicksPerStack)) {
             leave(run, loading);
@@ -420,42 +421,45 @@ public final class Logistics<I> {
     // ---- fuel ----
 
     /**
-     * One tick of fuelling {@code train} (ADR 0008): at rest at a Station, on a job or
-     * waiting, each provider there beside one of its Locomotives moves a stack of fuel into it every
-     * {@link #hatchTicksPerStack()} ticks, the first on the first tick at rest, of what no load
-     * claims, as far as its fuel slots take it. Its Train waits on its job while there is more to
-     * move.
+     * One tick of fuelling {@code train} (ADR 0008): at rest at a Station, waiting with no job or
+     * stopped at its job's, each provider there beside one of its Locomotives moves a stack of fuel
+     * into it every {@link #hatchTicksPerStack()} ticks, the first on the first tick at rest, of what
+     * no load claims, as far as its fuel slots take it; a Train on its way, held at another Station,
+     * takes none. Its Train waits on its job while there is more to move. Whether any fuel moved.
      */
-    private void fuel(RailNetwork network, Train train, Run<I> run, List<Hatch<I>> hatches, Goods<I> goods) {
-        run.fuelMoved = false;
-        if (!train.atRest()) {
+    private boolean fuel(RailNetwork network, Train train, Run<I> run, List<Hatch<I>> hatches, Goods<I> goods) {
+        Job<I> job = run.job;
+        if (!train.atRest() || job != null && !job.stopped()) {
             run.sinceFuel = hatchTicksPerStack;
-            run.fuelling = false;
-            return;
+            run.moreFuel = false;
+            return false;
         }
         if (++run.sinceFuel < hatchTicksPerStack) {
-            return;
+            return false;
         }
         run.sinceFuel = 0;
-        run.fuelling = false;
+        run.moreFuel = false;
+        Station at = job == null ? null : job.leg == Leg.AT_PROVIDER ? job.provider : job.requester;
+        boolean moved = false;
         Map<Station, Integer> standing = new HashMap<>();
         for (Hatch<I> hatch : hatches) {
-            if (!hatch.provider()) {
+            if (!hatch.provider() || at != null && !hatch.station().samePlace(at)) {
                 continue;
             }
-            Integer way = standing.computeIfAbsent(hatch.station(), station -> wayAt(network, train, station));
-            if (way == 0 || !(carAtSpot(train, way, hatch.spot()) instanceof Locomotive locomotive)) {
+            Integer way = standing.computeIfAbsent(hatch.station(), station -> Driver.wayAt(network, train, station));
+            if (way == 0 || !(carAt(train, way, hatch.spot()) instanceof Locomotive locomotive)) {
                 continue;
             }
             for (I item : goods.contents(hatch).keySet()) {
                 long most = Math.min(goods.stackSize(item), fuelToMove(hatch, locomotive, item, goods));
                 if (most > 0) {
-                    run.fuelMoved |= goods.refuel(hatch, locomotive, item, most) > 0;
+                    moved |= goods.refuel(hatch, locomotive, item, most) > 0;
                     break;
                 }
             }
-            run.fuelling |= fuelLeft(hatch, locomotive, goods);
+            run.moreFuel |= fuelLeft(hatch, locomotive, goods);
         }
+        return moved;
     }
 
     /** Whether {@code provider} has fuel no load claims that {@code locomotive} still takes. */
@@ -466,16 +470,6 @@ public final class Logistics<I> {
     /** How much of {@code item} {@code provider} has to give {@code locomotive}: what no load claims, as far as its fuel slots take it. */
     private long fuelToMove(Hatch<I> provider, Locomotive locomotive, I item, Goods<I> goods) {
         return Math.min(unclaimed(provider, item, goods), goods.fuelRoom(provider, locomotive, item));
-    }
-
-    /** The way {@code train}, at rest, runs to stand at {@code station}, as {@link Driver#standsAt} says; 0 where it does not stand there. */
-    private static int wayAt(RailNetwork network, Train train, Station station) {
-        for (int way : new int[] {1, -1}) {
-            if (Driver.standsAt(network, train, way, station)) {
-                return way;
-            }
-        }
-        return 0;
     }
 
     /**
@@ -674,7 +668,7 @@ public final class Logistics<I> {
             if (hatch.provider() || hatch.request().isEmpty() || !hatch.station().samePlace(station)) {
                 continue;
             }
-            CargoCar car = carAt(train, way, hatch.spot());
+            CargoCar car = cargoAt(train, way, hatch.spot());
             if (car != null) {
                 asking.add(new Asking<>(hatch, hatch.request().get().item(), car));
             }
@@ -832,12 +826,12 @@ public final class Logistics<I> {
      * The Cargo car that stands at car {@code spot} behind the leading car running {@code way}, or at
      * the leading car's place for {@link Platform#LEADING}; null for none, or for a Locomotive there.
      */
-    private static CargoCar carAt(Train train, int way, int spot) {
-        return carAtSpot(train, way, spot) instanceof CargoCar cargo ? cargo : null;
+    private static CargoCar cargoAt(Train train, int way, int spot) {
+        return carAt(train, way, spot) instanceof CargoCar cargo ? cargo : null;
     }
 
     /** The car that stands at car {@code spot} behind the leading car running {@code way}, or at the leading car's place for {@link Platform#LEADING}; null for none. */
-    private static Car carAtSpot(Train train, int way, int spot) {
+    private static Car carAt(Train train, int way, int spot) {
         List<Car> cars = fromLead(train, way);
         return spot + 1 >= 0 && spot + 1 < cars.size() ? cars.get(spot + 1) : null;
     }

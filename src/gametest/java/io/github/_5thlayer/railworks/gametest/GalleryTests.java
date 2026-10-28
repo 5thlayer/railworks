@@ -98,7 +98,7 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::signReplays);
         tests.testOnItsOwn("gallery_logistics_scenes_deliver_what_each_requester_asks_for",
                 GalleryCheck.TICKS, GalleryTests::logisticsDeliver);
-        tests.testOnItsOwn("gallery_refuel_scene_fuels_its_dry_train_which_then_delivers",
+        tests.testOnItsOwn("refuel_the_gallery_scene_fuels_its_dry_train_which_then_delivers",
                 GalleryCheck.TICKS, GalleryTests::refuelDelivers);
     }
 

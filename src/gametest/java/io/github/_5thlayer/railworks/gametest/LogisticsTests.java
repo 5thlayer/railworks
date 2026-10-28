@@ -50,11 +50,12 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * Automatic Trains in a real level (#37, ADR 0008): the Locomotive's menu switches its Train to
  * automatic, the level saves the mode, a driver takes it over, the status line follows it, and one
  * Train runs unattended from a provider Station to a requester Station through the level's tick, the
- * Stations and hatches real blocks and the fuel burnt from the slot, and what it loaded for a requester
- * broken on the way is held until a requester asks for it again (#38); and a provider beside the
- * leading car's place fills an automatic Train's Locomotive with fuel that leaves nothing behind (#53),
- * those tests sharing the {@code logistics_refuel_} prefix. How jobs are planned, stacks
- * moved, claims broken and fuel moved is {@code LogisticsTest}'s. All of these tests share the {@code logistics_} prefix.
+ * Stations and hatches real blocks and the fuel burnt from the slots, and what it loaded for a
+ * requester broken on the way is held until a requester asks for it again (#38). How jobs are
+ * planned, stacks moved, claims broken and fuel moved is {@code LogisticsTest}'s. These tests share
+ * the {@code logistics_} prefix, but for a provider beside the leading car's place filling an
+ * automatic Train's Locomotive with fuel that leaves nothing behind (#53), whose share
+ * {@code refuel_}.
  */
 final class LogisticsTests {
 
@@ -84,9 +85,9 @@ final class LogisticsTests {
         tests.testOnItsOwn("logistics_a_broken_requester_leaves_a_leftover_delivered_once_one_asks_again", 1_600,
                 LogisticsTests::brokenRequester);
         // Its line, too, runs out past the structure.
-        tests.testOnItsOwn("logistics_refuel_a_provider_by_the_leading_car_fills_the_locomotive_with_clean_fuel", 400,
+        tests.testOnItsOwn("refuel_a_provider_by_the_leading_car_fills_the_locomotive_with_clean_fuel", 400,
                 LogisticsTests::refuels);
-        tests.testOnItsOwn("logistics_refuel_a_manual_train_is_left_alone", 200, LogisticsTests::refuelsNoManualTrain);
+        tests.testOnItsOwn("refuel_a_manual_train_is_left_alone", 200, LogisticsTests::refuelsNoManualTrain);
     }
 
     // ---- the mode ----
