@@ -23,16 +23,16 @@ import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.ValueInput;
 
 /**
- * A Cargo car in the world: the view of its {@link CargoCar}, which holds a chest's worth of items
- * in its record in the level's {@link CarRecords} (ADR 0008), shown by its menu, vanilla's three-row
- * chest, when the car is used. It is no {@link Container} and gives no item capability, so no
- * hopper, feeder or pipe reaches its cargo: with no player there, items go in and out through a
+ * A Cargo car in the world: the view of its {@link CargoCar}, which holds a double chest's worth of
+ * items in its record in the level's {@link CarRecords} (ADR 0008), shown by its menu, vanilla's
+ * six-row chest, when the car is used. It is no {@link Container} and gives no item capability, so
+ * no hopper, feeder or pipe reaches its cargo: with no player there, items go in and out through a
  * Station's hatches (ADR 0008). Nobody rides it; coupling and the rest are {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {
 
-    /** A chest's worth, three rows of nine. */
-    public static final int SLOTS = 27;
+    /** A double chest's worth, six rows of nine. */
+    public static final int SLOTS = 54;
 
     /** How far from the car the player may stand with its menu open, in blocks. */
     private static final double REACH = 8.0;
@@ -90,7 +90,7 @@ public final class CargoCarEntity extends CarEntity {
     /** The menu, from using the car. */
     @Override
     public void openCustomInventoryScreen(Player player) {
-        open(player, new SimpleMenuProvider((id, inventory, opener) -> ChestMenu.threeRows(id, inventory, cargo),
+        open(player, new SimpleMenuProvider((id, inventory, opener) -> ChestMenu.sixRows(id, inventory, cargo),
                 Component.translatable("entity.railworks.cargo_car")));
     }
 

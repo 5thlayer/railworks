@@ -26,7 +26,7 @@ public final class FluidCar implements GoodsCar {
     public static final double LENGTH = CargoCar.LENGTH;
 
     /** How many buckets its tank holds by default, as the server config starts from. */
-    public static final int DEFAULT_TANK_BUCKETS = 64;
+    public static final int DEFAULT_TANK_BUCKETS = 160;
 
     static final MapCodec<FluidCar> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             ID_FIELD.forGetter(FluidCar::id)
