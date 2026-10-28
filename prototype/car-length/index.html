@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   PROTOTYPE, throwaway. Question: what do a Locomotive and a Cargo car look like at 5 blocks long,
-  against today's (3 and 2) and a matched 3? Five variants, switchable by ?variant= and the bottom bar
+  against today's (3 and 2) and a matched 3, and for fun at 3 wide? Six variants, switchable by ?variant= and the bottom bar
   (or the arrow keys). The boxes are CarBody's (rail/CarBody.java), ported by hand and stretched; the
   5-block variants are guesses at what fills the extra length. Not the mod's code; never shipped.
   Open the file in a browser: drag to orbit, scroll to zoom, right-drag to pan.
@@ -156,6 +156,21 @@ function cargo(carLength, chestAt) {
   return { parts, chests: chestAt, seats: [] };
 }
 
+// A body made w blocks wide: the skirts stay round the Rail's web, and every other part moves out
+// by the extra half width, a part spanning the middle stretching, one on a side moving whole, so
+// walls stay thin and the doors, the dash and the bay's Rider stay as wide as they were.
+function widen(body, w) {
+  const out = (w - 1) / 2;
+  const shift = x => Math.abs(x) >= 0.3 ? x + Math.sign(x) * out : x;
+  const parts = body.parts.map(([paint, x0, y0, z0, x1, y1, z1]) => {
+    if (paint === 'DARK_RUST' && y0 === 0) return [paint, x0, y0, z0, x1, y1, z1];
+    if (x0 >= 0.15) return [paint, x0 + out, y0, z0, x1 + out, y1, z1];
+    if (x1 <= -0.15) return [paint, x0 - out, y0, z0, x1 - out, y1, z1];
+    return [paint, shift(x0), y0, z0, shift(x1), y1, z1];
+  });
+  return { ...body, parts, width: w };
+}
+
 // ---- The variants ------------------------------------------------------------------------------
 const VARIANTS = {
   A: { name: 'Today: L 3, C 2', loco: 3, car: 2, build: () => [locoCabBay(3), cargo(2, [0])],
@@ -166,10 +181,13 @@ const VARIANTS = {
        note: "Today's cab at the front, the bay stretched to 3 blocks behind it; Cargo with three chests a side." },
   D: { name: '5: cab, hood and bay', loco: 5, car: 5, build: () => [locoHood(5), cargo(5, [-1.5, 0, 1.5])],
        note: 'A closed engine room between the cab and a short bay, as a road diesel has. The extra length becomes machinery.' },
+  F: { name: '5 long, 3 wide: D widened', loco: 5, car: 5, width: 3,
+       build: () => [widen(locoHood(5), 3), widen(cargo(5, [-1.5, 0, 1.5]), 3)],
+       note: "Just for fun: D's cars three blocks wide, still straddling one Rail. Hatches move out to two blocks off the Rail to clear the car, and the Clearance would be three wide." },
   E: { name: '5: a cab at each end', loco: 5, car: 5, build: () => [locoDoubleCab(5), cargo(5, [-1.2, 1.2])],
        note: 'Double-ended: a cab facing out at each end and the bay between. One Locomotive drives both ways; Cargo with two chests a side.' },
 };
-const KEYS = Object.keys(VARIANTS);
+const KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 // ---- Scene -------------------------------------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -212,7 +230,7 @@ function build(key) {
   world = new THREE.Group();
   scene.add(world);
   const v = VARIANTS[key];
-  const lead = v.loco, spot = v.car;
+  const lead = v.loco, spot = v.car, width = v.width || 1, off = 1 + (width - 1) / 2;
   const platform = lead + SPOTS * spot;
   const railBack = FRONT - platform - 14;
 
@@ -238,8 +256,8 @@ function build(key) {
     const front = s < 0 ? FRONT : FRONT - lead - s * spot, len = s < 0 ? lead : spot;
     // Blocks are centred on whole x, and a spot's edges fall on block edges, half a block off.
     for (let c = front - len + 0.5; c < front; c++) {
-      for (const z of [-1, 1]) {
-        const station = s < 0 && z === 1 && c === FRONT - 0.5;
+      for (const z of [-off, off]) {
+        const station = s < 0 && z === off && c === FRONT - 0.5;
         const col = station ? [0.55, 0.3, 0.65] : s < 0 ? [0.6, 0.6, 0.6] : hatchColours[s % 2];
         box(world, col, c - 0.48, R - 1, z - 0.48, c + 0.48, R - 0.02, z + 0.48);
         // Supports down to the ground, so the hatches do not float.
@@ -263,7 +281,7 @@ function build(key) {
   for (const seat of seats) {
     player(FRONT - lead / 2 + seat.z, R + seat.y - (seat.kind === 'cab' ? 0.6 : 0), 0, seat.kind === 'cab');
   }
-  player(FRONT - lead / 2 - 0.5, R, 1.0, false);
+  player(FRONT - lead / 2 - 0.5, R, off, false);
   player(FRONT + 2, 0, 2.5, false);
 
   // The info panel.
@@ -274,6 +292,7 @@ function build(key) {
     <table>
       <tr><td>Locomotive, coupler to coupler</td><td>${lead} blocks</td></tr>
       <tr><td>Cargo car, coupler to coupler</td><td>${spot} blocks</td></tr>
+      <tr><td>Car width</td><td>${width} block${width > 1 ? 's' : ''}</td></tr>
       <tr><td>Chests a side (drawn)</td><td>${cargoBody.chests.length}</td></tr>
       <tr><td>Platform, lead + 4 spots</td><td>${platform} blocks</td></tr>
       <tr><td>Hatch blocks per spot, each side</td><td>${spot}</td></tr>
@@ -292,7 +311,8 @@ function addCar(body, middle) {
   }
   for (const c of body.chests) {
     for (const s of [1, -1]) {
-      const zIn = s > 0 ? 0.05 : -0.44, zOut = s > 0 ? 0.44 : -0.05;
+      const out = ((body.width || 1) - 1) / 2;
+      const zIn = s > 0 ? 0.05 + out : -0.44 - out, zOut = s > 0 ? 0.44 + out : -0.05 - out;
       box(g, PAINT.CHEST, c - 0.195, 1.075, zIn, c + 0.195, 1.465, zOut);
       box(g, PAINT.CHEST_DARK, c - 0.2, 1.33, zIn - 0.003, c + 0.2, 1.35, zOut + 0.003);
       const face = s > 0 ? zOut : zIn;
@@ -323,7 +343,7 @@ function view(name) {
   const v = VARIANTS[current()], mid = FRONT - (v.loco + 3 * v.car) / 2;
   const t = new THREE.Vector3(mid, R + 1, 0);
   const pos = {
-    side: [mid, R + 1.5, 22], three: [mid + 12, R + 9, 18], top: [mid, R + 30, 0.01], eye: [FRONT - v.loco - 1, R + 1.62, 2.5],
+    side: [mid, R + 1.5, 22], three: [mid + 12, R + 9, 18], top: [mid, R + 30, 0.01], eye: [FRONT - v.loco - 1, R + 1.62, 1.5 + (v.width || 1)],
   }[name];
   if (name === 'eye') t.set(FRONT, R + 1.5, 0.5);
   camera.position.set(...pos);
