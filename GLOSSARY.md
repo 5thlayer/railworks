@@ -107,11 +107,11 @@ _Avoid_: state, status text, train info
 ### Logistics
 
 **Goods**:
-What automatic Trains carry between hatches, of two kinds: items, held by a hatch and a Cargo car, and fluid, held by a Fluid hatch and a Fluid car. Each hatch and car holds one kind and trades only with the other side of its kind.
-_Avoid_: freight, wares (for the domain; `Ware` is only the code's name for one kind of goods)
+What automatic Trains carry between hatches, of two kinds: items, held by a hatch of items and a Cargo car, and fluid, held by a Fluid hatch and a Fluid car. Each hatch and car holds one kind and trades only with the other side of its kind.
+_Avoid_: freight, wares (for the domain; `Ware` is only the code's name for one good, an item's kind or a fluid)
 
 **Hatch**:
-A container beside a Station's platform at a car's floor, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: it trades with a Cargo car, and a provider fuels a Locomotive. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
+A container beside a Station's platform at a car's floor, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: a hatch of items trades with a Cargo car, and its provider fuels a Locomotive; a **Fluid hatch** trades with a Fluid car. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
 _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 
 **Fluid hatch**:
