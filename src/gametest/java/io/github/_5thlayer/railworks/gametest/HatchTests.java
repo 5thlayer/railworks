@@ -62,9 +62,9 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
  * Hatches join a Station's platform (#36, ADR 0008): a Station north of {@link LocomotiveTests}'
- * Span, which runs east from x 1 to x 9 along z 3, at x 3 serves Trains heading west, so its platform
- * runs back east from it: the leading car's place beside x 3 and 4, its first car spot beside x 5 and
- * 6 and its second beside x 7 and 8, either side of the Rail at a car's floor, y 2. A hatch places beside a car spot or the
+ * Span, which runs east from x 1 to x 9 along z 3, at x 2 serves Trains heading west, so its platform
+ * runs back east from it: the leading car's place beside x 2, 3 and 4, its first car spot beside x 5
+ * and 6 and its second beside x 7 and 8, either side of the Rail at a car's floor, y 2. A hatch places beside a car spot or the
  * leading car's place (#53) and nowhere else, keeps its mode, request and
  * contents in the level's {@link LevelHatches}, is reached by hoppers through its block, and joins
  * the Station as long as its platform covers it. Which block is beside which spot is
@@ -73,7 +73,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 final class HatchTests {
 
     /** Where the Station stands, beside the Rail a block below a car's floor, north of it. */
-    private static final BlockPos STATION = new BlockPos(3, 1, 2);
+    private static final BlockPos STATION = new BlockPos(2, 1, 2);
     /** Beside the leading car's place, which has no car spot but takes a hatch as one does. */
     private static final BlockPos LEADER = new BlockPos(4, 2, 2);
     /** Beside the first car spot at a car's floor, over the block behind the Station. */
@@ -83,7 +83,7 @@ final class HatchTests {
     /** Beside the second car spot. */
     private static final BlockPos SECOND = new BlockPos(7, 2, 2);
     /** Ahead of the Station, beside no car spot. */
-    private static final BlockPos AHEAD = new BlockPos(2, 2, 2);
+    private static final BlockPos AHEAD = new BlockPos(1, 2, 2);
     /** What {@link #expectJoined} expects of a hatch that joins no Station. */
     private static final int JOINS_NOTHING = Integer.MIN_VALUE;
 
@@ -171,10 +171,11 @@ final class HatchTests {
     private static void freeSpots(GameTestHelper helper) {
         ServerPlayer player = withStation(helper);
         BlockPos first = helper.absolutePos(FIRST);
-        // Drawn spot by spot: the leading car's place and two spots, each a box on either side of the
-        // Rail, a car gap short of its ends.
+        // Drawn spot by spot: the leading car's three-block place and two spots, each a box on either
+        // side of the Rail, a car gap short of its ends.
         List<AABB> spots = ownSpots(helper);
-        if (spots.size() != 6 || !spots.stream().allMatch(box -> Math.abs(box.getXsize() - 1.8) < 1e-6 && box.getZsize() == 1.0)
+        if (spots.size() != 6 || !ownFreeSpots(helper).stream().allMatch(spot -> spot.box().getZsize() == 1.0
+                        && Math.abs(spot.box().getXsize() - (spot.leading() ? 2.8 : 1.8)) < 1e-6)
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(first).deflate(0.01)))
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(helper.absolutePos(LEADER)).deflate(0.01)))
                 || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {

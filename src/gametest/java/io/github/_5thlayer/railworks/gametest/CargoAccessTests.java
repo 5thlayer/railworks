@@ -32,12 +32,16 @@ import net.neoforged.neoforge.capabilities.Capabilities;
  * else does (ADR 0008: a Station's hatches load a car). All of these tests share the
  * {@code logistics_cargo_} prefix, as the logistics work's (#26) game tests do, and stand on
  * {@link LocomotiveTests}' Span, the Locomotive placed at x 7.5 and a Cargo car coupled behind it at
- * x 5.5.
+ * x 5.
  */
 final class CargoAccessTests {
 
-    /** Beside the Rail a block down, by the coupled Cargo car. */
-    static final BlockPos BY_CARGO = new BlockPos(5, 1, 2);
+    /**
+     * Beside the Rail a block down, just ahead of the coupled Cargo car, which leads a Train heading
+     * west: it stops with its middle where a leading Locomotive's would be, half a block on, in the
+     * block {@link #CAR}.
+     */
+    static final BlockPos BY_CARGO = new BlockPos(4, 1, 2);
     /** The block the coupled Cargo car's floor is in, and those beside it on the near side and under it. */
     private static final BlockPos CAR = new BlockPos(5, 2, 3);
     private static final BlockPos BESIDE = CAR.north();

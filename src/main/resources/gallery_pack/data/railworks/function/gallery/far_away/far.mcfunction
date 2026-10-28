@@ -3,6 +3,7 @@
 # level's Stations, and its hatch, which takes its record. A Train an earlier build set running stands
 # on that line out of the plot clear cleared, so the line is laid again only two ticks on
 # (far_away/lay), once that Train has come off the cut Rail.
+setblock ~257 ~2 ~-7 minecraft:air destroy
 setblock ~258 ~2 ~-7 minecraft:air destroy
 setblock ~260 ~2 ~-5 minecraft:air destroy
 fill ~51 ~ ~-6 ~261 ~1 ~-6 minecraft:air destroy

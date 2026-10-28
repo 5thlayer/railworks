@@ -18,8 +18,8 @@ railworks span ~15 ~ ~-6 ~21 ~ ~-6
 railworks span ~21 ~ ~-6 ~25 ~ ~-6
 fill ~4 ~ ~-7 ~4 ~1 ~-7 minecraft:stone_bricks
 setblock ~4 ~2 ~-7 railworks:station{name:"Mine"}
-fill ~24 ~ ~-5 ~24 ~1 ~-5 minecraft:stone_bricks
-setblock ~24 ~2 ~-5 railworks:station{name:"Smelter"}
+fill ~25 ~ ~-5 ~25 ~1 ~-5 minecraft:stone_bricks
+setblock ~25 ~2 ~-5 railworks:station{name:"Smelter"}
 fill ~7 ~ ~-5 ~7 ~1 ~-5 minecraft:stone_bricks
 setblock ~7 ~2 ~-5 railworks:hatch[mode=provider]
 railworks hatch ~7 ~2 ~-5 provider minecraft:iron_ore 8
@@ -37,8 +37,8 @@ fill ~23 ~ ~-8 ~23 ~1 ~-8 minecraft:stone_bricks
 setblock ~23 ~2 ~-8 railworks:burner_generator[facing=north]
 setblock ~23 ~3 ~-8 minecraft:hopper[facing=down]
 setblock ~23 ~4 ~-8 minecraft:chest[facing=north]{Items:[{Slot:0b,id:"minecraft:coal",count:64},{Slot:1b,id:"minecraft:coal",count:64}]}
-railworks car cargo_car ~7 ~2 ~-6 90
+railworks car cargo_car ~8 ~2 ~-6 90
 railworks car electric_locomotive ~5 ~2 ~-6 90
-railworks car electric_locomotive ~9 ~2 ~-6 -90
+railworks car electric_locomotive ~10 ~2 ~-6 -90
 # The Train automatic, its Locomotives empty.
 execute align xyz positioned ~2 ~-1 ~-12 as @e[type=railworks:electric_locomotive,dx=23,dy=16,dz=12,limit=1] run railworks automatic @s

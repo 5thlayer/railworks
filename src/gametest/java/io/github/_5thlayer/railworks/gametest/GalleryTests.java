@@ -59,7 +59,7 @@ final class GalleryTests {
     private static final BlockPos SIGN = new BlockPos(14, 0, 0);
     /** The Stations scene's two Stations, from where it is run, and what it names them. */
     private static final BlockPos QUARRY = new BlockPos(4, 2, -7);
-    private static final BlockPos SMELTER = new BlockPos(24, 2, -5);
+    private static final BlockPos SMELTER = new BlockPos(25, 2, -5);
 
     /** The logistics scenes' first provider hatch, and the chests under the requesters beside their first and second car spots, from where each is run. */
     private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);

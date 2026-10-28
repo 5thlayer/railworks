@@ -21,8 +21,8 @@ public final class CargoCar implements GoodsCar {
     /** Factorio's cargo wagon weighs 1,000 kg, half a Locomotive. */
     public static final double MASS_KG = 1_000.0;
 
-    /** Blocks along the Line: as long as a Locomotive, as Factorio's wagon is. */
-    public static final double LENGTH = Locomotive.LENGTH;
+    /** Blocks along the Line, coupler to coupler: two blocks, a block shorter than a Locomotive. */
+    public static final double LENGTH = 2.0;
 
     static final MapCodec<CargoCar> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             ID_FIELD.forGetter(CargoCar::id)

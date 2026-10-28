@@ -23,12 +23,15 @@ class StationsTest {
     private static final Arm A = new Arm(0, 5, 0);
     private static final Arm B = new Arm(20, 5, 0);
     private static final Span AB = Span.of(A, B, 20);
-    /** From one car's centre to the next's. */
-    private static final double PITCH = (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0;
+    /** From the Locomotive's middle to its last Cargo car's: 2.5 to the first, 2 more to the second. */
+    private static final double LAST = 4.5;
 
     private final RailNetwork network = new RailNetwork();
     private final Stations stations = new Stations();
-    /** Beside the Rail ten blocks from A, on its south side: on the right of a Train heading for B. */
+    /**
+     * Beside the Rail ten blocks from A, on its south side: on the right of a Train heading for B.
+     * Its leading car's mark is at 9, a Locomotive's middle, its front at the Station block's front edge.
+     */
     private final Station mine = new Station(10, 6, 1, "Mine");
 
     @BeforeEach
@@ -59,8 +62,8 @@ class StationsTest {
 
     @Test
     void aTrainWhoseLeadingCarIsAtAStationIsStoppedAtIt() {
-        // The Locomotive is at the Mine's stop, half a block short of it; its Cargo cars stand behind it.
-        Train train = train(9.5);
+        // The Locomotive is at the Mine's mark; its Cargo cars stand behind it.
+        Train train = train(9.0);
         assertTrue(stations.at(network, train.placeOf(network, train.cars().getLast())).isEmpty());
         assertEquals(List.of(mine), stations.stoppedAt(network, train));
     }
@@ -70,7 +73,7 @@ class StationsTest {
         // On the north side: it serves Trains heading for A, and this one's last car leads that way.
         Station yard = new Station(10, 6, -1, "Yard");
         stations.put(yard);
-        assertEquals(List.of(yard), stations.stoppedAt(network, train(10.5 + 2 * PITCH)));
+        assertEquals(List.of(yard), stations.stoppedAt(network, train(11.0 + LAST)));
     }
 
     @Test
@@ -100,8 +103,8 @@ class StationsTest {
 
     @Test
     void aTrainBetweenTwoStationsIsStoppedAtBoth() {
-        // The Smelter on the north side by its last car, which leads toward A.
-        Station smelter = new Station(10 - (int) Math.round(2 * PITCH), 6, -1, "Smelter");
+        // The Smelter on the north side by its last car, which leads toward A: its mark at 6.
+        Station smelter = new Station(5, 6, -1, "Smelter");
         stations.put(smelter);
         assertEquals(List.of(mine, smelter), stations.stoppedAt(network, train(10.0)));
     }
@@ -137,18 +140,18 @@ class StationsTest {
 
     @Test
     void aTrainAtRestShortOfItsMarkEasesOntoIt() {
-        Train train = train(9.0);
+        Train train = train(8.5);
         int ticks = settled(train);
-        assertEquals(9.5, headFromA(train), 1e-9);
+        assertEquals(9.0, headFromA(train), 1e-9);
         assertEquals(Math.round(0.5 / Stations.SETTLE_STEP), ticks, "a step a tick");
         assertTrue(train.atRest());
     }
 
     @Test
     void aTrainAtRestPastItsMarkEasesBack() {
-        Train train = train(10.3);
+        Train train = train(9.8);
         settled(train);
-        assertEquals(9.5, headFromA(train), 1e-9);
+        assertEquals(9.0, headFromA(train), 1e-9);
     }
 
     @Test
@@ -156,10 +159,10 @@ class StationsTest {
         Station yard = new Station(10, 6, -1, "Yard");
         stations.remove(mine.x(), mine.y(), mine.z());
         stations.put(yard);
-        // Its last car leads toward A: at rest at 10.0, it eases to the Yard's mark at 10.5.
-        Train train = train(10.0 + 2 * PITCH);
+        // Its last car leads toward A: at rest at 10.5, it eases to the Yard's mark at 11.
+        Train train = train(10.5 + LAST);
         settled(train);
-        assertEquals(10.5 + 2 * PITCH, headFromA(train), 1e-9);
+        assertEquals(11.0 + LAST, headFromA(train), 1e-9);
     }
 
     @Test
@@ -175,10 +178,11 @@ class StationsTest {
 
     @Test
     void aTrainBetweenTwoStationsSettlesAtOneAndStays() {
-        // Its Locomotive half a block past the Mine's mark, its last car half a block short of the Smelter's.
-        Station smelter = new Station(10 - (int) Math.round(2 * PITCH), 6, -1, "Smelter");
+        // Its Locomotive 0.4 past the Mine's mark, its last car 0.1 short of the Smelter's at 5: it
+        // settles at the Smelter, the nearer, and its Locomotive is still within the Mine's stretch.
+        Station smelter = new Station(4, 6, -1, "Smelter");
         stations.put(smelter);
-        Train train = train(10.0);
+        Train train = train(9.4);
         int ticks = settled(train);
         assertTrue(ticks < 100, "it settles once, not back and forth");
         assertEquals(9.5, headFromA(train), 1e-9);
@@ -187,9 +191,9 @@ class StationsTest {
 
     @Test
     void aLoneLocomotiveSettlesOnlyArrivingTheWayItFaces() {
-        Train east = Train.of(new Place(AB, B, AB.length() - 9.0), Locomotive.burner());
+        Train east = Train.of(new Place(AB, B, AB.length() - 8.5), Locomotive.burner());
         settled(east);
-        assertEquals(9.5, headFromA(east), 1e-9);
+        assertEquals(9.0, headFromA(east), 1e-9);
         // Facing A, the Mine does not serve it: it stays.
         Train west = Train.of(new Place(AB, A, 9.0), Locomotive.burner());
         assertEquals(0, settled(west));
@@ -204,13 +208,13 @@ class StationsTest {
         network.add(bc);
         Station end = new Station(20, 6, 1, "End");
         stations.put(end);
-        Train train = train(19.0);
+        Train train = train(18.0);
         int ticks = settled(train, span -> span.equals(bc));
         // It eases only as far as its front face may go, short of the taken Span.
         assertTrue(ticks < 100);
-        assertTrue(headFromA(train) < 19.5 - 1e-6, "it did not run onto the taken Span");
-        Train free = train(19.0);
+        assertTrue(headFromA(train) < 19.0 - 1e-6, "it did not run onto the taken Span");
+        Train free = train(18.0);
         settled(free);
-        assertEquals(19.5, headFromA(free), 1e-9, "with the Span free it settles onto the mark");
+        assertEquals(19.0, headFromA(free), 1e-9, "with the Span free it settles onto the mark");
     }
 }

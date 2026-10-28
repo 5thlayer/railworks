@@ -27,8 +27,8 @@ public final class Locomotive implements Car {
     public static final String KIND = "locomotive";
     public static final String ELECTRIC_KIND = "electric_locomotive";
 
-    /** Blocks along the Line, coupler to coupler: a car's {@link CarBody#PITCH}. */
-    public static final double LENGTH = CarBody.PITCH;
+    /** Blocks along the Line, coupler to coupler: a cab and a bay behind it, three blocks. */
+    public static final double LENGTH = 3.0;
     /** How many fuel slots it has, each a stack of one fuel, the fuels free to differ. */
     public static final int FUEL_SLOTS = 4;
 

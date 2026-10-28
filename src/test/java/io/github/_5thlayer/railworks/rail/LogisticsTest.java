@@ -30,11 +30,11 @@ class LogisticsTest {
     private static final Arm A = new Arm(0, 5, 0);
     private static final Arm B = new Arm(20, 5, 0);
     private static final Arm C = new Arm(40, 5, 0);
-    /** North of the line, serving Trains heading for A: the leading car at 5.5, its spots back east from 7.5. */
+    /** North of the line, serving Trains heading for A: the leading car at 6, its spots back east from 8.5. */
     private static final Station MINE = new Station(5, 6, -1, "Mine");
-    /** South of the line, serving Trains heading for C: the leading car at 34.5, its spots back west from 32.5. */
+    /** South of the line, serving Trains heading for C: the leading car at 34, its spots back west from 31.5. */
     private static final Station DEPOT = new Station(35, 6, 1, "Depot");
-    /** South of the line, serving Trains heading for C: the leading car at 8.5, its spots back west from 6.5. */
+    /** South of the line, serving Trains heading for C: the leading car at 8, its spots back west from 5.5. */
     private static final Station QUARRY = new Station(9, 6, 1, "Quarry");
     /** North of the line, serving Trains heading for A, nearer the Depot than the Mine is. */
     private static final Station PIT = new Station(17, 6, -1, "Pit");
@@ -575,7 +575,7 @@ class LogisticsTest {
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
         // The Locomotive facing A leading at the Mine, its Cargo car at the first spot.
-        Train train = shuttle(9.5);
+        Train train = shuttle(11.0);
         train.setAutomatic(false);
         assertTrue(stationsAt(train).contains(MINE));
         runFor(200);
@@ -696,7 +696,7 @@ class LogisticsTest {
     @Test
     void aTrainOnItsWayHeldAtAnotherStationTakesNoFuelThere() {
         line();
-        // South of the line, serving Trains heading for C: the leading car at 18.5, a block short of B.
+        // South of the line, serving Trains heading for C: the leading car at 18, two blocks short of B.
         Station siding = new Station(19, 6, 1, "Siding");
         provider(siding, Platform.LEADING, "coal", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
@@ -705,7 +705,7 @@ class LogisticsTest {
         goods.put(cargo(train, 1), "iron", 10);
         // A Train on the Span from B, so it is held at B on its way to deliver, by the Siding.
         trains.add(Train.of(onLine(30.0), fuelled()));
-        runUntil(() -> train.atRest() && train.head().toFront() == 1.0, "held at B");
+        runUntil(() -> train.atRest() && train.head().toFront() == 1.5, "held at B");
         runFor(100);
         assertEquals(Logistics.Kind.TO_UNLOAD, kind(train));
         assertEquals(0, goods.fuel(locomotive, "coal"), "on its way, not at its job's Station");
@@ -773,7 +773,7 @@ class LogisticsTest {
     @Test
     void aTrainOnItsWayHeldAtAnotherStationTakesNoChargeThere() {
         line();
-        // South of the line, serving Trains heading for C: the leading car at 18.5, a block short of B.
+        // South of the line, serving Trains heading for C: the leading car at 18, two blocks short of B.
         Station siding = new Station(19, 6, 1, "Siding");
         charger(siding, Platform.LEADING, 1_000_000L);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
@@ -781,7 +781,7 @@ class LogisticsTest {
         goods.put(cargo(train, 1), "iron", 10);
         // A Train on the Span from B, so it is held at B on its way to deliver, by the Siding.
         trains.add(Train.of(onLine(30.0), fuelled()));
-        runUntil(() -> train.atRest() && train.head().toFront() == 1.0, "held at B");
+        runUntil(() -> train.atRest() && train.head().toFront() == 1.5, "held at B");
         long held = goods.charge(first(train));
         runFor(100);
         assertEquals(Logistics.Kind.TO_UNLOAD, kind(train));
