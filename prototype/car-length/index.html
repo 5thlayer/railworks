@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   PROTOTYPE, throwaway. Question: what do a Locomotive and a Cargo car look like at 5 blocks long,
-  against today's (3 and 2) and a matched 3, and for fun at 3 wide? Six variants, switchable by ?variant= and the bottom bar
+  against today's (3 and 2) and a matched 3, and for fun at 3 and 2 wide? Seven variants, switchable by ?variant= and the bottom bar
   (or the arrow keys). The boxes are CarBody's (rail/CarBody.java), ported by hand and stretched; the
   5-block variants are guesses at what fills the extra length. Not the mod's code; never shipped.
   Open the file in a browser: drag to orbit, scroll to zoom, right-drag to pan.
@@ -184,10 +184,13 @@ const VARIANTS = {
   F: { name: '5 long, 3 wide: D widened', loco: 5, car: 5, width: 3,
        build: () => [widen(locoHood(5), 3), widen(cargo(5, [-1.5, 0, 1.5]), 3)],
        note: "Just for fun: D's cars three blocks wide, still straddling one Rail. Hatches move out to two blocks off the Rail to clear the car, and the Clearance would be three wide." },
+  G: { name: '5 long, 2 wide: D widened', loco: 5, car: 5, width: 2,
+       build: () => [widen(locoHood(5), 2), widen(cargo(5, [-1.5, 0, 1.5]), 2)],
+       note: "D's cars two blocks wide. Centred on the Rail, a car's sides fall halfway across the blocks beside it, so the hatches stand two blocks off the Rail with half a block of air before the car." },
   E: { name: '5: a cab at each end', loco: 5, car: 5, build: () => [locoDoubleCab(5), cargo(5, [-1.2, 1.2])],
        note: 'Double-ended: a cab facing out at each end and the bay between. One Locomotive drives both ways; Cargo with two chests a side.' },
 };
-const KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
 
 // ---- Scene -------------------------------------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -230,7 +233,7 @@ function build(key) {
   world = new THREE.Group();
   scene.add(world);
   const v = VARIANTS[key];
-  const lead = v.loco, spot = v.car, width = v.width || 1, off = 1 + (width - 1) / 2;
+  const lead = v.loco, spot = v.car, width = v.width || 1, off = Math.ceil(width / 2 + 0.5);
   const platform = lead + SPOTS * spot;
   const railBack = FRONT - platform - 14;
 
