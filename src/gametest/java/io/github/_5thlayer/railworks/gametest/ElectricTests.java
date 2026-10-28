@@ -128,8 +128,8 @@ final class ElectricTests {
         helper.setBlock(LogisticsTests.besideTheLeadingCar(helper, LogisticsTests.DEPOT), block);
         Locomotive east = Locomotive.electric();
         CargoCar wagon = CargoCar.create();
-        // Its middle a block short of the line's end, where the Depot's leading Locomotive stands.
-        Train train = Train.of(new Place(last, last.b(), 1.0), List.of(east, wagon));
+        // Its middle where the Depot's leading Locomotive stands.
+        Train train = Train.of(new Place(last, last.b(), LogisticsTests.AT_THE_DEPOT), List.of(east, wagon));
         LocomotiveEntity locomotive = LogisticsTests.spawn(helper, RailworksRegistries.ELECTRIC_LOCOMOTIVE_ENTITY.get(), train, east);
         LogisticsTests.spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
         return locomotive;

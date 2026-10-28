@@ -21,18 +21,39 @@ class CarBodyTest {
 
     @Test
     void eachBodyStaysWithinItsCarsBoxAndLength() {
-        check(CarBody.LOCOMOTIVE, 2.8);
-        check(CarBody.ELECTRIC, 2.8);
-        check(CarBody.CARGO, 1.8);
-        check(CarBody.FLUID, 1.8);
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO, CarBody.FLUID)) {
+            check(body, 4.8);
+        }
     }
 
     @Test
-    void aLocomotiveIsThreeBlocksAndACargoCarTwoWithAGapAtEachCoupling() {
-        assertEquals(3.0, Locomotive.LENGTH);
-        assertEquals(2.0, CargoCar.LENGTH);
-        assertEquals(2.8, CarBody.LOCOMOTIVE.length(), 1e-9);
-        assertEquals(1.8, CarBody.CARGO.length(), 1e-9);
+    void everyCarIsFiveBlocksWithAGapAtEachCoupling() {
+        assertEquals(5.0, Locomotive.LENGTH);
+        assertEquals(5.0, CargoCar.LENGTH);
+        assertEquals(CargoCar.LENGTH, FluidCar.LENGTH);
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO, CarBody.FLUID)) {
+            assertEquals(4.8, body.length(), 1e-9);
+        }
+    }
+
+    @Test
+    void theLocomotivesCabEngineRoomAndBayMeetOnWholeBlocksTheEngineRoomOnTheMiddleOne() {
+        // The car's middle block runs from -0.5 to 0.5, and its others a whole block on from there.
+        assertEquals(0.5, CarBody.CAB_BACK);
+        assertEquals(-0.5, CarBody.BAY_FRONT);
+        // The Engine room is closed: from the bay's spot, looking ahead, it is the first thing seen.
+        CarBody.Box seen = firstHit(boxes(CarBody.LOCOMOTIVE),
+                new double[] {CarBody.BAY_SPOT.x(), CarBody.BAY_SPOT.y() + 1.0, CarBody.BAY_SPOT.z()}, new double[] {0.0, 0.0, 1.0});
+        assertTrue(seen != null && seen.minZ() >= CarBody.BAY_FRONT - 0.05 && seen.maxZ() <= CarBody.CAB_BACK + 0.05,
+                "the bay looks ahead into " + seen);
+    }
+
+    @Test
+    void theDriverSitsInTheCabAndTheRiderStandsInTheBay() {
+        double half = CarBody.LOCOMOTIVE.length() / 2.0;
+        assertTrue(CarBody.CAB_SEAT.z() > CarBody.CAB_BACK && CarBody.CAB_SEAT.z() < half, "the Driver is not in the cab");
+        assertTrue(CarBody.BAY_SPOT.z() < CarBody.BAY_FRONT && CarBody.BAY_SPOT.z() > -half, "the Rider is not in the bay");
+        assertEquals((CarBody.BAY_FRONT - half) / 2.0, CarBody.BAY_SPOT.z(), 1e-9, "the Rider stands mid-bay");
     }
 
     private static void check(CarBody body, double length) {
@@ -45,7 +66,7 @@ class CarBodyTest {
 
     @Test
     void noTwoFacesOfABodyShareAPlane() {
-        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.CARGO, CarBody.FLUID)) {
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO, CarBody.FLUID)) {
             List<CarBody.Box> boxes = boxes(body);
             for (int i = 0; i < boxes.size(); i++) {
                 for (int j = i + 1; j < boxes.size(); j++) {
@@ -93,12 +114,12 @@ class CarBodyTest {
     @Test
     void theRiderSitsForwardInTheCabBehindTheDashAndTheFrontsFrame() {
         CarBody.Point eye = CarBody.eye();
-        assertTrue(eye.z() > 0.0, "the rider does not sit forward of the car's middle");
+        assertTrue(eye.z() > CarBody.CAB_BACK, "the rider does not sit in the cab");
         for (CarBody.Part part : CarBody.LOCOMOTIVE.parts()) {
             CarBody.Box box = part.box();
             assertTrue(!contains(box, eye), "the rider's eye is inside " + part);
-            // The dash, the roof's edge and the nose, across the car in front of the rider.
-            if (box.minX() < 0.0 && box.maxX() > 0.0 && box.minZ() > 0.0) {
+            // The dash, the roof's edge and the nose, across the car ahead of the cab's back wall.
+            if (box.minX() < 0.0 && box.maxX() > 0.0 && box.minZ() > CarBody.CAB_BACK + 0.08) {
                 assertTrue(box.minZ() > eye.z(), "the rider's eye is not behind " + part);
             }
         }
@@ -196,9 +217,15 @@ class CarBodyTest {
     }
 
     @Test
-    void theCargoCarShowsAChestSetIntoEachSide() {
+    void theCargoCarShowsAChestSetIntoEachSideOverEachOfItsThreeInnerBlocks() {
         List<CarBody.Box> chests = CarBody.CARGO.chests();
-        assertEquals(2, chests.size(), "a chest on each side");
+        assertEquals(6, chests.size(), "three chests a side");
+        for (double at : new double[] {-1.0, 0.0, 1.0}) {
+            for (double side : new double[] {1.0, -1.0}) {
+                assertEquals(1, chests.stream().filter(chest -> (chest.minZ() + chest.maxZ()) / 2.0 == at
+                        && Math.signum(chest.minX() + chest.maxX()) == side).count(), "a chest on side " + side + " at " + at);
+            }
+        }
         for (CarBody.Box chest : chests) {
             assertEquals(chest.maxY() - chest.minY(), chest.maxX() - chest.minX(), 1e-9, chest + " is not a cube");
             assertEquals(chest.maxY() - chest.minY(), chest.maxZ() - chest.minZ(), 1e-9, chest + " is not a cube");
@@ -212,6 +239,11 @@ class CarBodyTest {
             CarBody.Box frame = firstHit(boxes(CarBody.CARGO), new double[] {side, chest.maxY() + 0.03, z}, inward);
             assertTrue(frame != null && Math.abs(side > 0 ? frame.maxX() : frame.minX()) > Math.abs(side > 0 ? chest.maxX() : chest.minX()),
                     "nothing frames the chest above it");
+            for (double along : new double[] {chest.minZ() - 0.1, chest.maxZ() + 0.1}) {
+                CarBody.Box beside = firstHit(boxes(CarBody.CARGO), new double[] {side, y, along}, inward);
+                assertTrue(beside != null && Math.abs(side > 0 ? beside.maxX() : beside.minX()) > Math.abs(side > 0 ? chest.maxX() : chest.minX()),
+                        "nothing frames the chest beside it");
+            }
         }
     }
 }

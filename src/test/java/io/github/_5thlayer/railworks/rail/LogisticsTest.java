@@ -21,23 +21,23 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Automatic Trains running jobs from providers to requesters (ADR 0008), through {@link Logistics}'
- * tick and drive with a fake {@link Goods}: on a Line of two 20-block Spans from A to C, and round a
+ * tick and drive with a fake {@link Goods}: on a Line of two 50-block Spans from A to C, and round a
  * loop of eight Arms, with round numbers for the drive. Item kinds are strings; coal stacks to 16 and
  * everything else to 64.
  */
 class LogisticsTest {
 
     private static final Arm A = new Arm(0, 5, 0);
-    private static final Arm B = new Arm(20, 5, 0);
-    private static final Arm C = new Arm(40, 5, 0);
-    /** North of the line, serving Trains heading for A: the leading car at 6, its spots back east from 8.5. */
+    private static final Arm B = new Arm(50, 5, 0);
+    private static final Arm C = new Arm(100, 5, 0);
+    /** North of the line, serving Trains heading for A: the leading car at 7, its spots back east from 12. */
     private static final Station MINE = new Station(5, 6, -1, "Mine");
-    /** South of the line, serving Trains heading for C: the leading car at 34, its spots back west from 31.5. */
-    private static final Station DEPOT = new Station(35, 6, 1, "Depot");
-    /** South of the line, serving Trains heading for C: the leading car at 8, its spots back west from 5.5. */
-    private static final Station QUARRY = new Station(9, 6, 1, "Quarry");
-    /** North of the line, serving Trains heading for A, nearer the Depot than the Mine is. */
-    private static final Station PIT = new Station(17, 6, -1, "Pit");
+    /** South of the line, serving Trains heading for C: the leading car at 93, its spots back west from 88. */
+    private static final Station DEPOT = new Station(95, 6, 1, "Depot");
+    /** South of the line, serving Trains heading for C: the leading car at 23, its spots back west from 18. */
+    private static final Station QUARRY = new Station(25, 6, 1, "Quarry");
+    /** North of the line, serving Trains heading for A, nearer the Depot than the Mine is: the leading car at 32. */
+    private static final Station PIT = new Station(30, 6, -1, "Pit");
     /** Far enough for any run here. */
     private static final int BUDGET = 3_000;
 
@@ -66,8 +66,8 @@ class LogisticsTest {
     // ---- the network ----
 
     private void line() {
-        network.add(Span.of(A, B, 20));
-        network.add(Span.of(B, C, 20));
+        network.add(Span.of(A, B, 50));
+        network.add(Span.of(B, C, 50));
     }
 
     /** A Locomotive facing C, a Cargo car, and a Locomotive facing A, the first car's middle {@code x} blocks from A. */
@@ -86,8 +86,8 @@ class LogisticsTest {
     }
 
     private Place onLine(double x) {
-        Span span = x <= 20.0 ? network.get(A, B) : network.get(B, C);
-        return new Place(span, x <= 20.0 ? B : C, (x <= 20.0 ? 20.0 : 40.0) - x);
+        Span span = x <= 50.0 ? network.get(A, B) : network.get(B, C);
+        return new Place(span, x <= 50.0 ? B : C, (x <= 50.0 ? 50.0 : 100.0) - x);
     }
 
     private Train automatic(Train train) {
@@ -206,7 +206,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 100);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> goods.held(depot, "iron") == 64 && kind(train) == Logistics.Kind.WAITING, "delivered");
         assertEquals(36, goods.held(mine, "iron"));
         assertTrue(goods.empty(cargo(train, 1)));
@@ -218,7 +218,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 100);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         assertEquals(Logistics.Kind.WAITING, kind(train));
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off to load");
         assertEquals("Mine", logistics.status(train, goods).station());
@@ -236,7 +236,7 @@ class LogisticsTest {
     @Test
     void aManualTrainIsSaidToBeManual() {
         line();
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         train.setAutomatic(false);
         assertEquals(Logistics.Kind.MANUAL, kind(train));
     }
@@ -247,7 +247,7 @@ class LogisticsTest {
         Logistics.Hatch<String> far = provider(MINE, 0, "iron", 64);
         Logistics.Hatch<String> near = provider(PIT, 0, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(25.0);
+        Train train = shuttle(65.0);
         runUntil(() -> goods.held(depot, "iron") == 64, "delivered");
         assertEquals(64, goods.held(far, "iron"));
         assertEquals(0, goods.held(near, "iron"));
@@ -285,7 +285,7 @@ class LogisticsTest {
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
         goods.put(depot, "iron", 64);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runFor(200);
         assertEquals(Logistics.Kind.WAITING, kind(train));
         assertEquals(64, goods.held(mine, "iron"));
@@ -299,7 +299,7 @@ class LogisticsTest {
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 500);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
         goods.put(depot, "iron", 10);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(118, goods.held(cargo(train, 1), "iron"));
 
@@ -316,7 +316,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 40);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(40, goods.held(cargo(train, 1), "iron"));
     }
@@ -411,7 +411,7 @@ class LogisticsTest {
         Logistics.Hatch<String> iron = requester(DEPOT, 0, "iron", 1);
         Logistics.Hatch<String> coal = requester(DEPOT, 1, "coal", 1);
         // Its Locomotive leading, the first Cargo car at spot 0 and the second at spot 1.
-        Train train = eastbound(5.0, 2);
+        Train train = eastbound(15.0, 2);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(64, goods.held(cargo(train, 1), "iron"));
         assertEquals(16, goods.held(cargo(train, 2), "coal"));
@@ -429,7 +429,7 @@ class LogisticsTest {
         provider(QUARRY, 0, "coal", 16);
         Logistics.Hatch<String> iron = requester(DEPOT, 0, "iron", 1);
         Logistics.Hatch<String> coal = requester(DEPOT, 0, "coal", 1);
-        Train train = eastbound(5.0, 1);
+        Train train = eastbound(15.0, 1);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(64, goods.held(cargo(train, 1), "iron"));
         assertEquals(16, goods.held(cargo(train, 1), "coal"));
@@ -444,12 +444,51 @@ class LogisticsTest {
         Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, Platform.LEADING, "iron", 1);
         // A Cargo car leading, its Locomotive behind it facing the same way.
-        Train train = automatic(Train.of(onLine(5.0), List.of(CargoCar.create(), fuelled())));
+        Train train = automatic(Train.of(onLine(15.0), List.of(CargoCar.create(), fuelled())));
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(64, goods.held(cargo(train, 0), "iron"));
         runUntil(() -> kind(train) == Logistics.Kind.WAITING, "unloaded");
         assertEquals(0, goods.held(quarry, "iron"));
         assertEquals(64, goods.held(depot, "iron"));
+    }
+
+    @Test
+    void aDoubleHeadedTrainAndACargoFirstOneEachStopWithEveryCarOnItsSpotsMiddle() {
+        line();
+        Platform quarry = Platform.of(network, QUARRY).orElseThrow();
+        // Two Locomotives leading a Cargo car, which loads at spot 1.
+        provider(QUARRY, 1, "iron", 64);
+        requester(DEPOT, 1, "iron", 1);
+        Train doubleHeaded = automatic(Train.of(onLine(15.0), List.of(fuelled(), fuelled(), CargoCar.create())));
+        assertStopsOnTheSpots(quarry, doubleHeaded);
+        trains.remove(doubleHeaded);
+        hatches.clear();
+        // Two Cargo cars leading, their Locomotive behind them facing the same way, the second car loading at spot 0.
+        provider(QUARRY, 0, "iron", 64);
+        requester(DEPOT, 0, "iron", 1);
+        Train cargoFirst = automatic(Train.of(onLine(15.0), List.of(CargoCar.create(), CargoCar.create(), fuelled())));
+        assertStopsOnTheSpots(quarry, cargoFirst);
+    }
+
+    /**
+     * Runs until {@code train} is at rest loading at {@code platform}'s Station, then checks each car's
+     * middle stands on its mark: the leading car's on the lead mark, within the {@link Driver#ARRIVE} it
+     * stops short by, and each car behind it on its spot's middle, short by just as much, since cars and
+     * spots are one length.
+     */
+    private void assertStopsOnTheSpots(Platform platform, Train train) {
+        runUntil(() -> kind(train) == Logistics.Kind.LOADING && train.atRest(), "at rest loading");
+        double shortBy = along(platform.leadMark()) - along(train.placeOf(network, train.cars().getFirst()));
+        assertTrue(shortBy >= -1e-9 && shortBy <= Driver.ARRIVE, "the leading car " + shortBy + " short of the lead mark");
+        for (int i = 1; i < train.cars().size(); i++) {
+            assertEquals(shortBy, along(platform.spots().get(i - 1).middle()) - along(train.placeOf(network, train.cars().get(i))),
+                    1e-9, "car " + i + " against spot " + (i - 1) + "'s middle");
+        }
+    }
+
+    /** How far along the line from A {@code p} is. */
+    private static double along(Place p) {
+        return p.front().equals(p.span().a()) ? p.toFront() + p.span().a().x() : p.span().b().x() - p.toFront();
     }
 
     // ---- at the Station ----
@@ -459,7 +498,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 640);
         requester(DEPOT, 0, "iron", 3);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "arrived");
         step();
         assertEquals(64, goods.held(cargo(train, 1), "iron"));
@@ -475,7 +514,7 @@ class LogisticsTest {
         Logistics.configure(5, Logistics.DEFAULT_STALL_SECONDS);
         provider(MINE, 0, "iron", 640);
         requester(DEPOT, 0, "iron", 3);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "arrived");
         runFor(1 + 5);
         assertEquals(128, goods.held(cargo(train, 1), "iron"));
@@ -487,7 +526,7 @@ class LogisticsTest {
         Logistics.configure(60, 1.0);
         provider(MINE, 0, "iron", 640);
         requester(DEPOT, 0, "iron", 3);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(192, goods.held(cargo(train, 1), "iron"));
     }
@@ -497,7 +536,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 640);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "arrived");
         int loading = runUntil(() -> kind(train) != Logistics.Kind.LOADING, "left");
         assertTrue(loading < 5, "it loaded for " + loading + " ticks");
@@ -509,7 +548,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 100);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 3);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         // Some is taken by hand after the job claimed all 100, so it finds only 70.
         goods.put(mine, "iron", 70);
@@ -529,7 +568,7 @@ class LogisticsTest {
         Logistics.configure(Logistics.DEFAULT_HATCH_TICKS_PER_STACK, 1.0);
         provider(MINE, 0, "iron", 128);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         goods.hatchRoom = 64;
         runUntil(() -> kind(train) == Logistics.Kind.UNLOADING, "arrived");
@@ -544,7 +583,7 @@ class LogisticsTest {
         Logistics.configure(Logistics.DEFAULT_HATCH_TICKS_PER_STACK, 1.0);
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         goods.put(mine, "iron", 0);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "arrived");
@@ -560,7 +599,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.WAITING && goods.empty(cargo(train, 1))
                 && !stationsAt(train).isEmpty(), "delivered");
         Place at = train.head();
@@ -575,7 +614,7 @@ class LogisticsTest {
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
         // The Locomotive facing A leading at the Mine, its Cargo car at the first spot.
-        Train train = shuttle(11.0);
+        Train train = shuttle(17.0);
         train.setAutomatic(false);
         assertTrue(stationsAt(train).contains(MINE));
         runFor(200);
@@ -588,7 +627,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(25.0);
+        Train train = shuttle(65.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         network.remove(A, B);
         runFor(20);
@@ -604,7 +643,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "coal", 100);
         // Waiting with no job, its Locomotive at the Quarry's leading car's place.
-        Train train = eastbound(8.5, 1);
+        Train train = eastbound(23.5, 1);
         Locomotive locomotive = (Locomotive) train.cars().getFirst();
         step();
         assertEquals(16, goods.fuel(locomotive, "coal"), "the first stack on the first tick");
@@ -621,7 +660,7 @@ class LogisticsTest {
     void aManualTrainIsNeverFuelled() {
         line();
         provider(QUARRY, Platform.LEADING, "coal", 100);
-        Train train = eastbound(8.5, 1);
+        Train train = eastbound(23.5, 1);
         train.setAutomatic(false);
         runFor(100);
         assertEquals(0, goods.fuel((Locomotive) train.cars().getFirst(), "coal"));
@@ -633,7 +672,7 @@ class LogisticsTest {
         Logistics.Hatch<String> asking = requester(QUARRY, Platform.LEADING, "coal", 1);
         goods.put(asking, "coal", 16);
         Logistics.Hatch<String> besideTheCar = provider(QUARRY, 0, "coal", 16);
-        Train train = eastbound(8.5, 1);
+        Train train = eastbound(23.5, 1);
         runFor(100);
         assertEquals(0, goods.fuel((Locomotive) train.cars().getFirst(), "coal"));
         assertEquals(16, goods.held(asking, "coal"));
@@ -646,7 +685,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "lava_bucket", 1);
         goods.put(quarry, "wood", 10);
-        Train train = eastbound(8.5, 1);
+        Train train = eastbound(23.5, 1);
         runFor(100);
         Locomotive locomotive = (Locomotive) train.cars().getFirst();
         assertEquals(0, goods.fuel(locomotive, "lava_bucket"));
@@ -659,10 +698,10 @@ class LogisticsTest {
         provider(QUARRY, Platform.LEADING, "coal", 20);
         Logistics.Hatch<String> depot = requester(DEPOT, Platform.LEADING, "coal", 1);
         // Its Locomotive at the Quarry's leading car's place, manual until a job of the other has claimed a stack.
-        Train standing = eastbound(8.5, 0);
+        Train standing = eastbound(23.5, 0);
         standing.setAutomatic(false);
         // A Cargo car leading, behind it.
-        Train other = automatic(Train.of(onLine(3.0), List.of(CargoCar.create(), fuelled())));
+        Train other = automatic(Train.of(onLine(12.0), List.of(CargoCar.create(), fuelled())));
         runUntil(() -> kind(other) == Logistics.Kind.TO_LOAD, "planned");
         standing.setAutomatic(true);
         runUntil(() -> goods.held(depot, "coal") == 16, "delivered the claimed stack");
@@ -675,7 +714,7 @@ class LogisticsTest {
         provider(QUARRY, 0, "iron", 64);
         provider(QUARRY, Platform.LEADING, "coal", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = eastbound(3.0, 1);
+        Train train = eastbound(12.0, 1);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "at the Quarry");
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(64, goods.held(cargo(train, 1), "iron"), "a stack on the first turn");
@@ -689,23 +728,23 @@ class LogisticsTest {
         provider(QUARRY, 0, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
         // Nothing in its buffer or its slots: it cannot pull, so no job is planned for it.
-        Train train = automatic(Train.of(onLine(8.5), List.of(Locomotive.burner(), CargoCar.create())));
+        Train train = automatic(Train.of(onLine(23.5), List.of(Locomotive.burner(), CargoCar.create())));
         runUntil(() -> goods.held(depot, "iron") == 64, "delivered");
     }
 
     @Test
     void aTrainOnItsWayHeldAtAnotherStationTakesNoFuelThere() {
         line();
-        // South of the line, serving Trains heading for C: the leading car at 18, two blocks short of B.
-        Station siding = new Station(19, 6, 1, "Siding");
+        // South of the line, serving Trains heading for C: the leading car at 47, three blocks short of B.
+        Station siding = new Station(49, 6, 1, "Siding");
         provider(siding, Platform.LEADING, "coal", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = eastbound(5.0, 1);
+        Train train = eastbound(15.0, 1);
         Locomotive locomotive = (Locomotive) train.cars().getFirst();
         goods.put(cargo(train, 1), "iron", 10);
         // A Train on the Span from B, so it is held at B on its way to deliver, by the Siding.
-        trains.add(Train.of(onLine(30.0), fuelled()));
-        runUntil(() -> train.atRest() && train.head().toFront() == 1.5, "held at B");
+        trains.add(Train.of(onLine(70.0), fuelled()));
+        runUntil(() -> train.atRest() && train.head().toFront() == 2.5, "held at B");
         runFor(100);
         assertEquals(Logistics.Kind.TO_UNLOAD, kind(train));
         assertEquals(0, goods.fuel(locomotive, "coal"), "on its way, not at its job's Station");
@@ -721,7 +760,7 @@ class LogisticsTest {
         line();
         Logistics.Charger quarry = charger(QUARRY, Platform.LEADING, 1_000_000L);
         // Its Locomotive at the Quarry's leading car's place.
-        Train train = electricEastbound(8.5, 1, 0L);
+        Train train = electricEastbound(23.5, 1, 0L);
         train.setAutomatic(false);
         step();
         assertEquals(10_000L, goods.charge(first(train)), "the Charger's rate on the first tick");
@@ -734,7 +773,7 @@ class LogisticsTest {
     void anAutomaticTrainWaitingAtAStationIsChargedUntilFull() {
         line();
         charger(QUARRY, Platform.LEADING, 20_000_000L);
-        Train train = electricEastbound(8.5, 1, ChargeSpec.locomotiveCapacity() - 25_000L);
+        Train train = electricEastbound(23.5, 1, ChargeSpec.locomotiveCapacity() - 25_000L);
         runFor(3);
         assertEquals(ChargeSpec.locomotiveCapacity(), goods.charge(first(train)), "two ticks at the rate, the third topping it up");
     }
@@ -743,7 +782,7 @@ class LogisticsTest {
     void aCreativeChargerFillsItInOneTickAndNeverRunsOut() {
         line();
         creativeCharger(QUARRY, Platform.LEADING);
-        Train train = electricEastbound(8.5, 1, 0L);
+        Train train = electricEastbound(23.5, 1, 0L);
         train.setAutomatic(false);
         step();
         assertEquals(ChargeSpec.locomotiveCapacity(), goods.charge(first(train)));
@@ -754,7 +793,7 @@ class LogisticsTest {
         line();
         charger(QUARRY, Platform.LEADING, 1_000_000L);
         charger(QUARRY, Platform.LEADING, 1_000_000L);
-        Train train = electricEastbound(8.5, 1, 0L);
+        Train train = electricEastbound(23.5, 1, 0L);
         step();
         assertEquals(20_000L, goods.charge(first(train)));
     }
@@ -764,7 +803,7 @@ class LogisticsTest {
         line();
         Logistics.Charger besideTheBurner = charger(QUARRY, Platform.LEADING, 1_000_000L);
         Logistics.Charger besideTheCargo = charger(QUARRY, 0, 1_000_000L);
-        eastbound(8.5, 1);
+        eastbound(23.5, 1);
         runFor(50);
         assertEquals(1_000_000L, goods.buffers.get(besideTheBurner.x()));
         assertEquals(1_000_000L, goods.buffers.get(besideTheCargo.x()));
@@ -773,15 +812,15 @@ class LogisticsTest {
     @Test
     void aTrainOnItsWayHeldAtAnotherStationTakesNoChargeThere() {
         line();
-        // South of the line, serving Trains heading for C: the leading car at 18, two blocks short of B.
-        Station siding = new Station(19, 6, 1, "Siding");
+        // South of the line, serving Trains heading for C: the leading car at 47, three blocks short of B.
+        Station siding = new Station(49, 6, 1, "Siding");
         charger(siding, Platform.LEADING, 1_000_000L);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = electricEastbound(5.0, 1, 1_000_000L);
+        Train train = electricEastbound(15.0, 1, 1_000_000L);
         goods.put(cargo(train, 1), "iron", 10);
         // A Train on the Span from B, so it is held at B on its way to deliver, by the Siding.
-        trains.add(Train.of(onLine(30.0), fuelled()));
-        runUntil(() -> train.atRest() && train.head().toFront() == 1.5, "held at B");
+        trains.add(Train.of(onLine(70.0), fuelled()));
+        runUntil(() -> train.atRest() && train.head().toFront() == 2.5, "held at B");
         long held = goods.charge(first(train));
         runFor(100);
         assertEquals(Logistics.Kind.TO_UNLOAD, kind(train));
@@ -798,7 +837,7 @@ class LogisticsTest {
         requester(DEPOT, 0, "iron", 1);
         charger(QUARRY, Platform.LEADING, 20_000_000L);
         // Short of full by far more than one hatch turn tops up, and far more than the stall.
-        Train train = electricEastbound(3.0, 1, ChargeSpec.locomotiveCapacity() - 2_000_000L);
+        Train train = electricEastbound(12.0, 1, ChargeSpec.locomotiveCapacity() - 2_000_000L);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "at the Quarry");
         int waited = runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded and charged");
         assertTrue(waited > 200, "it waited " + waited + " ticks, not for its charge");
@@ -815,7 +854,7 @@ class LogisticsTest {
         requester(DEPOT, 0, "iron", 1);
         // A Charger with little in it and nothing coming in.
         Logistics.Charger quarry = charger(QUARRY, Platform.LEADING, 5_000L);
-        Train train = electricEastbound(3.0, 1, 1_000_000L);
+        Train train = electricEastbound(12.0, 1, 1_000_000L);
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "at the Quarry");
         int waited = runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(0L, goods.buffers.get(quarry.x()), "it took what the Charger had");
@@ -828,7 +867,7 @@ class LogisticsTest {
         line();
         provider(QUARRY, 0, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = electricEastbound(8.5, 1, 0L);
+        Train train = electricEastbound(23.5, 1, 0L);
         runFor(3 * Logistics.PLAN_TICKS);
         assertEquals(Logistics.Kind.WAITING, kind(train), "it cannot pull, so no job is planned for it");
         charger(QUARRY, Platform.LEADING, 1_000_000L);
@@ -840,7 +879,7 @@ class LogisticsTest {
         line();
         provider(QUARRY, 0, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = electricEastbound(3.0, 1, 1_000_000L);
+        Train train = electricEastbound(12.0, 1, 1_000_000L);
         int powered = 0;
         for (int tick = 0; tick < BUDGET && goods.held(depot, "iron") < 64; tick++) {
             long before = goods.charge(first(train));
@@ -920,7 +959,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 640);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 3);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         ask(depot, "iron", 1);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
@@ -933,7 +972,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         hatches.remove(mine);
         step();
@@ -948,7 +987,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         replace(mine, new Logistics.Hatch<>(mine.x(), mine.y(), mine.z(), MINE, 0, false, Goods.Kind.ITEMS, Optional.empty()));
         step();
@@ -960,7 +999,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 640);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         hatches.remove(depot);
         step();
@@ -980,7 +1019,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 640);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         replace(depot, new Logistics.Hatch<>(depot.x(), depot.y(), depot.z(), DEPOT, 0, true, Goods.Kind.ITEMS, Optional.empty()));
         step();
@@ -994,7 +1033,7 @@ class LogisticsTest {
         provider(QUARRY, 1, "coal", 16);
         Logistics.Hatch<String> iron = requester(DEPOT, 0, "iron", 1);
         Logistics.Hatch<String> coal = requester(DEPOT, 1, "coal", 1);
-        Train train = eastbound(5.0, 2);
+        Train train = eastbound(15.0, 2);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         hatches.remove(coal);
         step();
@@ -1009,7 +1048,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 640);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(128, goods.held(cargo(train, 1), "iron"));
         Logistics.Hatch<String> cut = ask(depot, "iron", 1);
@@ -1026,7 +1065,7 @@ class LogisticsTest {
         line();
         provider(MINE, 0, "iron", 640);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         ask(depot, "copper", 1);
         runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "gave up on the Depot");
@@ -1041,7 +1080,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 640);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         hatches.remove(depot);
         runFor(Logistics.PLAN_TICKS * 3);
@@ -1061,8 +1100,8 @@ class LogisticsTest {
         Logistics.Hatch<String> far = requester(DEPOT, 0, "iron", 1);
         Logistics.Hatch<String> near = requester(QUARRY, 0, "iron", 1);
         // At the nearest Station of all, but asking for another item.
-        Logistics.Hatch<String> other = requester(new Station(7, 6, 1, "Siding"), 0, "copper", 1);
-        Train train = eastbound(3.0, 1);
+        Logistics.Hatch<String> other = requester(new Station(18, 6, 1, "Siding"), 0, "copper", 1);
+        Train train = eastbound(12.0, 1);
         train.setAutomatic(false);
         goods.put(cargo(train, 1), "iron", 40);
         train.setAutomatic(true);
@@ -1078,7 +1117,7 @@ class LogisticsTest {
     void aDeliveryCutOffFromItsRequesterIsGivenUpAndTheTrainHolds() {
         line();
         requester(DEPOT, 0, "iron", 1);
-        Train train = eastbound(5.0, 1);
+        Train train = eastbound(15.0, 1);
         goods.put(cargo(train, 1), "iron", 40);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "sent to deliver");
         network.remove(B, C);
@@ -1091,7 +1130,7 @@ class LogisticsTest {
         line();
         provider(QUARRY, 0, "iron", 64);
         requester(DEPOT, 0, "iron", 1);
-        Train train = eastbound(5.0, 1);
+        Train train = eastbound(15.0, 1);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         network.remove(B, C);
         runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "gave the job up");
@@ -1104,7 +1143,7 @@ class LogisticsTest {
         provider(QUARRY, 0, "iron", 64);
         provider(QUARRY, 0, "iron", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 2);
-        Train train = eastbound(5.0, 1);
+        Train train = eastbound(15.0, 1);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
         ask(depot, "iron", 1);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
@@ -1116,7 +1155,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> mine = provider(MINE, 0, "iron", 640);
         requester(DEPOT, 0, "iron", 1);
-        Train train = shuttle(20.0);
+        Train train = shuttle(50.0);
         goods.put(cargo(train, 1), "coal", 5);
         runFor(200);
         assertEquals(Logistics.Kind.HOLDING, kind(train));
@@ -1145,7 +1184,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> quarry = provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(100));
         Logistics.Hatch<String> depot = requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
-        Train train = eastbound(5.0, FluidCar.create());
+        Train train = eastbound(15.0, FluidCar.create());
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(buckets(16), goods.held(fluidCar(train, 1), "water"));
         assertEquals(List.of(new Logistics.Cargo<>("water", buckets(16))), logistics.status(train, goods).cargo());
@@ -1160,7 +1199,7 @@ class LogisticsTest {
         line();
         provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(100));
         requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
-        Train train = eastbound(5.0, FluidCar.create());
+        Train train = eastbound(15.0, FluidCar.create());
         runUntil(() -> kind(train) == Logistics.Kind.LOADING, "arrived");
         step();
         assertEquals(buckets(Logistics.FLUID_BUCKETS_PER_STEP), goods.held(fluidCar(train, 1), "water"));
@@ -1176,7 +1215,7 @@ class LogisticsTest {
         goods.tank = buckets(10);
         provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(100));
         requester(DEPOT, 0, Goods.Kind.FLUID, "water", 64);
-        Train train = eastbound(5.0, FluidCar.create());
+        Train train = eastbound(15.0, FluidCar.create());
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(buckets(10), goods.held(fluidCar(train, 1), "water"));
     }
@@ -1188,7 +1227,7 @@ class LogisticsTest {
         provider(QUARRY, 0, Goods.Kind.FLUID, "oil", buckets(8));
         requester(DEPOT, 0, Goods.Kind.FLUID, "water", 8);
         Logistics.Hatch<String> oil = requester(DEPOT, 0, Goods.Kind.FLUID, "oil", 8);
-        Train train = eastbound(5.0, FluidCar.create());
+        Train train = eastbound(15.0, FluidCar.create());
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(buckets(8), goods.held(fluidCar(train, 1), "water"));
         assertEquals(0, goods.held(fluidCar(train, 1), "oil"));
@@ -1217,7 +1256,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> quarry = provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(64));
         requester(DEPOT, 0, Goods.Kind.FLUID, "water", 8);
-        Train train = eastbound(5.0, FluidCar.create());
+        Train train = eastbound(15.0, FluidCar.create());
         goods.put(fluidCar(train, 1), "oil", buckets(5));
         runFor(200);
         Logistics.Status<String> status = logistics.status(train, goods);
@@ -1237,7 +1276,7 @@ class LogisticsTest {
         provider(QUARRY, 1, Goods.Kind.FLUID, "water", buckets(16));
         Logistics.Hatch<String> iron = requester(DEPOT, 0, "iron", 1);
         Logistics.Hatch<String> water = requester(DEPOT, 1, Goods.Kind.FLUID, "water", 16);
-        Train train = eastbound(5.0, CargoCar.create(), FluidCar.create());
+        Train train = eastbound(15.0, CargoCar.create(), FluidCar.create());
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(64, goods.held(cargo(train, 1), "iron"));
         assertEquals(buckets(16), goods.held(fluidCar(train, 2), "water"));
@@ -1256,7 +1295,7 @@ class LogisticsTest {
         requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
         Logistics.Hatch<String> iron = provider(QUARRY, 1, "iron", 64);
         requester(DEPOT, 1, "iron", 1);
-        Train train = eastbound(5.0, CargoCar.create(), FluidCar.create());
+        Train train = eastbound(15.0, CargoCar.create(), FluidCar.create());
         runFor(200);
         assertEquals(Logistics.Kind.WAITING, kind(train));
         assertEquals(buckets(16), goods.held(water, "water"));
@@ -1268,7 +1307,7 @@ class LogisticsTest {
         line();
         Logistics.Hatch<String> items = provider(QUARRY, 0, "water", 64);
         requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
-        Train train = eastbound(5.0, FluidCar.create());
+        Train train = eastbound(15.0, FluidCar.create());
         runFor(200);
         assertEquals(Logistics.Kind.WAITING, kind(train));
         assertEquals(64, goods.held(items, "water"));
@@ -1279,7 +1318,7 @@ class LogisticsTest {
         line();
         // Oil burns, but from a Fluid hatch it goes into no fuel slot.
         Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, Goods.Kind.FLUID, "oil", buckets(10));
-        Train train = eastbound(8.5, 1);
+        Train train = eastbound(23.5, 1);
         Locomotive locomotive = (Locomotive) train.cars().getFirst();
         runFor(200);
         assertEquals(0, goods.fuel(locomotive, "oil"));
@@ -1290,7 +1329,7 @@ class LogisticsTest {
     void aChargerBesideAFluidCarGivesNothing() {
         line();
         Logistics.Charger besideTheFluidCar = charger(QUARRY, 0, 1_000_000L);
-        eastbound(8.5, FluidCar.create());
+        eastbound(23.5, FluidCar.create());
         runFor(50);
         assertEquals(1_000_000L, goods.buffers.get(besideTheFluidCar.x()));
     }

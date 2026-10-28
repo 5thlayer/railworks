@@ -67,29 +67,41 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * {@code refuel_}, for a rider logging out of a Train on its job (#56), whose names share
  * {@code logout_} with {@code LocomotiveTests}' logging out, for a job run with its Cargo car
  * out of view (#59), whose name shares {@code record_} with {@code CarRecordTests}, and for the
- * leading car's place covering a three-block Locomotive (#62), whose name shares {@code loco_length_}.
+ * leading car's place covering a Locomotive's five blocks (#62, #70), whose name shares {@code loco_length_}.
  */
 final class LogisticsTests {
 
     /**
-     * A line in the plot and the gap beside it: west along z 3, a 45-degree jog south-east, and on east
-     * along z 5, so each Straight leg ends a platform after one car spot and the two never overlap. A
-     * Span bends all along when either Arm does, so a short Span each side of the jog takes the bend.
+     * A line out of the plot east past the structure: west along z 3, a 45-degree jog south-east, and
+     * on east along z 5, each Straight leg ten blocks, so each ends a platform after one five-block car
+     * spot and the two never overlap. A Span bends all along when either Arm does, so a short Span
+     * each side of the jog takes the bend.
      */
-    private static final BlockPos[] LINE = {new BlockPos(-1, 1, 3), new BlockPos(4, 1, 3), new BlockPos(5, 1, 3),
-            new BlockPos(7, 1, 5), new BlockPos(8, 1, 5), new BlockPos(13, 1, 5)};
+    private static final BlockPos[] LINE = {new BlockPos(-1, 1, 3), new BlockPos(9, 1, 3), new BlockPos(10, 1, 3),
+            new BlockPos(12, 1, 5), new BlockPos(13, 1, 5), new BlockPos(23, 1, 5)};
+    /** How far east the {@link #LINE} runs. */
+    private static final int EAST = 23;
     /**
      * North of the west leg at the line's end, serving Trains heading west: the leading car's place
-     * beside x -1 to 1 and its first car spot beside x 2 and 3.
+     * beside x -1 to 3 and its first car spot beside x 4 to 8.
      */
     private static final BlockPos MINE = new BlockPos(-1, 1, 2);
     /**
      * South of the east leg at the line's end, serving Trains heading east: the leading car's place
-     * beside x 11 to 13 and its first car spot beside x 9 and 10.
+     * beside x 19 to 23 and its first car spot beside x 14 to 18.
      */
-    static final BlockPos DEPOT = new BlockPos(13, 1, 6);
-    private static final BlockPos PROVIDER = new BlockPos(3, 2, 2);
-    private static final BlockPos REQUESTER = new BlockPos(9, 2, 6);
+    static final BlockPos DEPOT = new BlockPos(EAST, 1, 6);
+    /** Beside the Mine's first car spot, at its fourth block. */
+    private static final BlockPos PROVIDER = new BlockPos(7, 2, 2);
+    /** Beside the Depot's first car spot, at its middle block. */
+    private static final BlockPos REQUESTER = new BlockPos(16, 2, 6);
+
+    /**
+     * How far short of the {@link #LINE}'s east end a car's middle is where the Depot's leading
+     * Locomotive stands: half its length behind the Station block's front edge, which is half a block
+     * past the end.
+     */
+    static final double AT_THE_DEPOT = Platform.LEAD / 2.0 - 0.5;
 
     private LogisticsTests() {
     }
@@ -110,8 +122,8 @@ final class LogisticsTests {
         tests.testOnItsOwn("refuel_a_stack_the_fuel_slots_cannot_take_is_passed_over", 400, LogisticsTests::refuelsPastAStack);
         tests.testOnItsOwn("logout_leaves_the_riders_car_in_its_train_on_its_job", 1_200, LogisticsTests::riderLogsOut);
         tests.testOnItsOwn("record_a_job_loads_and_unloads_a_cargo_car_out_of_view", 1_200, LogisticsTests::cargoOutOfView);
-        tests.testOnItsOwn("loco_length_a_provider_by_a_stopped_locomotives_third_block_fuels_it_and_the_first_spot_loads_the_car_behind",
-                400, LogisticsTests::thirdBlock);
+        tests.testOnItsOwn("loco_length_a_provider_by_a_stopped_locomotives_back_block_fuels_it_and_the_first_spot_loads_the_car_behind",
+                400, LogisticsTests::backBlock);
     }
 
     // ---- the mode ----
@@ -194,7 +206,8 @@ final class LogisticsTests {
         Locomotive east = Locomotive.burner();
         CargoCar wagon = CargoCar.create();
         Locomotive west = Locomotive.burner();
-        Train train = Train.of(new Place(last, last.b(), 2.0), List.of(east, wagon))
+        // A block short of where the Depot's leading Locomotive stands.
+        Train train = Train.of(new Place(last, last.b(), AT_THE_DEPOT + 1.0), List.of(east, wagon))
                 .coupled(LevelRails.of(helper.getLevel()).network(), Train.End.BACK, west, true);
         LocomotiveEntity leading = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         CargoCarEntity cargo = spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
@@ -215,9 +228,9 @@ final class LogisticsTests {
         helper.startSequence()
                 .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.to_unload"))
                 .thenExecute(() -> {
-                    if (cargo.cargo().countItem(Items.IRON_INGOT) != 64) {
-                        helper.fail("the Cargo car left the Mine with " + cargo.cargo().countItem(Items.IRON_INGOT)
-                                + " iron, not the stack the Depot asks for", MINE);
+                    int iron = view(helper, cargo).cargo().countItem(Items.IRON_INGOT);
+                    if (iron != 64) {
+                        helper.fail("the Cargo car left the Mine with " + iron + " iron, not the stack the Depot asks for", MINE);
                     }
                     expectIcons(helper, leading, "64 minecraft:iron_ingot");
                 })
@@ -226,16 +239,18 @@ final class LogisticsTests {
                     expectIcons(helper, leading, "");
                     long delivered = held(record(helper, REQUESTER));
                     long left = held(record(helper, PROVIDER));
-                    if (delivered != 64 || left != 36 || !cargo.cargo().isEmpty()) {
+                    CargoCarEntity car = view(helper, cargo);
+                    if (delivered != 64 || left != 36 || !car.cargo().isEmpty()) {
                         helper.fail("the run left the Depot with " + delivered + " iron and the Mine with " + left
-                                + ", the car holding " + cargo.cargo().countItem(Items.IRON_INGOT), DEPOT);
+                                + ", the car holding " + car.cargo().countItem(Items.IRON_INGOT), DEPOT);
                     }
-                    if (leading.fuelItem().getCount() >= 4 && trailing.fuelItem().getCount() >= 4) {
+                    if (view(helper, leading).fuelItem().getCount() >= 4 && view(helper, trailing).fuelItem().getCount() >= 4) {
                         helper.fail("the run burnt no coal from either Locomotive's slot", DEPOT);
                     }
-                    // Unloaded, it waits by the Depot, its cars on the car spots.
-                    if (Math.abs(cargo.getX() - (helper.absolutePos(REQUESTER).getX() + 1.0)) > 1.0) {
-                        helper.fail("the Cargo car stands at x " + cargo.getX() + ", not by the requester", REQUESTER);
+                    // Unloaded, it waits by the Depot, its cars on the car spots: the Cargo car's middle
+                    // is the first spot's, the middle of the requester's block.
+                    if (Math.abs(car.getX() - (helper.absolutePos(REQUESTER).getX() + 0.5)) > 1.0) {
+                        helper.fail("the Cargo car stands at x " + car.getX() + ", not by the requester", REQUESTER);
                     }
                 })
                 .thenExecute(() -> forceLoad(helper, false))
@@ -283,9 +298,9 @@ final class LogisticsTests {
                 .thenExecute(() -> helper.destroyBlock(REQUESTER))
                 .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.holding"))
                 .thenExecute(() -> {
-                    if (cargo.cargo().countItem(Items.IRON_INGOT) != 64) {
-                        helper.fail("the Cargo car holds " + cargo.cargo().countItem(Items.IRON_INGOT)
-                                + " iron, not the stack loaded for the broken requester", REQUESTER);
+                    int iron = view(helper, cargo).cargo().countItem(Items.IRON_INGOT);
+                    if (iron != 64) {
+                        helper.fail("the Cargo car holds " + iron + " iron, not the stack loaded for the broken requester", REQUESTER);
                     }
                     expectIcons(helper, leading, "64 minecraft:iron_ingot");
                 })
@@ -302,10 +317,11 @@ final class LogisticsTests {
                 })
                 .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.waiting"))
                 .thenExecute(() -> {
-                    if (held(record(helper, REQUESTER)) != 64 || !cargo.cargo().isEmpty()
+                    CargoCarEntity car = view(helper, cargo);
+                    if (held(record(helper, REQUESTER)) != 64 || !car.cargo().isEmpty()
                             || held(record(helper, PROVIDER)) != 36) {
                         helper.fail("the leftover was not delivered: the requester holds " + held(record(helper, REQUESTER))
-                                + ", the car " + cargo.cargo().countItem(Items.IRON_INGOT) + " and the Mine "
+                                + ", the car " + car.cargo().countItem(Items.IRON_INGOT) + " and the Mine "
                                 + held(record(helper, PROVIDER)), REQUESTER);
                     }
                 })
@@ -333,8 +349,8 @@ final class LogisticsTests {
         fuel.forEach(stack -> insert(record(helper, hatch), stack));
         Locomotive east = Locomotive.burner();
         CargoCar wagon = CargoCar.create();
-        // Its middle a block short of the line's end, where the Depot's leading Locomotive stands.
-        Train train = Train.of(new Place(last, last.b(), 1.0), List.of(east, wagon));
+        // Its middle where the Depot's leading Locomotive stands.
+        Train train = Train.of(new Place(last, last.b(), AT_THE_DEPOT), List.of(east, wagon));
         LocomotiveEntity locomotive = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
         return locomotive;
@@ -389,18 +405,18 @@ final class LogisticsTests {
 
     /**
      * A Train of a dry Locomotive facing east, a Cargo car and a fuelled Locomotive facing west, standing
-     * automatic at the Depot, its leading car's place three blocks long: a provider of coal beside its
-     * third block, the one furthest from the Station, fills the leading Locomotive's slots, and a
+     * automatic at the Depot, its leading car's place five blocks long: a provider of coal beside its
+     * fifth block, the one furthest from the Station, fills the leading Locomotive's slots, and a
      * provider of iron beside the first car spot, for the Mine's requester, loads the Cargo car
      * coupled right behind it.
      */
-    private static void thirdBlock(GameTestHelper helper) {
+    private static void backBlock(GameTestHelper helper) {
         Span last = line(helper);
         station(helper, MINE);
         station(helper, DEPOT);
         BlockPos fuel = besideTheLeadingCarsBack(helper, DEPOT);
-        if (DEPOT.getX() - fuel.getX() != 2) {
-            helper.fail("the block beside the leading car's back is at x " + fuel.getX() + ", not two behind the Depot", fuel);
+        if (DEPOT.getX() - fuel.getX() != (int) Platform.LEAD - 1) {
+            helper.fail("the block beside the leading car's back is at x " + fuel.getX() + ", not four behind the Depot", fuel);
         }
         helper.setBlock(fuel, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
         insert(record(helper, fuel), new ItemStack(Items.COAL, 300));
@@ -414,8 +430,8 @@ final class LogisticsTests {
         Locomotive east = Locomotive.burner();
         CargoCar wagon = CargoCar.create();
         Locomotive west = Locomotive.burner();
-        // Its middle a block short of the line's end, where the Depot's leading Locomotive stands.
-        Train train = Train.of(new Place(last, last.b(), 1.0), List.of(east, wagon))
+        // Its middle where the Depot's leading Locomotive stands.
+        Train train = Train.of(new Place(last, last.b(), AT_THE_DEPOT), List.of(east, wagon))
                 .coupled(LevelRails.of(helper.getLevel()).network(), Train.End.BACK, west, true);
         LocomotiveEntity leading = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         CargoCarEntity cargo = spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
@@ -428,7 +444,7 @@ final class LogisticsTests {
                 .thenWaitUntil(() -> {
                     if (held(record(helper, REQUESTER)) == 64) {
                         helper.fail("the first car spot's hatch still holds its iron, the car "
-                                + cargo.cargo().countItem(Items.IRON_INGOT), REQUESTER);
+                                + view(helper, cargo).cargo().countItem(Items.IRON_INGOT), REQUESTER);
                     }
                 })
                 .thenExecute(() -> forceLoad(helper, false))
@@ -533,7 +549,7 @@ final class LogisticsTests {
         for (BlockPos pylon : LINE) {
             helper.setBlock(pylon, RailworksRegistries.PYLON.get().defaultBlockState());
         }
-        for (int x = -1; x <= 14; x++) {
+        for (int x = -1; x <= EAST + 1; x++) {
             for (int z = 2; z <= 6; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
             }
@@ -548,10 +564,13 @@ final class LogisticsTests {
         return span;
     }
 
-    /** Forces the chunks under the {@link #LINE} loaded, or lets them go. */
+    /**
+     * Forces the chunks under the {@link #LINE} loaded, or lets them go. A chunk forced only starts to
+     * tick a little later, so a car set there loses its view and is shown again: {@link #view}.
+     */
     static void forceLoad(GameTestHelper helper, boolean forced) {
         BlockPos west = helper.absolutePos(new BlockPos(-1, 1, 2));
-        BlockPos east = helper.absolutePos(new BlockPos(14, 1, 6));
+        BlockPos east = helper.absolutePos(new BlockPos(EAST + 1, 1, 6));
         for (int cx = Math.min(west.getX(), east.getX()) >> 4; cx <= Math.max(west.getX(), east.getX()) >> 4; cx++) {
             for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
                 helper.getLevel().setChunkForced(cx, cz, forced);
@@ -597,6 +616,27 @@ final class LogisticsTests {
         return view;
     }
 
+    /**
+     * The view the level shows now of the car {@code car} viewed, which is {@code car} itself while it
+     * stands where its place ticks; another, once its place has stopped ticking and started again, as
+     * a chunk forced loaded only starts to tick a little after the car is set there.
+     */
+    @SuppressWarnings("unchecked")
+    static <T extends CarEntity> T view(GameTestHelper helper, T car) {
+        if (!car.isRemoved()) {
+            return car;
+        }
+        LevelRails rails = LevelRails.of(helper.getLevel());
+        Train train = rails.trains().of(car.carId());
+        CarEntity view = train == null ? null : train.cars().stream()
+                .filter(one -> one.id().equals(car.carId()))
+                .findFirst().map(rails::view).orElse(null);
+        if (view == null || view.getClass() != car.getClass()) {
+            throw helper.assertionException(Component.literal("the car " + car.carId() + " is not shown: " + view));
+        }
+        return (T) view;
+    }
+
     /** The hatch's record in the level's hatches, which its block puts there if it has not yet as it loads. */
     static Hatches.Hatch record(GameTestHelper helper, BlockPos pos) {
         return helper.getBlockEntity(pos, HatchBlockEntity.class).hatch()
@@ -638,7 +678,8 @@ final class LogisticsTests {
      * Fails unless the Locomotive's status line, as a client reads it, shows {@code icons} after its
      * words, "64 minecraft:iron_ingot" for each, comma-separated, and names no items beyond them.
      */
-    static void expectIcons(GameTestHelper helper, LocomotiveEntity locomotive, String icons) {
+    static void expectIcons(GameTestHelper helper, LocomotiveEntity car, String icons) {
+        LocomotiveEntity locomotive = view(helper, car);
         String shown = locomotive.statusIconsSeen().stream()
                 .map(icon -> icon.getCount() + " " + BuiltInRegistries.ITEM.getKey(icon.getItem()))
                 .collect(Collectors.joining(", "));
@@ -649,7 +690,8 @@ final class LogisticsTests {
     }
 
     /** Fails unless the Locomotive's status line, as a client reads it, is the line {@code key} says. */
-    static void expectStatus(GameTestHelper helper, LocomotiveEntity locomotive, String key) {
+    static void expectStatus(GameTestHelper helper, LocomotiveEntity car, String key) {
+        LocomotiveEntity locomotive = view(helper, car);
         Component status = locomotive.statusSeen();
         String said = status.getContents() instanceof TranslatableContents contents ? contents.getKey() : status.getString();
         if (!said.equals(key)) {

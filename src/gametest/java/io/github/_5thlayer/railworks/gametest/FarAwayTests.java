@@ -23,6 +23,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
@@ -79,12 +80,14 @@ final class FarAwayTests {
     private static final int SPAN = 30;
     private static final int FAR = 239;
     private static final int Z = 3;
-    /** North of the line's west end, serving Trains heading west: its first car spot beside x 2 and 3. */
+    /** North of the line's west end, serving Trains heading west: its first car spot beside x 5 to 9. */
     private static final BlockPos MINE = new BlockPos(0, 1, 2);
-    /** South of the line's far end, serving Trains heading east: its first car spot beside x 236 and 237. */
+    /** South of the line's far end, serving Trains heading east: its first car spot beside x 230 to 234. */
     private static final BlockPos DEPOT = new BlockPos(FAR, 1, 4);
-    private static final BlockPos PROVIDER = new BlockPos(3, 2, 2);
-    private static final BlockPos REQUESTER = new BlockPos(FAR - 3, 2, 4);
+    private static final BlockPos PROVIDER = new BlockPos(7, 2, 2);
+    private static final BlockPos REQUESTER = new BlockPos(FAR - 7, 2, 4);
+    /** How far east of the structure the line's near stretch runs, which the shuttle stands on as it starts. */
+    private static final int NEAR = 22;
     /** On the far stretch, out of every chunk the runner loads: where a Train stands still for a test. */
     private static final BlockPos YARD = new BlockPos(164, 2, Z);
     /** How far around a chunk a ticket of {@link RailworksGameTests#IN_VIEW} simulates: that chunk and those beside it. */
@@ -323,7 +326,8 @@ final class FarAwayTests {
                 return;
             }
             helper.assertTrue(!seat.isRemoved() && rider.getVehicle() == seat, "the rider's car went from under them");
-            helper.assertTrue(rider.position().distanceTo(seat.position()) < 2.0,
+            // Seated in the cab, at the car's front: within half its length of its middle.
+            helper.assertTrue(rider.position().distanceTo(seat.position()) < Locomotive.LENGTH / 2.0,
                     "the rider is at " + rider.position() + ", left behind by their car at " + seat.position());
         });
         helper.startSequence()
@@ -438,7 +442,8 @@ final class FarAwayTests {
                     expectInBay(helper, view, back);
                     players[1] = LocomotiveTests.board(helper, view);
                     players[1].rideTick();
-                    Vec3 cab = view.position().add(new Vec3(0.0, 0.6, 0.8).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
+                    // A seated player's feet 0.6 over the floor's underside, at the cab's seat along the car.
+                    Vec3 cab = view.position().add(new Vec3(0.0, 0.6, CarBody.CAB_SEAT.z()).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
                     helper.assertTrue(players[1].position().distanceTo(cab) < 1e-3,
                             "the player boarding after the pig came back is at " + players[1].position().subtract(view.position())
                                     + " from the car's middle, not in the cab");
@@ -450,10 +455,11 @@ final class FarAwayTests {
                 .thenSucceed();
     }
 
-    /** {@code mob} stands in {@code view}'s bay, 0.9 behind its middle on the floor, 0.7 up, facing the car's way. */
+    /** {@code mob} stands in {@code view}'s bay, {@link CarBody#BAY_SPOT} from its middle, facing the car's way. */
     private static void expectInBay(GameTestHelper helper, CarEntity view, Entity mob) {
         view.positionRider(mob);
-        Vec3 bay = view.position().add(new Vec3(0.0, 0.7, -0.9).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
+        Vec3 spot = new Vec3(CarBody.BAY_SPOT.x(), CarBody.BAY_SPOT.y(), CarBody.BAY_SPOT.z());
+        Vec3 bay = view.position().add(spot.yRot(-view.getYRot() * Mth.DEG_TO_RAD));
         helper.assertTrue(mob.position().distanceTo(bay) < 1e-3 && Math.abs(Mth.wrapDegrees(mob.getYRot() - view.getYRot())) < 1e-3,
                 "the pig is at " + mob.position().subtract(view.position()) + " from the car's middle facing " + mob.getYRot()
                         + ", not in the bay facing the car's " + view.getYRot());
@@ -677,7 +683,7 @@ final class FarAwayTests {
             Arm other = arm(helper, x + SPAN);
             network.add(Span.of(one, other, SpanRules.cost(one, other)));
         }
-        for (int x = WEST; x <= 15; x++) {
+        for (int x = WEST; x <= NEAR; x++) {
             for (int z = 2; z <= 4; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), net.minecraft.world.level.block.Blocks.AIR);
             }
@@ -765,7 +771,7 @@ final class FarAwayTests {
     /** Forces the chunks under the line's near stretch, by the structure, loaded, or lets them go. */
     private static void forceLoad(GameTestHelper helper, boolean forced) {
         BlockPos west = helper.absolutePos(new BlockPos(WEST, 1, 2));
-        BlockPos east = helper.absolutePos(new BlockPos(15, 1, 4));
+        BlockPos east = helper.absolutePos(new BlockPos(NEAR, 1, 4));
         for (int cx = west.getX() >> 4; cx <= east.getX() >> 4; cx++) {
             for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
                 helper.getLevel().setChunkForced(cx, cz, forced);

@@ -13,6 +13,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
@@ -36,7 +37,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A car on the curved Rail: that the entity stands where {@code RailCurve} says and faces and
  * pitches the way it runs, that driving through an Arm turns it without a jump, that coupled cars
- * stand two blocks apart through a bend as on the straight, and that the rider's seat stands square
+ * stand five blocks apart through a bend as on the straight, and that the rider's seat stands square
  * to a climbing floor. The curve's own geometry is {@code RailCurveTest}'s. All of
  * these tests share the {@code curve_} prefix but the coupled cars' one, which has the logistics work's
  * (#26) {@code logistics_} prefix.
@@ -58,7 +59,7 @@ final class CurveTests {
         tests.test("curve_car_stands_faces_and_pitches_along_the_curve", 20, CurveTests::followsCurve);
         tests.test("curve_car_driven_through_an_arm_turns_without_a_jump", 100, CurveTests::throughArm);
         tests.test("curve_driver_seat_stands_square_to_a_climbing_floor", 20, CurveTests::seatOnClimb);
-        tests.test("logistics_coupled_cars_stand_two_and_a_half_blocks_apart_through_an_arm", 20, CurveTests::coupledThroughArm);
+        tests.test("logistics_coupled_cars_stand_five_blocks_apart_through_an_arm", 20, CurveTests::coupledThroughArm);
     }
 
     private static void followsCurve(GameTestHelper helper) {
@@ -116,7 +117,7 @@ final class CurveTests {
         RailNetwork network = bend(helper);
         Span before = network.get(arm(helper, A), arm(helper, B));
         Span beyond = network.get(arm(helper, B), arm(helper, C));
-        // The Locomotive a block past the bend's Arm, the Cargo car coupled behind it, a block and a half short of it.
+        // The Locomotive a block past the bend's Arm, the Cargo car coupled behind it, four blocks short of it.
         Locomotive locomotive = Locomotive.burner();
         CargoCar cargo = CargoCar.create();
         Train train = Train.of(new Place(beyond, arm(helper, C), beyond.length() - 1.0), List.of(locomotive, cargo));
@@ -124,15 +125,16 @@ final class CurveTests {
         LocomotiveEntity front = view(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, locomotive);
         CargoCarEntity back = view(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, cargo);
         Place behind = train.placeOf(network, cargo);
-        if (!behind.span().equals(before) || Math.abs(behind.toFront() - 1.5) > 1e-6) {
-            helper.fail("the Cargo car stands at " + behind + ", not a block and a half short of the Arm", STAND);
+        if (!behind.span().equals(before) || Math.abs(behind.toFront() - 4.0) > 1e-6) {
+            helper.fail("the Cargo car stands at " + behind + ", not four blocks short of the Arm", STAND);
         }
-        // Two and a half blocks along the Line, half a Locomotive and half a Cargo car; drawn on the
-        // curve, which runs a little off the Spans through a bend, they stand within a few hundredths
-        // of that apart, and each car on the curve.
+        // Five blocks along the Line, half a Locomotive and half a Cargo car; drawn on the curve,
+        // which runs a little off the Spans through a bend, they stand within a tenth of that apart
+        // (the straight line between them cuts the bend's corner, by about 0.07 at five blocks),
+        // and each car on the curve.
         double apart = front.position().distanceTo(back.position());
-        if (Math.abs(apart - 2.5) > 0.05) {
-            helper.fail("coupled cars through the bend stand " + apart + " apart, not about two and a half blocks", STAND);
+        if (Math.abs(apart - 5.0) > 0.1) {
+            helper.fail("coupled cars through the bend stand " + apart + " apart, not about five blocks", STAND);
         }
         RailCurve.Pose pose = behind.pose(network);
         Vec3 expected = new Vec3(pose.x() + RailGeometry.ATTACH_X, pose.y() + RailGeometry.RIDE_Y, pose.z() + RailGeometry.ATTACH_Z);
@@ -158,12 +160,14 @@ final class CurveTests {
         if (car.getXRot() > -10.0F) {
             helper.fail("a car climbing a quarter is pitched " + car.getXRot(), STAND);
         }
-        // Square to the floor, the Driver's seat (1.2 up, 0.8 forward in the cab) leans back down the climb and
+        // Square to the floor, the Driver's seat (1.2 up, 1.8 forward in the cab) leans back down the climb and
         // its forward offset rises with it; the car faces east. A seated player's feet are 0.6 below it.
         Vec3 seat = driver.position().subtract(car.position());
         double climb = Math.toRadians(-car.getXRot());
-        double east = 0.8 * Math.cos(climb) - 1.2 * Math.sin(climb);
-        double up = 1.2 * Math.cos(climb) + 0.8 * Math.sin(climb) - 0.6;
+        double forward = CarBody.CAB_SEAT.z();
+        double height = CarBody.CAB_SEAT.y();
+        double east = forward * Math.cos(climb) - height * Math.sin(climb);
+        double up = height * Math.cos(climb) + forward * Math.sin(climb) - 0.6;
         if (Math.abs(seat.x - east) > 0.01 || Math.abs(seat.y - up) > 0.01 || Math.abs(seat.z) > 0.01) {
             helper.fail("the Driver sits " + seat + " from a car pitched " + car.getXRot(), STAND);
         }

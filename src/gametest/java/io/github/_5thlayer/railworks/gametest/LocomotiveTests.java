@@ -16,6 +16,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailGeometry;
@@ -60,9 +61,15 @@ import net.minecraft.world.phys.Vec3;
  */
 final class LocomotiveTests {
 
-    /** Eight apart, one segment tall, with a Span strung between the tops for the car to ride. */
-    static final BlockPos A = new BlockPos(1, 1, 3);
-    static final BlockPos B = new BlockPos(9, 1, 3);
+    /**
+     * Twelve apart, one segment tall, with a Span strung between the tops for the car to ride: room
+     * for a Locomotive and a Cargo car coupled behind it, each five blocks long, from where
+     * {@link #placed} sets the Locomotive.
+     */
+    static final BlockPos A = new BlockPos(-1, 1, 3);
+    static final BlockPos B = new BlockPos(11, 1, 3);
+    /** The Rail {@link #span} cost: its length. */
+    private static final int COST = 12;
     static final int HEIGHT = 1;
     /** Beside the middle of the Span, looking across it at the web. */
     static final BlockPos STAND = new BlockPos(5, 1, 1);
@@ -117,6 +124,10 @@ final class LocomotiveTests {
         }
         if (!player.getMainHandItem().isEmpty()) {
             helper.fail("placing the only Locomotive left one in hand", STAND);
+        }
+        // Five blocks long, coupler to coupler, as every car is.
+        if (car.car().length() != 5.0) {
+            helper.fail("the placed Locomotive is " + car.car().length() + " blocks long, not five", STAND);
         }
         helper.succeed();
     }
@@ -384,7 +395,7 @@ final class LocomotiveTests {
             step(car);
             driver.rideTick();
             // Seated in the cab, forward of the car's middle; the car faces east.
-            if (Math.abs(driver.getX() - (car.getX() + 0.8)) > 0.01 || Math.abs(driver.getZ() - car.getZ()) > 0.01) {
+            if (Math.abs(driver.getX() - (car.getX() + CarBody.CAB_SEAT.z())) > 0.01 || Math.abs(driver.getZ() - car.getZ()) > 0.01) {
                 helper.fail("on tick " + tick + " the rider is at " + driver.getX() + ", " + driver.getZ()
                         + " but the car is at " + car.getX() + ", " + car.getZ(), STAND);
             }
@@ -395,16 +406,19 @@ final class LocomotiveTests {
         helper.succeed();
     }
 
-    /** A rider sits in the cab, 0.8 forward of the car's middle the way it faces, their eye at 2.22. */
+    /**
+     * A rider sits in the cab, {@link CarBody#CAB_SEAT}'s 1.8 forward of the car's middle the way it
+     * faces, their eye at 2.22.
+     */
     private static void seatsForward(GameTestHelper helper, float lookYaw, int east) {
         ServerPlayer placer = player(helper, lookYaw);
         use(helper, placer);
         LocomotiveEntity car = onlyCar(helper);
         ServerPlayer driver = board(helper, car);
         driver.rideTick();
-        double x = car.getX() + 0.8 * east;
-        // A seated player's feet are 0.6 below the seat, 1.2 over the floor's underside.
-        double y = car.getY() + 0.6;
+        double x = car.getX() + CarBody.CAB_SEAT.z() * east;
+        // A seated player's feet are 0.6 below the seat, which is 1.2 over the floor's underside.
+        double y = car.getY() + CarBody.CAB_SEAT.y() - 0.6;
         if (Math.abs(driver.getX() - x) > 1e-3 || Math.abs(driver.getY() - y) > 1e-3
                 || Math.abs(driver.getZ() - car.getZ()) > 1e-3) {
             helper.fail("the Driver sits at " + driver.position() + ", not in the cab at " + new Vec3(x, y, car.getZ()), STAND);
@@ -499,7 +513,7 @@ final class LocomotiveTests {
             helper.fail("the segment was not stacked on the column", B);
         }
         Span moved = Span.of(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))),
-                PylonColumn.arm(helper.absolutePos(B.above(HEIGHT))), 8);
+                PylonColumn.arm(helper.absolutePos(B.above(HEIGHT))), COST);
         step(car);
         if (car.isRemoved() || !car.holds(moved)) {
             helper.fail("a car on a Span whose Arm moved should stay on it, removed=" + car.isRemoved(), STAND);
@@ -697,7 +711,7 @@ final class LocomotiveTests {
                 helper.setBlock(B.above(i), RailworksRegistries.PYLON.get().defaultBlockState());
             }
             // The structure's roof is a barrier layer; the car rides up into it, so clear it over the Span.
-            for (int x = 0; x <= 10; x++) {
+            for (int x = -2; x <= 12; x++) {
                 for (int z = 2; z <= 4; z++) {
                     helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
                 }
@@ -714,7 +728,7 @@ final class LocomotiveTests {
     }
 
     static Span span(GameTestHelper helper) {
-        return Span.of(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))), PylonColumn.arm(helper.absolutePos(B.above(HEIGHT - 1))), 8);
+        return Span.of(PylonColumn.arm(helper.absolutePos(A.above(HEIGHT - 1))), PylonColumn.arm(helper.absolutePos(B.above(HEIGHT - 1))), COST);
     }
 
     static AABB searchBox(GameTestHelper helper) {

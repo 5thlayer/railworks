@@ -33,7 +33,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A Station faces the way it serves (ADR 0008): placed by a real player beside {@link LocomotiveTests}'
- * Span, which runs east from x 1 to x 9 along z 3, its arrow points the way the Trains it serves
+ * Span, which runs east from x -1 to x 11 along z 3, its arrow points the way the Trains it serves
  * head, the Trains with it on their drive side, and a Train standing at it is stopped there only
  * when it came in that way. Run driving on the right and, in a batch of their own, on the left. A
  * Station under the Rail, or one whose platform would overlap another's, is refused with the reason
@@ -43,10 +43,10 @@ import net.minecraft.world.phys.Vec3;
  */
 final class StationFacingTests {
 
-    /** Beside the Rail a block down, north of it, just ahead of the Cargo car coupled behind the Locomotive. */
+    /** Beside the Rail a block down, north of it, at the front end of the Cargo car coupled behind the Locomotive. */
     private static final BlockPos NORTH = CargoAccessTests.BY_CARGO;
     /** The same, south of the Rail. */
-    private static final BlockPos SOUTH = new BlockPos(4, 1, 4);
+    private static final BlockPos SOUTH = new BlockPos(0, 1, 4);
     /** Under the Rail. */
     private static final BlockPos UNDER = new BlockPos(5, 1, 3);
 
@@ -134,10 +134,16 @@ final class StationFacingTests {
     /**
      * A Train at rest by a Station, off the place its platform puts it: with nobody in its Locomotive
      * it eases onto it and stops there; with a driver seated, pressing nothing, it stays where it was
-     * brought to rest until they get off, and then settles.
+     * brought to rest until they get off, and then settles. The Locomotive is set half a block east
+     * of where {@link LocomotiveTests#placed} sets it, so the Cargo car stands half a block off the
+     * Station's mark.
      */
     private static void settles(GameTestHelper helper, boolean seated) {
-        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        ServerPlayer placer = LocomotiveTests.player(helper, -45.0F);
+        placer.snapTo(placer.getX() + 0.5, placer.getY(), placer.getZ(), -45.0F, 5.0F);
+        LocomotiveTests.use(helper, placer);
+        LocomotiveEntity locomotive = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class,
+                LocomotiveTests.searchBox(helper)).getFirst();
         CargoCarEntity cargo = CargoCarTests.placeCargoBeside(helper, locomotive, -1);
         var train = cargo.train();
         ServerPlayer driver = helper.makeMockServerPlayerInLevel();

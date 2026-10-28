@@ -82,25 +82,28 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 final class FluidTests {
 
     /**
-     * A straight line along z 3, Span by Span from x -11 to 29, its Pylons out past the structure, so
-     * a Train of three cars stands behind a Station's four car spots.
+     * A straight line along z 3, Span by Span from x -11 to 37, its Pylons out past the structure at
+     * both ends: the Quarry's platform runs back to three five-block car spots before the line's west
+     * end cuts it short, and the Depot's, at the line's east end, four, back to just east of the
+     * Quarry's leading car's place, so the two never overlap. No Pylon stands under the Quarry's lead
+     * mark, at x 9: a job is never planned for a provider whose lead mark is at an Arm.
      */
-    private static final int[] PYLONS = {-11, -1, 9, 19, 29};
+    private static final int[] PYLONS = {-11, -1, 8, 19, 29, 37};
     private static final int Z = 3;
-    /** South of the line, serving Trains heading east: its leading car's place beside x 9 to 11, its car spots back west from 7 and 8. */
+    /** South of the line, serving Trains heading east: its leading car's place beside x 7 to 11, its car spots back west from 2 to 6. */
     private static final BlockPos QUARRY = new BlockPos(11, 1, 4);
-    /** South of the line, serving Trains heading east: its leading car's place beside x 25 to 27, its car spots back west from 23 and 24. */
-    private static final BlockPos DEPOT = new BlockPos(27, 1, 4);
-    /** The two blocks beside each of a Station's first two car spots, at a car's floor. */
-    private static final BlockPos QUARRY_0 = new BlockPos(7, 2, 4);
-    private static final BlockPos QUARRY_0_OTHER = new BlockPos(8, 2, 4);
-    private static final BlockPos QUARRY_1 = new BlockPos(5, 2, 4);
-    private static final BlockPos QUARRY_1_OTHER = new BlockPos(6, 2, 4);
+    /** South of the line at its east end, serving Trains heading east: its leading car's place beside x 33 to 37, its car spots back west from 28 to 32. */
+    private static final BlockPos DEPOT = new BlockPos(37, 1, 4);
+    /** Two blocks beside each of a Station's first two car spots, at a car's floor: each spot's first and last. */
+    private static final BlockPos QUARRY_0 = new BlockPos(6, 2, 4);
+    private static final BlockPos QUARRY_0_OTHER = new BlockPos(2, 2, 4);
+    private static final BlockPos QUARRY_1 = new BlockPos(1, 2, 4);
+    private static final BlockPos QUARRY_1_OTHER = new BlockPos(-3, 2, 4);
     private static final BlockPos QUARRY_LEADING = new BlockPos(9, 2, 4);
-    private static final BlockPos DEPOT_0 = new BlockPos(23, 2, 4);
-    private static final BlockPos DEPOT_0_OTHER = new BlockPos(24, 2, 4);
-    private static final BlockPos DEPOT_1 = new BlockPos(21, 2, 4);
-    private static final BlockPos DEPOT_1_OTHER = new BlockPos(22, 2, 4);
+    private static final BlockPos DEPOT_0 = new BlockPos(32, 2, 4);
+    private static final BlockPos DEPOT_0_OTHER = new BlockPos(28, 2, 4);
+    private static final BlockPos DEPOT_1 = new BlockPos(27, 2, 4);
+    private static final BlockPos DEPOT_1_OTHER = new BlockPos(23, 2, 4);
     /** A hatch inside the structure, joining no Station: only a tank. */
     private static final BlockPos LONE = new BlockPos(4, 2, 6);
 
@@ -414,7 +417,7 @@ final class FluidTests {
         fluidHatch(helper, QUARRY_0, HatchMode.PROVIDER, Fluids.WATER, 20);
         Running running = running(helper, FluidCar.create());
         FluidCarEntity fluid = (FluidCarEntity) running.views().get(1);
-        ServerPlayer player = LogisticsTests.near(helper, new BlockPos(-7, 2, 1));
+        ServerPlayer player = LogisticsTests.near(helper, new BlockPos(-3, 2, 1));
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LAVA_BUCKET));
         fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
         expectTank(helper, fluid.tank(), Fluids.LAVA, BUCKET, "a lava bucket poured in by hand");
@@ -493,9 +496,9 @@ final class FluidTests {
         line(helper);
         fluidHatch(helper, QUARRY_LEADING, HatchMode.PROVIDER, Fluids.LAVA, 10);
         Locomotive east = Locomotive.burner();
-        Span span = span(helper, 9);
-        // Its middle a block short of the Quarry's own x, where its leading car stands.
-        Train train = Train.of(new Place(span, span.b(), 19 - (QUARRY.getX() - 1.0)), List.of(east));
+        Span span = span(helper, 8);
+        // Its middle where the Quarry's leading car stands, half a Locomotive behind the Station block's front edge.
+        Train train = Train.of(new Place(span, span.b(), 19 - (QUARRY.getX() + 0.5 - Platform.LEAD / 2.0)), List.of(east));
         LocomotiveEntity locomotive = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         train.setAutomatic(true);
         helper.startSequence()
@@ -521,8 +524,9 @@ final class FluidTests {
         Locomotive east = Locomotive.burner();
         List<Car> all = new ArrayList<>(List.of(east));
         all.addAll(List.of(cars));
-        Span first = span(helper, -11);
-        Train train = Train.of(new Place(first, first.b(), 2.0), all);
+        // Its leading car's middle at x 2.5, west of the Quarry, so a Train of three five-block cars ends a block short of the line's west end.
+        Span first = span(helper, -1);
+        Train train = Train.of(new Place(first, first.b(), PYLONS[2] - 2.5), all);
         List<CarEntity> views = new ArrayList<>();
         LocomotiveEntity locomotive = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         views.add(locomotive);

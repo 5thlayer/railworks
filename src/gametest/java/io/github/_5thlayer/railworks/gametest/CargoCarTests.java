@@ -102,18 +102,18 @@ final class CargoCarTests {
             helper.fail("the Cargo car did not couple behind the Locomotive: " + train + " and " + cargo.train(), STAND);
             return;
         }
-        // Two and a half blocks apart, middle to middle: half a three-block Locomotive and half a two-block Cargo car.
+        // Five blocks apart, middle to middle: half a five-block Locomotive and half a five-block Cargo car.
         double gap = locomotive.getX() - cargo.getX();
-        if (Math.abs(gap - 2.5) > 1e-6) {
+        if (Math.abs(gap - 5.0) > 1e-6) {
             helper.fail("the coupled car stands " + gap + " behind the Locomotive", STAND);
         }
         helper.succeed();
     }
 
     private static void couplesAhead(GameTestHelper helper) {
-        // Two blocks further from the line's end than the others, so a whole car fits ahead of it.
+        // Five blocks further from the line's end than the others, so a whole car fits ahead of it.
         ServerPlayer placer = LocomotiveTests.player(helper, -45.0F);
-        placer.snapTo(placer.getX() - 2.0, placer.getY(), placer.getZ(), -45.0F, 5.0F);
+        placer.snapTo(placer.getX() - 5.0, placer.getY(), placer.getZ(), -45.0F, 5.0F);
         LocomotiveTests.use(helper, placer);
         LocomotiveEntity locomotive = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class,
                 LocomotiveTests.searchBox(helper)).getFirst();
@@ -123,8 +123,8 @@ final class CargoCarTests {
             helper.fail("the Cargo car did not couple ahead of the Locomotive: " + train, STAND);
             return;
         }
-        if (cargo.getX() <= locomotive.getX()) {
-            helper.fail("the car coupled ahead is behind the Locomotive", STAND);
+        if (Math.abs(cargo.getX() - locomotive.getX() - 5.0) > 1e-6) {
+            helper.fail("the car coupled ahead stands " + (cargo.getX() - locomotive.getX()) + " ahead of the Locomotive, not five", STAND);
         }
         helper.succeed();
     }
@@ -158,6 +158,10 @@ final class CargoCarTests {
         }
         if (!player.getMainHandItem().isEmpty()) {
             helper.fail("placing the only Cargo car left one in hand", STAND);
+        }
+        // Five blocks long, coupler to coupler, as every car is.
+        if (cargo.car().length() != 5.0) {
+            helper.fail("the placed Cargo car is " + cargo.car().length() + " blocks long, not five", STAND);
         }
         helper.succeed();
     }

@@ -32,18 +32,18 @@ import net.neoforged.neoforge.capabilities.Capabilities;
  * else does (ADR 0008: a Station's hatches load a car). All of these tests share the
  * {@code logistics_cargo_} prefix, as the logistics work's (#26) game tests do, and stand on
  * {@link LocomotiveTests}' Span, the Locomotive placed at x 7.5 and a Cargo car coupled behind it at
- * x 5.
+ * x 2.5.
  */
 final class CargoAccessTests {
 
     /**
-     * Beside the Rail a block down, just ahead of the coupled Cargo car, which leads a Train heading
-     * west: it stops with its middle where a leading Locomotive's would be, half a block on, in the
-     * block {@link #CAR}.
+     * Beside the Rail a block down, at the front end of the coupled Cargo car, which leads a Train
+     * heading west: it stands with its middle where a leading Locomotive's would, two blocks back
+     * from the Station, its front at the Station block's front edge, in the block {@link #CAR}.
      */
-    static final BlockPos BY_CARGO = new BlockPos(4, 1, 2);
-    /** The block the coupled Cargo car's floor is in, and those beside it on the near side and under it. */
-    private static final BlockPos CAR = new BlockPos(5, 2, 3);
+    static final BlockPos BY_CARGO = new BlockPos(0, 1, 2);
+    /** The block the coupled Cargo car's floor is in at its middle, and those beside it on the near side and under it. */
+    private static final BlockPos CAR = new BlockPos(2, 2, 3);
     private static final BlockPos BESIDE = CAR.north();
     private static final BlockPos UNDER = CAR.below();
     /** The row beside the Span a player stands in, on the near side of the Rail. */
@@ -127,7 +127,7 @@ final class CargoAccessTests {
                 .thenExecute(() -> {
                     ServerPlayer player = helper.makeMockServerPlayerInLevel();
                     player.setGameMode(GameType.SURVIVAL);
-                    BlockPos stand = helper.absolutePos(new BlockPos(5, 1, SIDE_Z));
+                    BlockPos stand = helper.absolutePos(new BlockPos(CAR.getX(), 1, SIDE_Z));
                     player.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
                     player.setShiftKeyDown(true);
                     player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.HOPPER, 4));

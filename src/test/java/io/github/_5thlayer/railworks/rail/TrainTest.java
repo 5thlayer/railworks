@@ -316,18 +316,18 @@ class TrainTest {
     }
 
     @Test
-    void itsCarsAreSpacedByTheirOwnLengths() {
+    void itsCarsAreSpacedFiveBlocksApartWhateverTheirKind() {
         Locomotive front = Locomotive.burner();
         Locomotive second = Locomotive.burner();
         CargoCar cargo = CargoCar.create();
         CargoCar last = CargoCar.create();
         Train train = Train.of(new Place(network.get(A, B), B, 2.0), List.of(front, second, cargo, last));
-        // Middle to middle: 3 between two Locomotives, 2.5 from a Locomotive to a Cargo car, 2 between
-        // two Cargo cars.
-        assertEquals(3.0, train.offset(second), EPS);
-        assertEquals(5.5, train.offset(cargo), EPS);
-        assertEquals(7.5, train.offset(last), EPS);
-        assertEquals(7.5, train.length(), EPS);
+        // Middle to middle: every car is 5 blocks long coupler to coupler, so 5 between two
+        // Locomotives, 5 from a Locomotive to a Cargo car, 5 between two Cargo cars.
+        assertEquals(5.0, train.offset(second), EPS);
+        assertEquals(10.0, train.offset(cargo), EPS);
+        assertEquals(15.0, train.offset(last), EPS);
+        assertEquals(15.0, train.length(), EPS);
     }
 
     @Test
@@ -452,7 +452,7 @@ class TrainTest {
         Locomotive back = Locomotive.burner();
         front.fuel().light(1_000_000_000L);
         back.fuel().light(1_000_000_000L);
-        Train train = Train.of(new Place(network.get(A, B), B, 10.0), List.of(front, CargoCar.create()));
+        Train train = Train.of(new Place(network.get(A, B), B, 5.0), List.of(front, CargoCar.create()));
         train = train.coupled(network, Train.End.BACK, back, true);
         assertTrue(train.reversed(back));
         long frontFuel = front.fuel().storedJoules();
@@ -495,7 +495,7 @@ class TrainTest {
         CargoCar cargo = CargoCar.create();
         Train coupled = mid.coupled(network, Train.End.FRONT, cargo, false);
         assertEquals(cargo, coupled.cars().getFirst());
-        assertEquals(10.0 - 2.5, coupled.head().toFront(), EPS);
+        assertEquals(10.0 - 5.0, coupled.head().toFront(), EPS);
         assertEquals(10.0, coupled.placeOf(network, mid.cars().getFirst()).toFront(), EPS, "the old first car stays put");
     }
 
@@ -611,10 +611,10 @@ class TrainTest {
 
     @Test
     void aCarCouplesOnlyWhereItsWholeBodyIsOnTheLine() {
-        // Its back 1.5 + 2 from A: a 2-block car fits behind it, a hair more does not.
-        Train train = train(network.get(A, B), B, 20.0 - 3.5);
-        assertTrue(train.slot(network, Train.End.BACK, 2.0) != null);
-        assertEquals(null, train.slot(network, Train.End.BACK, 2.01));
+        // Its back 2.5 + 5 from A: a 5-block car fits behind it, a hair more does not.
+        Train train = train(network.get(A, B), B, 20.0 - 7.5);
+        assertTrue(train.slot(network, Train.End.BACK, 5.0) != null);
+        assertEquals(null, train.slot(network, Train.End.BACK, 5.01));
     }
 
     // ---- automatic ----

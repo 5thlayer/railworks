@@ -27,8 +27,11 @@ public final class Locomotive implements Car {
     public static final String KIND = "locomotive";
     public static final String ELECTRIC_KIND = "electric_locomotive";
 
-    /** Blocks along the Line, coupler to coupler: a cab and a bay behind it, three blocks. */
-    public static final double LENGTH = 3.0;
+    /**
+     * Blocks along the Line, coupler to coupler: a cab, an Engine room over its middle block and a
+     * bay behind it, five blocks, as every car is (ADR 0010).
+     */
+    public static final double LENGTH = 5.0;
     /** How many fuel slots it has, each a stack of one fuel, the fuels free to differ. */
     public static final int FUEL_SLOTS = 4;
 

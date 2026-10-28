@@ -22,8 +22,11 @@ import net.minecraft.world.phys.Vec3;
  */
 final class CollisionTests {
 
-    /** Under the Rail ahead of the car, at a car's floor: what stands on it is in the car's way. */
-    private static final BlockPos STONE = new BlockPos(7, 1, 3);
+    /**
+     * Under the Rail just ahead of the car, at a car's floor: what stands on it is in the car's way.
+     * The five-block car is set from x 5 to 10, its middle at 7.5.
+     */
+    private static final BlockPos STONE = new BlockPos(10, 1, 3);
     /** The middle of the Rail across, as the line runs along x. */
     private static final double LINE_Z = 3.5;
 
