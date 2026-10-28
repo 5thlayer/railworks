@@ -10,6 +10,7 @@ import io.github._5thlayer.libworks.gallery.GalleryPack;
 import io.github._5thlayer.libworks.testkit.GalleryCheck;
 import io.github._5thlayer.libworks.testkit.GalleryCheck.Layout;
 import io.github._5thlayer.libworks.testkit.GalleryCheck.Scene;
+import io.github._5thlayer.railworks.LevelChargers;
 import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
@@ -39,6 +40,8 @@ import net.minecraft.world.phys.Vec3;
  * strung and not joined. Beyond the build, the coupling scene's sign, clicked, builds it again,
  * leaving one Train and nothing loose, and the two logistics scenes are built working: each
  * requester's chest gets what it asks for, as the refuel scene's does once its dry Train is fuelled,
+ * and the charge scene's once its Train is charged, by a Creative Charger and by a Charger its Burner
+ * Generator feeds,
  * and the far-away scene's Train fetches ore from its far end out of view. How a Train plans and runs its jobs is the mechanics' own
  * game tests' to check, never the Gallery's. Each test turns the pack on, which reloads the server's
  * data, and off again, passing or failing, so each runs in a batch of its own.
@@ -62,6 +65,9 @@ final class GalleryTests {
     private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
     /** The refuel scene's provider of coal beside Mine's leading car's place, from where it is run. */
     private static final BlockPos LEADING_FUEL = new BlockPos(5, 2, -5);
+    /** The charge scene's Creative Charger beside Mine's leading car's place, and the Charger by Smelter fed by its Burner Generator, from where it is run. */
+    private static final BlockPos CREATIVE_CHARGER = new BlockPos(5, 2, -5);
+    private static final BlockPos SMELTER_CHARGER = new BlockPos(23, 2, -7);
     /** The far-away scene's Mine, at its line's far end, and the chest under Smelter's requester by its plot, from where it is run. */
     private static final BlockPos FAR_MINE = new BlockPos(260, 2, -5);
     private static final BlockPos NEAR_CHEST = new BlockPos(7, 0, -5);
@@ -96,6 +102,7 @@ final class GalleryTests {
                 new Scene("two_loads", PROVIDER, RailworksRegistries.HATCH.get()),
                 new Scene("flyover", HIGH_LINE.getLast(), pylon),
                 new Scene("refuel", LEADING_FUEL, RailworksRegistries.HATCH.get()),
+                new Scene("charge", CREATIVE_CHARGER, RailworksRegistries.CREATIVE_CHARGER.get()),
                 new Scene("far_away", PROVIDER, RailworksRegistries.HATCH.get()));
     }
 
@@ -108,6 +115,8 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::logisticsDeliver);
         tests.testOnItsOwn("refuel_the_gallery_scene_fuels_its_dry_train_which_then_delivers",
                 GalleryCheck.TICKS, GalleryTests::refuelDelivers);
+        tests.testOnItsOwn("electric_the_gallery_charge_scene_charges_its_train_at_both_stations_and_it_delivers",
+                GalleryCheck.TICKS, GalleryTests::chargeDelivers);
         // Its Train runs out 240 blocks and back, after the scene is built twice.
         tests.testOnItsOwn("far_the_gallery_scene_brings_ore_back_from_its_far_end_out_of_view",
                 3 * GalleryCheck.TICKS, GalleryTests::farAwayDelivers);
@@ -205,6 +214,33 @@ final class GalleryTests {
         GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "refuel")))
                 .thenWaitUntil(() -> holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE))).thenSucceed();
+    }
+
+    /**
+     * The charge scene: its shuttle, set down with no charge, is filled by Mine's Creative Chargers and
+     * carries the ore to Smelter's chest, where the Charger its Burner Generator feeds gives the
+     * Locomotive standing by it some of what it holds.
+     */
+    private static void chargeDelivers(GameTestHelper helper) {
+        var at = helper.absolutePos(ORIGIN);
+        boolean[] given = {false};
+        long[] most = {0L};
+        helper.onEachTick(() -> {
+            var charger = LevelChargers.of(helper.getLevel()).at(at.offset(SMELTER_CHARGER));
+            charger.ifPresent(c -> {
+                long now = c.held();
+                // Fed by the Burner Generator, it holds more; charging the Locomotive, less.
+                given[0] |= now < most[0];
+                most[0] = Math.max(most[0], now);
+            });
+        });
+        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+                .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "charge")))
+                .thenWaitUntil(() -> {
+                    holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE);
+                    helper.assertTrue(most[0] > 0L, "the Burner Generator put nothing in Smelter's Charger");
+                    helper.assertTrue(given[0], "Smelter's Charger gave the Locomotive by it nothing");
+                })).thenSucceed();
     }
 
     /**

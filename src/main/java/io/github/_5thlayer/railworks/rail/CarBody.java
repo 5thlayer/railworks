@@ -45,7 +45,9 @@ public record CarBody(List<Part> parts, List<Box> chests) {
         /** The band across the Locomotive's front, deep red. */
         DEEP_RED(0.30F, 0.10F, 0.08F),
         /** A headlight. */
-        LAMP(0.95F, 0.90F, 0.62F);
+        LAMP(0.95F, 0.90F, 0.62F),
+        /** The Electric Locomotive's nose band, copper. */
+        COPPER(0.78F, 0.45F, 0.28F);
 
         public final float red;
         public final float green;
@@ -120,6 +122,7 @@ public record CarBody(List<Part> parts, List<Box> chests) {
     private static final double WINDOW_FRONT = 0.74;
 
     public static final CarBody LOCOMOTIVE = locomotive();
+    public static final CarBody ELECTRIC = electric();
     public static final CarBody CARGO = cargo();
 
     /** Where the Locomotive's rider's eye is. */
@@ -160,6 +163,15 @@ public record CarBody(List<Part> parts, List<Box> chests) {
         parts.add(new Part(Paint.TRIM, -0.31, 0.65, 0.78, 0.31, 1.6, 0.88));
         parts.add(new Part(Paint.DEEP_RED, -0.5, 0.72, 0.86, 0.5, 1.45, 0.89));
         sides(parts, new Part(Paint.LAMP, 0.22, 1.1, 0.875, 0.36, 1.3, 0.9));
+        return new CarBody(List.copyOf(parts), List.of());
+    }
+
+    /** The Electric Locomotive: the Burner's body, its nose band copper rather than deep red. Placeholder. */
+    private static CarBody electric() {
+        List<Part> parts = new ArrayList<>();
+        for (Part part : locomotive().parts()) {
+            parts.add(part.paint() == Paint.DEEP_RED ? new Part(Paint.COPPER, part.box()) : part);
+        }
         return new CarBody(List.copyOf(parts), List.of());
     }
 

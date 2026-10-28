@@ -18,8 +18,9 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * What each car of a level holds (ADR 0008, amended in #6): a Cargo car's cargo and a Locomotive's
- * fuel slots, by the car's id, whole stacks with their components, in view or not. A car's view is
+ * What each car of a level holds (ADR 0008, amended in #6): a Cargo car's cargo, a Burner
+ * Locomotive's fuel slots and an Electric Locomotive's charge of FE (ADR 0005, amended in #9), by the
+ * car's id, whole stacks with their components, in view or not. A car's view is
  * a window onto its record here, as a hatch's block is onto its own in {@link Hatches}. A car's
  * record is made with its view, keeps its id through coupling and uncoupling, and is taken out when
  * the car is gone for good, its view dropping what it held. A mob riding a car whose view is taken
@@ -31,7 +32,8 @@ public final class CarRecords {
     /** Every car's record as it is saved, in the order they were made. */
     public static final Codec<CarRecords> CODEC = Entry.CODEC.listOf()
             .xmap(CarRecords::read, records -> records.records.entrySet().stream()
-                    .map(e -> new Entry(e.getKey(), e.getValue().getItems(), Optional.ofNullable(e.getValue().rider))).toList());
+                    .map(e -> new Entry(e.getKey(), e.getValue().getItems(), Optional.ofNullable(e.getValue().rider),
+                            e.getValue().charge)).toList());
 
     private final Map<UUID, Contents> records = new LinkedHashMap<>();
     private Runnable onChange = () -> {
@@ -86,17 +88,23 @@ public final class CarRecords {
         entries.forEach(entry -> {
             Contents record = new Contents(entry.stacks().size(), entry.stacks(), records);
             record.rider = entry.rider().orElse(null);
+            record.charge = Math.max(0L, entry.charge());
             records.records.put(entry.car(), record);
         });
         return records;
     }
 
-    /** One car's slots, which mark the records to be saved whenever what they hold changes. */
+    /**
+     * One car's slots, and an Electric Locomotive's charge, which mark the records to be saved
+     * whenever what they hold changes.
+     */
     public static final class Contents extends SimpleContainer {
 
         private final CarRecords records;
         /** The saved entity data of the mob riding the car while it has no view; null for none. */
         private @Nullable CompoundTag rider;
+        /** An Electric Locomotive's charge, in FE; none for any other car. */
+        private long charge;
 
         /** {@code slots} slots holding {@code stacks} in order, as many as fit, the rest empty. */
         private Contents(int slots, List<ItemStack> stacks, CarRecords records) {
@@ -123,18 +131,33 @@ public final class CarRecords {
             this.rider = rider;
             records.onChange.run();
         }
+
+        /** An Electric Locomotive's charge, in FE. */
+        public long charge() {
+            return charge;
+        }
+
+        /** Sets an Electric Locomotive's charge, in FE, none below 0. */
+        public void setCharge(long charge) {
+            long now = Math.max(0L, charge);
+            if (now != this.charge) {
+                this.charge = now;
+                records.onChange.run();
+            }
+        }
     }
 
     /**
      * A record as it is saved: its slots in order, the empty ones too, so what was put where stays there,
-     * and the mob riding it out of view.
+     * the mob riding it out of view, and an Electric Locomotive's charge.
      */
-    private record Entry(UUID car, List<ItemStack> stacks, Optional<CompoundTag> rider) {
+    private record Entry(UUID car, List<ItemStack> stacks, Optional<CompoundTag> rider, long charge) {
 
         static final Codec<Entry> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Car.ID_CODEC.fieldOf("car").forGetter(Entry::car),
                 ItemStack.OPTIONAL_CODEC.listOf().fieldOf("stacks").forGetter(Entry::stacks),
-                CompoundTag.CODEC.optionalFieldOf("rider").forGetter(Entry::rider)
+                CompoundTag.CODEC.optionalFieldOf("rider").forGetter(Entry::rider),
+                Codec.LONG.optionalFieldOf("charge", 0L).forGetter(Entry::charge)
         ).apply(i, Entry::new));
     }
 }

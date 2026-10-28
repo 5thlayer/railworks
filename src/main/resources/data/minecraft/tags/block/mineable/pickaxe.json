@@ -2,6 +2,9 @@
   "values": [
     "railworks:pylon",
     "railworks:station",
-    "railworks:hatch"
+    "railworks:hatch",
+    "railworks:charger",
+    "railworks:creative_charger",
+    "railworks:burner_generator"
   ]
 }

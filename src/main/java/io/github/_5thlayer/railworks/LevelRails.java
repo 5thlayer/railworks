@@ -101,6 +101,8 @@ public final class LevelRails extends SavedData {
     private final Logistics<Item> logistics = new Logistics<>();
     /** The hatches that join a Station as logistics last asked, in the order they were placed; asked afresh once a plan. */
     private List<Logistics.Hatch<Item>> joined = List.of();
+    /** The Chargers that join a Station, asked afresh with the hatches. */
+    private List<Logistics.Charger> joinedChargers = List.of();
     private int ticks;
 
     public LevelRails() {
@@ -323,7 +325,7 @@ public final class LevelRails extends SavedData {
         if (train.automatic()) {
             logistics.drive(network, train, goods(level), ignite, taken);
         } else {
-            train.tick(network, throttle, driven, ignite, taken);
+            train.tick(network, throttle, driven, Locomotive.power(goods(level), ignite), taken);
         }
         if (train.cars().stream().noneMatch(car -> view(car) instanceof LocomotiveEntity locomotive && locomotive.driven())) {
             // At rest within a Station's stretch, nobody driving it, it eases onto the Station's mark,
@@ -370,8 +372,8 @@ public final class LevelRails extends SavedData {
     }
 
     /**
-     * The level ticked: its Trains, unless the game is frozen, and its logistics, with the hatches that
-     * join a Station asked afresh once a plan.
+     * The level ticked: its Trains, unless the game is frozen, and its logistics, with the hatches and
+     * Chargers that join a Station asked afresh once a plan.
      */
     public static void onLevelTick(LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
@@ -387,8 +389,27 @@ public final class LevelRails extends SavedData {
         // In step with the logistics' own count, so each plan sees the hatches as they are that tick.
         if (++ticks % Logistics.PLAN_TICKS == 0) {
             joined = joinedHatches(level);
+            joinedChargers = joinedChargers(level);
         }
-        logistics.tick(network, trains, joined, goods(level));
+        logistics.tick(network, trains, joined, joinedChargers, goods(level));
+    }
+
+    /**
+     * Every Charger of the level that joins a Station, as logistics sees it, in the order they were
+     * placed. A record whose block is loaded but no longer that Charger is stale, and goes.
+     */
+    private List<Logistics.Charger> joinedChargers(ServerLevel level) {
+        Chargers chargers = LevelChargers.of(level);
+        List<Logistics.Charger> joined = new ArrayList<>();
+        for (Chargers.Charger charger : chargers.all()) {
+            BlockPos pos = charger.pos();
+            if (chargers.dropIfStale(level, pos)) {
+                continue;
+            }
+            PlatformsNear.joined(level, pos).ifPresent(at -> joined.add(new Logistics.Charger(pos.getX(), pos.getY(),
+                    pos.getZ(), at.station(), at.spot(), charger.creative())));
+        }
+        return List.copyOf(joined);
     }
 
     /** Every hatch of the level that joins a Station, as logistics sees it, in the order they were placed. */

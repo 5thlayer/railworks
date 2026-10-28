@@ -22,6 +22,7 @@ class CarBodyTest {
     @Test
     void eachBodyStaysWithinItsCarsBoxAndLength() {
         check(CarBody.LOCOMOTIVE, CarBody.LENGTH);
+        check(CarBody.ELECTRIC, CarBody.LENGTH);
         check(CarBody.CARGO, CarBody.LENGTH);
     }
 

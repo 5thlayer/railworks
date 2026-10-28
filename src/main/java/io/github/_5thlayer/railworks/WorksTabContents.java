@@ -22,9 +22,14 @@ final class WorksTabContents {
         event.accept(RailworksRegistries.PYLON_ITEM.get());
         event.accept(RailworksRegistries.RAIL.get());
         event.accept(RailworksRegistries.LOCOMOTIVE.get());
+        event.accept(RailworksRegistries.ELECTRIC_LOCOMOTIVE.get());
         event.accept(RailworksRegistries.CARGO_CAR.get());
         event.accept(RailworksRegistries.STATION_ITEM.get());
         event.accept(RailworksRegistries.HATCH_ITEM.get());
         event.accept(RailworksRegistries.REQUESTER_HATCH_ITEM.get());
+        event.accept(RailworksRegistries.CHARGER_ITEM.get());
+        // No recipe makes it: the Works tab, in creative, is the one way to get it.
+        event.accept(RailworksRegistries.CREATIVE_CHARGER_ITEM.get());
+        event.accept(RailworksRegistries.BURNER_GENERATOR_ITEM.get());
     }
 }

@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.railworks.rail.ChargeSpec;
 import io.github._5thlayer.railworks.rail.DriveSide;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Logistics;
@@ -16,7 +17,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, the Burner
- * Locomotive's drive and fuel, the drive side, how many car spots a Station's platform has, how
+ * Locomotive's drive and fuel, the Electric Locomotive's charge with the Charger and the Burner
+ * Generator that fill it, the drive side, how many car spots a Station's platform has, how
  * many slots a hatch holds, and how fast hatches trade and how long a Train waits on them. A server config, so the client measures the same limits the server
  * strings by.
  */
@@ -31,6 +33,11 @@ public final class RailworksConfig {
     private static final ModConfigSpec.DoubleValue LOCOMOTIVE_BRAKING;
     private static final ModConfigSpec.DoubleValue LOCOMOTIVE_FRICTION;
     private static final ModConfigSpec.LongValue LOCOMOTIVE_JOULES_PER_BURN_TICK;
+    private static final ModConfigSpec.LongValue JOULES_PER_FE;
+    private static final ModConfigSpec.LongValue ELECTRIC_CAPACITY;
+    private static final ModConfigSpec.LongValue CHARGER_RATE;
+    private static final ModConfigSpec.LongValue CHARGER_BUFFER;
+    private static final ModConfigSpec.DoubleValue GENERATOR_KILOWATTS;
     private static final ModConfigSpec.EnumValue<DriveSide> DRIVE_SIDE;
     private static final ModConfigSpec.IntValue PLATFORM_CARS;
     private static final ModConfigSpec.IntValue HATCH_SLOTS;
@@ -67,6 +74,18 @@ public final class RailworksConfig {
         LOCOMOTIVE_JOULES_PER_BURN_TICK = builder.comment("What one tick of a fuel's vanilla burn time is worth to the Locomotive, in joules. 2500 makes coal's 1600 ticks Factorio's 4 MJ, as in Wireworks' Boiler.")
                 .defineInRange("joules_per_burn_tick", LocomotiveSpec.DEFAULT_JOULES_PER_BURN_TICK, 1L, 1_000_000L);
         builder.pop();
+        builder.push("electric_locomotive");
+        JOULES_PER_FE = builder.comment("What one FE is worth to the Electric Locomotive and the Burner Generator, in joules. 100, as Wireworks' Steam Engine, makes the Locomotive's 600 kW 300 FE a tick.")
+                .defineInRange("joulesPerFe", ChargeSpec.DEFAULT_JOULES_PER_FE, 1L, 1_000_000L);
+        ELECTRIC_CAPACITY = builder.comment("How many FE the Electric Locomotive's charge holds. 10,000,000 is 1 GJ at 100 J an FE, about four stacks of coal.")
+                .defineInRange("capacity", ChargeSpec.DEFAULT_LOCOMOTIVE_CAPACITY, 1L, Long.MAX_VALUE / 2);
+        CHARGER_RATE = builder.comment("How many FE a Charger takes in from cables, and gives the Electric Locomotive beside it, each tick at most.")
+                .defineInRange("chargerRate", ChargeSpec.DEFAULT_CHARGER_RATE, 1L, Integer.MAX_VALUE);
+        CHARGER_BUFFER = builder.comment("How many FE a Charger buffers at most.")
+                .defineInRange("chargerBuffer", ChargeSpec.DEFAULT_CHARGER_BUFFER, 1L, Long.MAX_VALUE / 2);
+        GENERATOR_KILOWATTS = builder.comment("How hard a Burner Generator burns its fuel into FE, in kilowatts. 600 is the Burner Locomotive's full power, so coal lasts as long in either.")
+                .defineInRange("burnerGeneratorKilowatts", ChargeSpec.DEFAULT_GENERATOR_KILOWATTS, 1.0, 1_000_000.0);
+        builder.pop();
         SPEC = builder.build();
     }
 
@@ -85,6 +104,7 @@ public final class RailworksConfig {
                 LocomotiveSpec.configure(LocomotiveSpec.DEFAULT_MAX_SPEED, LocomotiveSpec.DEFAULT_ACCELERATION,
                         LocomotiveSpec.DEFAULT_BRAKING, LocomotiveSpec.DEFAULT_FRICTION);
                 LocomotiveSpec.configureFuel(LocomotiveSpec.DEFAULT_JOULES_PER_BURN_TICK);
+                ChargeSpec.reset();
                 DriveSide.configure(DriveSide.DEFAULT);
                 Platform.configure(Platform.MAX_CARS);
                 Hatches.configure(Hatches.DEFAULT_SLOTS);
@@ -101,6 +121,8 @@ public final class RailworksConfig {
             LocomotiveSpec.configure(LOCOMOTIVE_MAX_SPEED.get(), LOCOMOTIVE_ACCELERATION.get(),
                     LOCOMOTIVE_BRAKING.get(), LOCOMOTIVE_FRICTION.get());
             LocomotiveSpec.configureFuel(LOCOMOTIVE_JOULES_PER_BURN_TICK.get());
+            ChargeSpec.configure(JOULES_PER_FE.get(), ELECTRIC_CAPACITY.get(), CHARGER_RATE.get(), CHARGER_BUFFER.get(),
+                    GENERATOR_KILOWATTS.get());
             DriveSide.configure(DRIVE_SIDE.get());
             Platform.configure(PLATFORM_CARS.get());
             Hatches.configure(HATCH_SLOTS.get());

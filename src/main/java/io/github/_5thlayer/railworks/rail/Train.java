@@ -353,8 +353,9 @@ public final class Train {
     /**
      * One tick under {@code throttle} from the cab of {@code driven}, whose forward is the way that
      * car faces. A powered tick has the Locomotives facing the way it pushes draw full power from
-     * their fuel buffers, or those facing the other way when none of them pays, lighting an item through
-     * {@code ignite} when a buffer cannot cover it (the item's joules, or 0 for none); those that
+     * their fuel buffers, or those facing the other way when none of them pays, lighting an item, or
+     * drawing charge, through {@code ignite} when a buffer cannot cover it (the joules, or 0 for none;
+     * {@link Locomotive#power} pays each kind from its own); those that
      * paid pull the Train, and with none it brakes to a stop. Pushing against the motion brakes, for
      * free. Its Locomotives brake and its other cars do not, so a heavier Train starts and stops
      * more slowly. It does not run onto a Span {@code taken} says another Train holds.
@@ -439,13 +440,14 @@ public final class Train {
     }
 
     /**
-     * Whether a Locomotive facing {@code way}, +1 the Train's heading and -1 against it, has fuel to
-     * pull with, in its buffer or, as {@code slotsFuelled} says, waiting in its slots.
+     * Whether a Locomotive facing {@code way}, +1 the Train's heading and -1 against it, has fuel or
+     * charge to pull with, in its buffer or, as {@code waiting} says, waiting in its slots or its
+     * charge ({@link Locomotive#waiting}).
      */
-    boolean pulls(int way, Predicate<Locomotive> slotsFuelled) {
+    boolean pulls(int way, Predicate<Locomotive> waiting) {
         for (Car car : cars) {
             if (car instanceof Locomotive locomotive && facingSign(car) == way
-                    && (locomotive.fuelled() || slotsFuelled.test(locomotive))) {
+                    && (locomotive.fuelled() || waiting.test(locomotive))) {
                 return true;
             }
         }

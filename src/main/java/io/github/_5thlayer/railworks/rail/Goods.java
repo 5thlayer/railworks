@@ -7,8 +7,9 @@ import java.util.Map;
 
 /**
  * What only Minecraft knows of the goods {@link Logistics} moves: what hatches and Cargo cars hold,
- * and moving it between them, and what a Locomotive's fuel slots hold and take. Counts are items,
- * of one kind each, its components ignored.
+ * and moving it between them, what a Locomotive's fuel slots hold and take, and the FE of an
+ * Electric Locomotive's charge and a Charger's buffer. Counts are items, of one kind each, its
+ * components ignored, or FE.
  *
  * <p>Pure: no Minecraft types. {@code I} is the item's kind, the game's {@code Item}.
  */
@@ -53,4 +54,16 @@ public interface Goods<I> {
 
     /** Whether fuel waits in {@code locomotive}'s slots, so it can pull before its buffer is lit. */
     boolean slotsFuelled(Locomotive locomotive);
+
+    /** How many FE {@code locomotive}'s charge holds: none for a Burner, or for one whose record is not known. */
+    long charge(Locomotive locomotive);
+
+    /** Spends {@code fe} of {@code locomotive}'s charge, all or nothing; whether it did. */
+    boolean spendCharge(Locomotive locomotive, long fe);
+
+    /**
+     * Moves up to {@code most} FE from {@code from}'s buffer into {@code into}'s charge, as far as the
+     * buffer holds it, a Creative Charger's never running out, and the charge has room; how many moved.
+     */
+    long charge(Logistics.Charger from, Locomotive into, long most);
 }

@@ -65,19 +65,20 @@ public final class Driver {
     }
 
     /**
-     * One tick of driving {@code train}, asking {@code slotsFuelled} whether fuel waits in a
-     * Locomotive's slots, which only its entity knows, and lighting it through {@code ignite}; it does
+     * One tick of driving {@code train}, asking {@code waiting} whether fuel waits in a
+     * Locomotive's slots or charge in its record, which only the level knows, and lighting or drawing
+     * it through {@code ignite}; it does
      * not run onto a Span {@code taken} says another Train holds. Whether the Train now stands at
      * rest at the Station: true from the tick it stopped there on, a Train set going there already
      * included.
      */
-    public boolean tick(RailNetwork network, Train train, Predicate<Locomotive> slotsFuelled,
+    public boolean tick(RailNetwork network, Train train, Predicate<Locomotive> waiting,
                         ToLongFunction<Locomotive> ignite, Predicate<Span> taken) {
-        if (there(network, train, slotsFuelled)) {
+        if (there(network, train, waiting)) {
             train.tick(network, 0, false, ignite, taken);
             return true;
         }
-        train.tick(network, push(network, train, slotsFuelled), false, ignite, taken);
+        train.tick(network, push(network, train, waiting), false, ignite, taken);
         return false;
     }
 
@@ -87,7 +88,7 @@ public final class Driver {
      * stops. The leading car is the first the way it runs; set going with no way yet, either way it
      * can pull.
      */
-    private boolean there(RailNetwork network, Train train, Predicate<Locomotive> slotsFuelled) {
+    private boolean there(RailNetwork network, Train train, Predicate<Locomotive> waiting) {
         if (!train.atRest()) {
             return false;
         }
@@ -95,7 +96,7 @@ public final class Driver {
             return standsAt(network, train, way, station);
         }
         for (int way : new int[] {1, -1}) {
-            if (train.pulls(way, slotsFuelled) && standsAt(network, train, way, station)) {
+            if (train.pulls(way, waiting) && standsAt(network, train, way, station)) {
                 return true;
             }
         }
@@ -123,10 +124,10 @@ public final class Driver {
     }
 
     /** The way to push it this tick, +1 the Train's heading, -1 against it and 0 for neither. */
-    private int push(RailNetwork network, Train train, Predicate<Locomotive> slotsFuelled) {
+    private int push(RailNetwork network, Train train, Predicate<Locomotive> waiting) {
         // At rest unable to pull its way, it looks for the other; moving, it runs on, out of fuel or not.
-        if (!fixed && (way == 0 || train.atRest() && !train.pulls(way, slotsFuelled))) {
-            way = pick(network, train, slotsFuelled);
+        if (!fixed && (way == 0 || train.atRest() && !train.pulls(way, waiting))) {
+            way = pick(network, train, waiting);
         }
         if (way == 0) {
             lost = true;
@@ -161,11 +162,11 @@ public final class Driver {
     }
 
     /** The nearer way it can pull to the Station's lead mark ahead of its leading car, past where it stands; 0 for neither. */
-    private int pick(RailNetwork network, Train train, Predicate<Locomotive> slotsFuelled) {
+    private int pick(RailNetwork network, Train train, Predicate<Locomotive> waiting) {
         int best = 0;
         double nearest = Double.POSITIVE_INFINITY;
         for (int way : new int[] {1, -1}) {
-            if (!train.pulls(way, slotsFuelled)) {
+            if (!train.pulls(way, waiting)) {
                 continue;
             }
             double d = distance(network, train, way, station);

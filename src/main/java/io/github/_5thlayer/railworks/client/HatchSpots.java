@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.github._5thlayer.groundworks.client.PlacementPreviewEvent;
+import io.github._5thlayer.railworks.ChargerItem;
 import io.github._5thlayer.railworks.HatchItem;
 import io.github._5thlayer.railworks.PlatformsNear;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -20,7 +21,7 @@ import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 import org.joml.Vector3f;
 
 /**
- * While a hatch is held, whatever the aim, an outline round the free blocks beside each car spot
+ * While a hatch or a Charger is held, whatever the aim, an outline round the free blocks beside each car spot
  * of the platforms near the player, and beside each leading car's place in a colour of its own, a
  * spot's two on a side as one box falling half a car gap short of its ends
  * ({@link PlatformsNear#freeSpots}), where a hatch could go, asked of the client's Spans and the
@@ -58,7 +59,7 @@ final class HatchSpots {
     }
 
     static void onMarker(PlacementPreviewEvent.Marker event) {
-        if (!(event.getStack().getItem() instanceof HatchItem)) {
+        if (!(event.getStack().getItem() instanceof HatchItem) && !(event.getStack().getItem() instanceof ChargerItem)) {
             return;
         }
         SubmitCustomGeometryEvent geometry = event.getGeometry();

@@ -37,7 +37,10 @@ import snownee.jade.api.view.ViewGroup;
  * shows a Cargo car's cargo. The slots are the car's record in the level, which no client holds, so
  * a server-side item storage provider reads
  * {@link LocomotiveEntity#fuelSlot(int)} and libworks-runtime's {@link MachineItems.Client} draws
- * them. Found by Jade's annotation scan and named nowhere else, so Jade stays a soft dependency.
+ * them. An Electric Locomotive shows its status line and speed the same, and no fuel: its charge
+ * is shown by Jade's own energy display, through the entity's energy handler
+ * ({@link LocomotiveEntity#charge()}). Found by Jade's annotation scan and named nowhere else, so
+ * Jade stays a soft dependency.
  */
 @WailaPlugin
 public class LocomotiveJadePlugin implements IWailaPlugin {
@@ -76,6 +79,9 @@ public class LocomotiveJadePlugin implements IWailaPlugin {
                     String.format(Locale.ROOT, "%.1f", Math.abs(speed)),
                     Component.translatable(speed < -1e-6
                             ? "tooltip.railworks.locomotive.jade.reversing" : "tooltip.railworks.locomotive.jade.forward")));
+            if (car.electric()) {
+                return;
+            }
             long joules = car.fuelJoules();
             // Seconds at full power, which is how long the buffer drives it.
             double seconds = joules / (LocomotiveSpec.JOULES_PER_TICK_AT_FULL_POWER * (double) LocomotiveSpec.TICKS_PER_SECOND);
@@ -95,7 +101,7 @@ public class LocomotiveJadePlugin implements IWailaPlugin {
 
         @Override
         public @Nullable List<ViewGroup<ItemStack>> getGroups(Accessor<?> accessor) {
-            if (!(accessor instanceof EntityAccessor entity) || !(entity.getEntity() instanceof LocomotiveEntity car)) {
+            if (!(accessor instanceof EntityAccessor entity) || !(entity.getEntity() instanceof LocomotiveEntity car) || car.electric()) {
                 return null;
             }
             List<ItemStack> stacks = new ArrayList<>();

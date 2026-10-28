@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "railworks:block/burner_generator/top",
+    "front": "railworks:block/burner_generator/front_on",
+    "side": "railworks:block/burner_generator/side"
+  }
+}

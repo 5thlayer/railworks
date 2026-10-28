@@ -6,6 +6,7 @@
 # the items and experience dropped, the cars' loads and the Spans' Rail among them. The game tests run
 # it on each plot before clearing away (libworks ADR 0010).
 execute align xyz positioned ~2 ~-1 ~-12 as @e[type=railworks:burner_locomotive,dx=23,dy=16,dz=12] run kill @s
+execute align xyz positioned ~2 ~-1 ~-12 as @e[type=railworks:electric_locomotive,dx=23,dy=16,dz=12] run kill @s
 execute align xyz positioned ~2 ~-1 ~-12 as @e[type=railworks:cargo_car,dx=23,dy=16,dz=12] run kill @s
 fill ~2 ~ ~-12 ~25 ~15 ~ minecraft:structure_void destroy
 fill ~2 ~-1 ~-12 ~25 ~-1 ~ minecraft:structure_void

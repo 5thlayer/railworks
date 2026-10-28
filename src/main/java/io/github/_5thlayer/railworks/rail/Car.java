@@ -45,6 +45,7 @@ public sealed interface Car permits Locomotive, CargoCar {
     static MapCodec<? extends Car> fields(String kind) {
         return switch (kind) {
             case Locomotive.KIND -> Locomotive.MAP_CODEC;
+            case Locomotive.ELECTRIC_KIND -> Locomotive.ELECTRIC_MAP_CODEC;
             case CargoCar.KIND -> CargoCar.MAP_CODEC;
             default -> null;
         };

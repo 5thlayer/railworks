@@ -34,7 +34,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  *   <li>{@code /railworks span <from> <to>} strings a Span between the Arms of the Pylon columns
  *       standing at {@code from} and {@code to}, for no Rail, under the length, grade and bend
  *       limits a player strings by.</li>
- *   <li>{@code /railworks car (locomotive|cargo_car) <pos> <yaw>} sets a car on the Rail where one
+ *   <li>{@code /railworks car (locomotive|electric_locomotive|cargo_car) <pos> <yaw>} sets a car on the Rail where one
  *       riding it would stand in the block {@code pos}, facing {@code yaw} along it, as the car in
  *       a player's hand would: coupled into a Train at rest when that is where it lands beside one
  *       of the Train's ends, and refused where the item would be.</li>
