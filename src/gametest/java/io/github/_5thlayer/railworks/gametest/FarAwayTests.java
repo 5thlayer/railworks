@@ -393,8 +393,9 @@ final class FarAwayTests {
 
     /**
      * A Locomotive standing on the far stretch, its chunk in view, carries a Driver in its cab and a pig
-     * that got in after them in its bay. The Driver gets off and the view goes, the pig kept in the
-     * car's record; brought back, the pig stands in the bay again, and a player boarding takes the cab.
+     * that got in after them in its bay. The Driver gets off before the view goes, since a view a
+     * player rides is never taken away; the pig is kept in the car's record and, brought back, stands
+     * in the bay again, and a player boarding takes the cab.
      */
     private static void mobBackInTheBay(GameTestHelper helper) {
         RailNetwork network = line(helper);

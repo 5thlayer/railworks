@@ -57,7 +57,7 @@ final class CurveTests {
     static void register(RailworksGameTests.Registrar tests) {
         tests.test("curve_car_stands_faces_and_pitches_along_the_curve", 20, CurveTests::followsCurve);
         tests.test("curve_car_driven_through_an_arm_turns_without_a_jump", 100, CurveTests::throughArm);
-        tests.test("curve_rider_seat_stands_square_to_a_climbing_floor", 20, CurveTests::seatOnClimb);
+        tests.test("curve_driver_seat_stands_square_to_a_climbing_floor", 20, CurveTests::seatOnClimb);
         tests.test("logistics_coupled_cars_stand_two_and_a_half_blocks_apart_through_an_arm", 20, CurveTests::coupledThroughArm);
     }
 
@@ -153,19 +153,19 @@ final class CurveTests {
         Arm high = arm(helper, TOP.above(2));
         network.add(Span.of(low, high, SpanRules.cost(low, high)));
         LocomotiveEntity car = spawn(helper, new Place(network.get(low, high), high, 4.0));
-        ServerPlayer rider = LocomotiveTests.board(helper, car);
-        rider.rideTick();
+        ServerPlayer driver = LocomotiveTests.board(helper, car);
+        driver.rideTick();
         if (car.getXRot() > -10.0F) {
             helper.fail("a car climbing a quarter is pitched " + car.getXRot(), STAND);
         }
-        // Square to the floor, the seat (1.2 up, 0.8 forward in the cab) leans back down the climb and
+        // Square to the floor, the Driver's seat (1.2 up, 0.8 forward in the cab) leans back down the climb and
         // its forward offset rises with it; the car faces east. A seated player's feet are 0.6 below it.
-        Vec3 seat = rider.position().subtract(car.position());
+        Vec3 seat = driver.position().subtract(car.position());
         double climb = Math.toRadians(-car.getXRot());
         double east = 0.8 * Math.cos(climb) - 1.2 * Math.sin(climb);
         double up = 1.2 * Math.cos(climb) + 0.8 * Math.sin(climb) - 0.6;
         if (Math.abs(seat.x - east) > 0.01 || Math.abs(seat.y - up) > 0.01 || Math.abs(seat.z) > 0.01) {
-            helper.fail("the rider sits " + seat + " from a car pitched " + car.getXRot(), STAND);
+            helper.fail("the Driver sits " + seat + " from a car pitched " + car.getXRot(), STAND);
         }
         helper.succeed();
     }
