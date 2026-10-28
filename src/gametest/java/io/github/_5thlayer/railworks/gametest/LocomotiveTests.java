@@ -407,7 +407,7 @@ final class LocomotiveTests {
         double y = car.getY() + 0.6;
         if (Math.abs(driver.getX() - x) > 1e-3 || Math.abs(driver.getY() - y) > 1e-3
                 || Math.abs(driver.getZ() - car.getZ()) > 1e-3) {
-            helper.fail("the rider sits at " + driver.position() + ", not in the cab at " + new Vec3(x, y, car.getZ()), STAND);
+            helper.fail("the Driver sits at " + driver.position() + ", not in the cab at " + new Vec3(x, y, car.getZ()), STAND);
         }
         // Their eye, 1.62 over their feet, at the height CarBody's sight lines are drawn from.
         if (Math.abs(driver.getEyeY() - (car.getY() + 2.22)) > 1e-3) {
