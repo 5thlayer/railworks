@@ -65,8 +65,9 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * the {@code logistics_} prefix, but for a provider beside the leading car's place filling an
  * automatic Train's Locomotive with fuel that leaves nothing behind (#53), whose names share
  * {@code refuel_}, for a rider logging out of a Train on its job (#56), whose names share
- * {@code logout_} with {@code LocomotiveTests}' logging out, and for a job run with its Cargo car
- * out of view (#59), whose name shares {@code record_} with {@code CarRecordTests}.
+ * {@code logout_} with {@code LocomotiveTests}' logging out, for a job run with its Cargo car
+ * out of view (#59), whose name shares {@code record_} with {@code CarRecordTests}, and for the
+ * leading car's place covering a three-block Locomotive (#62), whose name shares {@code loco_length_}.
  */
 final class LogisticsTests {
 
@@ -76,11 +77,17 @@ final class LogisticsTests {
      * Span bends all along when either Arm does, so a short Span each side of the jog takes the bend.
      */
     private static final BlockPos[] LINE = {new BlockPos(-1, 1, 3), new BlockPos(4, 1, 3), new BlockPos(5, 1, 3),
-            new BlockPos(7, 1, 5), new BlockPos(8, 1, 5), new BlockPos(12, 1, 5)};
-    /** North of the west leg, serving Trains heading west: its first car spot beside x 2 and 3. */
-    private static final BlockPos MINE = new BlockPos(0, 1, 2);
-    /** South of the east leg at the line's end, serving Trains heading east: its first car spot beside x 9 and 10. */
-    static final BlockPos DEPOT = new BlockPos(12, 1, 6);
+            new BlockPos(7, 1, 5), new BlockPos(8, 1, 5), new BlockPos(13, 1, 5)};
+    /**
+     * North of the west leg at the line's end, serving Trains heading west: the leading car's place
+     * beside x -1 to 1 and its first car spot beside x 2 and 3.
+     */
+    private static final BlockPos MINE = new BlockPos(-1, 1, 2);
+    /**
+     * South of the east leg at the line's end, serving Trains heading east: the leading car's place
+     * beside x 11 to 13 and its first car spot beside x 9 and 10.
+     */
+    static final BlockPos DEPOT = new BlockPos(13, 1, 6);
     private static final BlockPos PROVIDER = new BlockPos(3, 2, 2);
     private static final BlockPos REQUESTER = new BlockPos(9, 2, 6);
 
@@ -91,8 +98,9 @@ final class LogisticsTests {
         tests.test("logistics_the_menus_toggle_switches_the_train_and_its_status_line_follows", 20, LogisticsTests::toggles);
         tests.test("logistics_a_driver_pressing_forward_switches_the_train_to_manual", 20, LogisticsTests::driverTakesOver);
         tests.test("logistics_the_mode_is_kept_across_a_save_and_reload", 20, LogisticsTests::saved);
-        tests.test("logistics_runs_a_train_unattended_from_a_provider_to_a_requester", 1_200, LogisticsTests::unattended);
-        // Its line runs out past the structure, as the unattended run's does, so the two would cross side by side.
+        // Its line runs out past the structure at both ends.
+        tests.testOnItsOwn("logistics_runs_a_train_unattended_from_a_provider_to_a_requester", 1_200, LogisticsTests::unattended);
+        // Its line, too, runs out past the structure.
         tests.testOnItsOwn("logistics_a_broken_requester_leaves_a_leftover_delivered_once_one_asks_again", 1_600,
                 LogisticsTests::brokenRequester);
         // Its line, too, runs out past the structure.
@@ -102,6 +110,8 @@ final class LogisticsTests {
         tests.testOnItsOwn("refuel_a_stack_the_fuel_slots_cannot_take_is_passed_over", 400, LogisticsTests::refuelsPastAStack);
         tests.testOnItsOwn("logout_leaves_the_riders_car_in_its_train_on_its_job", 1_200, LogisticsTests::riderLogsOut);
         tests.testOnItsOwn("record_a_job_loads_and_unloads_a_cargo_car_out_of_view", 1_200, LogisticsTests::cargoOutOfView);
+        tests.testOnItsOwn("loco_length_a_provider_by_a_stopped_locomotives_third_block_fuels_it_and_the_first_spot_loads_the_car_behind",
+                400, LogisticsTests::thirdBlock);
     }
 
     // ---- the mode ----
@@ -323,8 +333,8 @@ final class LogisticsTests {
         fuel.forEach(stack -> insert(record(helper, hatch), stack));
         Locomotive east = Locomotive.burner();
         CargoCar wagon = CargoCar.create();
-        // Its middle half a block short of the line's end, where the Depot's leading car stands.
-        Train train = Train.of(new Place(last, last.b(), 0.5), List.of(east, wagon));
+        // Its middle a block short of the line's end, where the Depot's leading Locomotive stands.
+        Train train = Train.of(new Place(last, last.b(), 1.0), List.of(east, wagon));
         LocomotiveEntity locomotive = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
         return locomotive;
@@ -375,6 +385,68 @@ final class LogisticsTests {
                         new ItemStack(Items.CHARCOAL, 10), new ItemStack(Items.OAK_PLANKS, 10), new ItemStack(Items.BLAZE_ROD, 10))))
                 .thenExecute(() -> forceLoad(helper, false))
                 .thenSucceed();
+    }
+
+    /**
+     * A Train of a dry Locomotive facing east, a Cargo car and a fuelled Locomotive facing west, standing
+     * automatic at the Depot, its leading car's place three blocks long: a provider of coal beside its
+     * third block, the one furthest from the Station, fills the leading Locomotive's slots, and a
+     * provider of iron beside the first car spot, for the Mine's requester, loads the Cargo car
+     * coupled right behind it.
+     */
+    private static void thirdBlock(GameTestHelper helper) {
+        Span last = line(helper);
+        station(helper, MINE);
+        station(helper, DEPOT);
+        BlockPos fuel = besideTheLeadingCarsBack(helper, DEPOT);
+        if (DEPOT.getX() - fuel.getX() != 2) {
+            helper.fail("the block beside the leading car's back is at x " + fuel.getX() + ", not two behind the Depot", fuel);
+        }
+        helper.setBlock(fuel, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        insert(record(helper, fuel), new ItemStack(Items.COAL, 300));
+        // The first car spot's hatch provides here, and the Mine's requests.
+        helper.setBlock(REQUESTER, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        helper.setBlock(PROVIDER, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+        expectJoined(helper, REQUESTER, DEPOT);
+        expectJoined(helper, PROVIDER, MINE);
+        insert(record(helper, REQUESTER), new ItemStack(Items.IRON_INGOT, 64));
+        record(helper, PROVIDER).ask(Items.IRON_INGOT);
+        Locomotive east = Locomotive.burner();
+        CargoCar wagon = CargoCar.create();
+        Locomotive west = Locomotive.burner();
+        // Its middle a block short of the line's end, where the Depot's leading Locomotive stands.
+        Train train = Train.of(new Place(last, last.b(), 1.0), List.of(east, wagon))
+                .coupled(LevelRails.of(helper.getLevel()).network(), Train.End.BACK, west, true);
+        LocomotiveEntity leading = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
+        CargoCarEntity cargo = spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
+        LocomotiveEntity trailing = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, west);
+        LocomotiveTests.fill(helper, trailing, new ItemStack(Items.COAL, 4));
+        leading.train().setAutomatic(true);
+        ItemStack full = new ItemStack(Items.COAL, 64);
+        helper.startSequence()
+                .thenWaitUntil(() -> LocomotiveTests.expectSlots(helper, leading, List.of(full, full, full, full)))
+                .thenWaitUntil(() -> {
+                    if (held(record(helper, REQUESTER)) == 64) {
+                        helper.fail("the first car spot's hatch still holds its iron, the car "
+                                + cargo.cargo().countItem(Items.IRON_INGOT), REQUESTER);
+                    }
+                })
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    /** The block beside the leading car's place of the Station at {@code station} furthest from it along x, on its side of the Rail. */
+    private static BlockPos besideTheLeadingCarsBack(GameTestHelper helper, BlockPos station) {
+        var network = LevelRails.of(helper.getLevel()).network();
+        BlockPos at = helper.absolutePos(station);
+        return LevelStations.of(helper.getLevel()).stations().all().stream()
+                .filter(s -> s.x() == at.getX() && s.y() == at.getY() && s.z() == at.getZ())
+                .flatMap(s -> Platform.of(network, s).stream())
+                .flatMap(p -> p.besideBlocks(network).stream())
+                .filter(b -> b.spot() == Platform.LEADING && b.z() == at.getZ())
+                .map(b -> new BlockPos(b.x(), b.y(), b.z()).subtract(helper.absolutePos(BlockPos.ZERO)))
+                .max((one, other) -> Integer.compare(Math.abs(one.getX() - station.getX()), Math.abs(other.getX() - station.getX())))
+                .orElseThrow(() -> helper.assertionException(station, Component.literal("nothing beside its leading car's place")));
     }
 
     /** A block beside the leading car's place of the Station at {@code station}, clear of the Station's own. */
@@ -461,7 +533,7 @@ final class LogisticsTests {
         for (BlockPos pylon : LINE) {
             helper.setBlock(pylon, RailworksRegistries.PYLON.get().defaultBlockState());
         }
-        for (int x = -1; x <= 13; x++) {
+        for (int x = -1; x <= 14; x++) {
             for (int z = 2; z <= 6; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
             }
@@ -479,7 +551,7 @@ final class LogisticsTests {
     /** Forces the chunks under the {@link #LINE} loaded, or lets them go. */
     static void forceLoad(GameTestHelper helper, boolean forced) {
         BlockPos west = helper.absolutePos(new BlockPos(-1, 1, 2));
-        BlockPos east = helper.absolutePos(new BlockPos(13, 1, 6));
+        BlockPos east = helper.absolutePos(new BlockPos(14, 1, 6));
         for (int cx = Math.min(west.getX(), east.getX()) >> 4; cx <= Math.max(west.getX(), east.getX()) >> 4; cx++) {
             for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
                 helper.getLevel().setChunkForced(cx, cz, forced);

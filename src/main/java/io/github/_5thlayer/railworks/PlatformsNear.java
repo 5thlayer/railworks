@@ -28,7 +28,7 @@ import net.minecraft.world.phys.AABB;
 public final class PlatformsNear {
 
     /** Half the gap between two coupled cars' bodies, by which a drawn car spot falls short of each of its ends. */
-    private static final double HALF_GAP = (CarBody.PITCH - CarBody.LENGTH) / 2.0;
+    private static final double HALF_GAP = CarBody.GAP / 2.0;
 
     /**
      * What a held hatch draws: the free blocks beside one car spot on one side of the Rail, as a
@@ -78,9 +78,9 @@ public final class PlatformsNear {
 
     /**
      * Where a hatch could go near {@code pos}, as a held hatch draws it, car spot by car spot: the
-     * free blocks beside a spot of the platform of a Station near, empty enough to place in, the two
-     * on one side of the Rail as one box, or the one of them still free, each falling half a car gap
-     * short of its spot's ends, so the spots read as the cars that will stand there. Those beside
+     * free blocks beside a spot of the platform of a Station near, empty enough to place in, those
+     * on one side of the Rail as one box, two for a spot and three for the leading car's place, or
+     * each still free on its own when some are taken, falling half a car gap short of its spot's ends, so the spots read as the cars that will stand there. Those beside
      * the leading car's place, where a provider fuels the Locomotive that usually leads, say so.
      */
     public static List<FreeSpot> freeSpots(Level level, BlockPos pos) {

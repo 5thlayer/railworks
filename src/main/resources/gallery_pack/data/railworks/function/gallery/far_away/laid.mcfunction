@@ -20,8 +20,8 @@ railworks span ~201 ~ ~-6 ~231 ~ ~-6
 railworks span ~231 ~ ~-6 ~261 ~ ~-6
 fill ~260 ~ ~-5 ~260 ~1 ~-5 minecraft:stone_bricks
 setblock ~260 ~2 ~-5 railworks:station{name:"Mine"}
-fill ~258 ~ ~-7 ~258 ~1 ~-7 minecraft:stone_bricks
-setblock ~258 ~2 ~-7 railworks:hatch[mode=provider]
-railworks hatch ~258 ~2 ~-7 provider minecraft:iron_ore 8
+fill ~257 ~ ~-7 ~257 ~1 ~-7 minecraft:stone_bricks
+setblock ~257 ~2 ~-7 railworks:hatch[mode=provider]
+railworks hatch ~257 ~2 ~-7 provider minecraft:iron_ore 8
 tag @s add railworks.gallery.far_away.built
 schedule function railworks:gallery/far_away/sweep 20t

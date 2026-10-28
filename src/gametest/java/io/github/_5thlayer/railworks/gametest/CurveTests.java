@@ -58,7 +58,7 @@ final class CurveTests {
         tests.test("curve_car_stands_faces_and_pitches_along_the_curve", 20, CurveTests::followsCurve);
         tests.test("curve_car_driven_through_an_arm_turns_without_a_jump", 100, CurveTests::throughArm);
         tests.test("curve_rider_seat_stands_square_to_a_climbing_floor", 20, CurveTests::seatOnClimb);
-        tests.test("logistics_coupled_cars_stand_two_blocks_apart_through_an_arm", 20, CurveTests::coupledThroughArm);
+        tests.test("logistics_coupled_cars_stand_two_and_a_half_blocks_apart_through_an_arm", 20, CurveTests::coupledThroughArm);
     }
 
     private static void followsCurve(GameTestHelper helper) {
@@ -116,7 +116,7 @@ final class CurveTests {
         RailNetwork network = bend(helper);
         Span before = network.get(arm(helper, A), arm(helper, B));
         Span beyond = network.get(arm(helper, B), arm(helper, C));
-        // The Locomotive a block past the bend's Arm, the Cargo car coupled behind it, a block short of it.
+        // The Locomotive a block past the bend's Arm, the Cargo car coupled behind it, a block and a half short of it.
         Locomotive locomotive = Locomotive.burner();
         CargoCar cargo = CargoCar.create();
         Train train = Train.of(new Place(beyond, arm(helper, C), beyond.length() - 1.0), List.of(locomotive, cargo));
@@ -124,14 +124,15 @@ final class CurveTests {
         LocomotiveEntity front = view(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, locomotive);
         CargoCarEntity back = view(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, cargo);
         Place behind = train.placeOf(network, cargo);
-        if (!behind.span().equals(before) || Math.abs(behind.toFront() - 1.0) > 1e-6) {
-            helper.fail("the Cargo car stands at " + behind + ", not a block short of the Arm", STAND);
+        if (!behind.span().equals(before) || Math.abs(behind.toFront() - 1.5) > 1e-6) {
+            helper.fail("the Cargo car stands at " + behind + ", not a block and a half short of the Arm", STAND);
         }
-        // Two blocks along the Line; drawn on the curve, which runs a little off the Spans through a
-        // bend, they stand within a few hundredths of that apart, and each car on the curve.
+        // Two and a half blocks along the Line, half a Locomotive and half a Cargo car; drawn on the
+        // curve, which runs a little off the Spans through a bend, they stand within a few hundredths
+        // of that apart, and each car on the curve.
         double apart = front.position().distanceTo(back.position());
-        if (Math.abs(apart - 2.0) > 0.05) {
-            helper.fail("coupled cars through the bend stand " + apart + " apart, not about two blocks", STAND);
+        if (Math.abs(apart - 2.5) > 0.05) {
+            helper.fail("coupled cars through the bend stand " + apart + " apart, not about two and a half blocks", STAND);
         }
         RailCurve.Pose pose = behind.pose(network);
         Vec3 expected = new Vec3(pose.x() + RailGeometry.ATTACH_X, pose.y() + RailGeometry.RIDE_Y, pose.z() + RailGeometry.ATTACH_Z);
@@ -157,12 +158,12 @@ final class CurveTests {
         if (car.getXRot() > -10.0F) {
             helper.fail("a car climbing a quarter is pitched " + car.getXRot(), STAND);
         }
-        // Square to the floor, the seat (1.2 up, 0.3 forward in the cab) leans back down the climb and
+        // Square to the floor, the seat (1.2 up, 0.8 forward in the cab) leans back down the climb and
         // its forward offset rises with it; the car faces east. A seated player's feet are 0.6 below it.
         Vec3 seat = rider.position().subtract(car.position());
         double climb = Math.toRadians(-car.getXRot());
-        double east = 0.3 * Math.cos(climb) - 1.2 * Math.sin(climb);
-        double up = 1.2 * Math.cos(climb) + 0.3 * Math.sin(climb) - 0.6;
+        double east = 0.8 * Math.cos(climb) - 1.2 * Math.sin(climb);
+        double up = 1.2 * Math.cos(climb) + 0.8 * Math.sin(climb) - 0.6;
         if (Math.abs(seat.x - east) > 0.01 || Math.abs(seat.y - up) > 0.01 || Math.abs(seat.z) > 0.01) {
             helper.fail("the rider sits " + seat + " from a car pitched " + car.getXRot(), STAND);
         }

@@ -87,10 +87,10 @@ final class FluidTests {
      */
     private static final int[] PYLONS = {-11, -1, 9, 19, 29};
     private static final int Z = 3;
-    /** South of the line, serving Trains heading east: its leading car's place beside x 9 and 10, its car spots back west from 7 and 8. */
-    private static final BlockPos QUARRY = new BlockPos(10, 1, 4);
-    /** South of the line, serving Trains heading east: its leading car's place beside x 25 and 26, its car spots back west from 23 and 24. */
-    private static final BlockPos DEPOT = new BlockPos(26, 1, 4);
+    /** South of the line, serving Trains heading east: its leading car's place beside x 9 to 11, its car spots back west from 7 and 8. */
+    private static final BlockPos QUARRY = new BlockPos(11, 1, 4);
+    /** South of the line, serving Trains heading east: its leading car's place beside x 25 to 27, its car spots back west from 23 and 24. */
+    private static final BlockPos DEPOT = new BlockPos(27, 1, 4);
     /** The two blocks beside each of a Station's first two car spots, at a car's floor. */
     private static final BlockPos QUARRY_0 = new BlockPos(7, 2, 4);
     private static final BlockPos QUARRY_0_OTHER = new BlockPos(8, 2, 4);
@@ -477,8 +477,8 @@ final class FluidTests {
         fluidHatch(helper, QUARRY_LEADING, HatchMode.PROVIDER, Fluids.LAVA, 10);
         Locomotive east = Locomotive.burner();
         Span span = span(helper, 9);
-        // Its middle half a block short of the Quarry's own x, where its leading car stands.
-        Train train = Train.of(new Place(span, span.b(), 19 - (QUARRY.getX() - 0.5)), List.of(east));
+        // Its middle a block short of the Quarry's own x, where its leading car stands.
+        Train train = Train.of(new Place(span, span.b(), 19 - (QUARRY.getX() - 1.0)), List.of(east));
         LocomotiveEntity locomotive = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
         train.setAutomatic(true);
         helper.startSequence()

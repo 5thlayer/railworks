@@ -108,18 +108,18 @@ class DriverTest {
     @Test
     void itStopsWithItsLeadingCarAtTheStation() {
         line();
-        Train train = shuttle(5.0);
+        Train train = shuttle(7.0);
         drive(new Driver(DEPOT), train);
         assertTrue(train.atRest());
-        // Its middle half a block short of the Station's centre, its front at the block's front edge.
-        assertEquals(34.5, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
+        // Its middle a block short of the Station's centre, its front at the block's front edge.
+        assertEquals(34.0, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
         assertEquals(List.of(DEPOT), stations.stoppedAt(network, train));
     }
 
     @Test
     void itStaysStoppedThereOnceItArrives() {
         line();
-        Train train = shuttle(5.0);
+        Train train = shuttle(7.0);
         Driver driver = new Driver(DEPOT);
         drive(driver, train);
         Place stopped = train.head();
@@ -132,8 +132,8 @@ class DriverTest {
     @Test
     void setGoingAtTheStationItIsThereAlready() {
         line();
-        // Its last car, leading toward A, at the Mine's stop.
-        Train train = shuttle(9.5);
+        // Its last car, leading toward A, at the Mine's stop, at 6.
+        Train train = shuttle(11.0);
         assertTrue(tick(new Driver(MINE), train));
         assertTrue(train.atRest());
     }
@@ -141,12 +141,12 @@ class DriverTest {
     @Test
     void withALocomotiveFacingEachWayItRunsBackAndForthAlongTheLine() {
         line();
-        Train train = shuttle(5.0);
+        Train train = shuttle(7.0);
         for (int trip = 0; trip < 2; trip++) {
             drive(new Driver(DEPOT), train);
             drive(new Driver(MINE), train);
             // Back at the Mine with the last car, the Locomotive facing A, leading.
-            assertEquals(5.5, alongLine(train, train.cars().getLast()), Driver.ARRIVE);
+            assertEquals(6.0, alongLine(train, train.cars().getLast()), Driver.ARRIVE);
             assertEquals(List.of(MINE), stations.stoppedAt(network, train));
         }
     }
@@ -166,9 +166,9 @@ class DriverTest {
     void aTrainWhoseFuelRunsOutAsItBrakesInStillGetsThere() {
         line();
         // Thirty blocks short of the Depot's stop, a run of round numbers.
-        Train train = lone(4.5);
+        Train train = lone(4.0);
         Driver driver = new Driver(DEPOT);
-        for (int i = 0; i < BUDGET && alongLine(train, train.cars().getFirst()) < 33.5; i++) {
+        for (int i = 0; i < BUDGET && alongLine(train, train.cars().getFirst()) < 33.0; i++) {
             tick(driver, train);
         }
         assertTrue(train.speed() > 0.0, "it should still be braking in: " + train);
@@ -181,11 +181,11 @@ class DriverTest {
     @Test
     void aCarAtTheStationBehindTheWayItRunsIsNotItsLeadingCar() {
         line();
-        // A Locomotive facing C at 37, its Cargo car behind it at 35 by the Depot: it cannot back,
-        // so its leading car is the Locomotive, two blocks past the Station.
+        // A Locomotive facing C at 36.5, its Cargo car behind it at 34 on the Depot's mark: it cannot
+        // back, so its leading car is the Locomotive, two and a half blocks past the mark.
         Span span = network.get(B, C);
-        Train train = Train.of(new Place(span, C, 3.0), List.of(fuelled(), CargoCar.create()));
-        assertEquals(35.0, alongLine(train, train.cars().getLast()), 1e-9);
+        Train train = Train.of(new Place(span, C, 3.5), List.of(fuelled(), CargoCar.create()));
+        assertEquals(34.0, alongLine(train, train.cars().getLast()), 1e-9);
         assertFalse(tick(new Driver(DEPOT), train));
     }
 
@@ -227,7 +227,7 @@ class DriverTest {
         Station yard = new Station(35, 6, -1, "Yard");
         stations.put(yard);
         drive(new Driver(yard), train);
-        assertEquals(34.5, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
+        assertEquals(34.0, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
         assertEquals(List.of(yard), stations.stoppedAt(network, train));
     }
 

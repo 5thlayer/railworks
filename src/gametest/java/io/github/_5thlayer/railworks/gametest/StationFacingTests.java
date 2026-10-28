@@ -43,10 +43,10 @@ import net.minecraft.world.phys.Vec3;
  */
 final class StationFacingTests {
 
-    /** Beside the Rail a block down, north of it, by the Cargo car coupled behind the Locomotive. */
+    /** Beside the Rail a block down, north of it, just ahead of the Cargo car coupled behind the Locomotive. */
     private static final BlockPos NORTH = CargoAccessTests.BY_CARGO;
     /** The same, south of the Rail. */
-    private static final BlockPos SOUTH = new BlockPos(5, 1, 4);
+    private static final BlockPos SOUTH = new BlockPos(4, 1, 4);
     /** Under the Rail. */
     private static final BlockPos UNDER = new BlockPos(5, 1, 3);
 

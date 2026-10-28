@@ -21,17 +21,18 @@ class CarBodyTest {
 
     @Test
     void eachBodyStaysWithinItsCarsBoxAndLength() {
-        check(CarBody.LOCOMOTIVE, CarBody.LENGTH);
-        check(CarBody.ELECTRIC, CarBody.LENGTH);
-        check(CarBody.CARGO, CarBody.LENGTH);
-        check(CarBody.FLUID, CarBody.LENGTH);
+        check(CarBody.LOCOMOTIVE, 2.8);
+        check(CarBody.ELECTRIC, 2.8);
+        check(CarBody.CARGO, 1.8);
+        check(CarBody.FLUID, 1.8);
     }
 
     @Test
-    void coupledCarsStandTwoBlocksApartWithAGapBetweenTheirBodies() {
-        assertEquals(2.0, Locomotive.LENGTH);
+    void aLocomotiveIsThreeBlocksAndACargoCarTwoWithAGapAtEachCoupling() {
+        assertEquals(3.0, Locomotive.LENGTH);
         assertEquals(2.0, CargoCar.LENGTH);
-        assertTrue(CarBody.LENGTH < CarBody.PITCH);
+        assertEquals(2.8, CarBody.LOCOMOTIVE.length(), 1e-9);
+        assertEquals(1.8, CarBody.CARGO.length(), 1e-9);
     }
 
     private static void check(CarBody body, double length) {

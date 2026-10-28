@@ -316,6 +316,21 @@ class TrainTest {
     }
 
     @Test
+    void itsCarsAreSpacedByTheirOwnLengths() {
+        Locomotive front = Locomotive.burner();
+        Locomotive second = Locomotive.burner();
+        CargoCar cargo = CargoCar.create();
+        CargoCar last = CargoCar.create();
+        Train train = Train.of(new Place(network.get(A, B), B, 2.0), List.of(front, second, cargo, last));
+        // Middle to middle: 3 between two Locomotives, 2.5 from a Locomotive to a Cargo car, 2 between
+        // two Cargo cars.
+        assertEquals(3.0, train.offset(second), EPS);
+        assertEquals(5.5, train.offset(cargo), EPS);
+        assertEquals(7.5, train.offset(last), EPS);
+        assertEquals(7.5, train.length(), EPS);
+    }
+
+    @Test
     void itsCarsAreSpacedBehindTheHeadAlongTheLine() {
         Train train = pair(network.get(B, C), C, 19.5);
         Car second = train.cars().get(1);
@@ -480,7 +495,7 @@ class TrainTest {
         CargoCar cargo = CargoCar.create();
         Train coupled = mid.coupled(network, Train.End.FRONT, cargo, false);
         assertEquals(cargo, coupled.cars().getFirst());
-        assertEquals(10.0 - 2.0, coupled.head().toFront(), EPS);
+        assertEquals(10.0 - 2.5, coupled.head().toFront(), EPS);
         assertEquals(10.0, coupled.placeOf(network, mid.cars().getFirst()).toFront(), EPS, "the old first car stays put");
     }
 
@@ -596,8 +611,8 @@ class TrainTest {
 
     @Test
     void aCarCouplesOnlyWhereItsWholeBodyIsOnTheLine() {
-        // Its back 2 + 1 from A: a 2-block car fits behind it, a hair more does not.
-        Train train = train(network.get(A, B), B, 20.0 - 3.0);
+        // Its back 1.5 + 2 from A: a 2-block car fits behind it, a hair more does not.
+        Train train = train(network.get(A, B), B, 20.0 - 3.5);
         assertTrue(train.slot(network, Train.End.BACK, 2.0) != null);
         assertEquals(null, train.slot(network, Train.End.BACK, 2.01));
     }

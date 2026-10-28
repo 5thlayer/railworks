@@ -17,8 +17,8 @@ railworks span ~15 ~ ~-6 ~21 ~ ~-6
 railworks span ~21 ~ ~-6 ~25 ~ ~-6
 fill ~4 ~ ~-7 ~4 ~1 ~-7 minecraft:stone_bricks
 setblock ~4 ~2 ~-7 railworks:station{name:"Diggings"}
-fill ~24 ~ ~-5 ~24 ~1 ~-5 minecraft:stone_bricks
-setblock ~24 ~2 ~-5 railworks:station{name:"Foundry"}
+fill ~25 ~ ~-5 ~25 ~1 ~-5 minecraft:stone_bricks
+setblock ~25 ~2 ~-5 railworks:station{name:"Foundry"}
 fill ~7 ~ ~-5 ~7 ~1 ~-5 minecraft:stone_bricks
 setblock ~7 ~2 ~-5 railworks:hatch[mode=provider]
 railworks hatch ~7 ~2 ~-5 provider minecraft:raw_copper 4
