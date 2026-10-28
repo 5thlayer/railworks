@@ -11,8 +11,8 @@ import java.util.List;
  * skirts down both sides of the web, the chests set into a Cargo car's sides, and a Fluid car's tank. Coordinates are
  * the car's own: x across, y up from the floor's underside on the flange's top, z along the car with
  * +z the end it faces. Placeholder art, so {@code CarRenderer} only paints these and nothing else
- * decides their sizes. It also holds the car's size and where the Locomotive's rider sits in it, so
- * the boxes, the seat and the rider's view out of the cab are checked together. A body is
+ * decides their sizes. It also holds the car's size and where the Locomotive's Driver sits in it and
+ * its Rider stands, so the boxes, the seats and the Driver's view out of the cab are checked together. A body is
  * {@link #length()} long, from {@code -length / 2} to {@code length / 2} along z.
  *
  * <p>Where two boxes meet, one stops a little short of the other's faces or reaches into it, so no
@@ -100,13 +100,6 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
     }
 
     /**
-     * Where the Locomotive's rider sits, in the cab, above the floor's underside and forward of the
-     * middle. Only a Locomotive is ridden.
-     */
-    public static final double SEAT_Y = 1.2;
-    public static final double SEAT_Z = 0.8;
-
-    /**
      * A seated player's eye above the seat: their 1.62 eye height less the 0.6 they sit below a
      * seat ({@code Avatar.DEFAULT_VEHICLE_ATTACHMENT}).
      */
@@ -126,15 +119,28 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
     private static final double LOCOMOTIVE_LENGTH = Locomotive.LENGTH - GAP;
     private static final double CAB_BACK = -0.4;
     private static final double BAY_WALL_TOP = 1.3;
+    /** The top of every car's floor, over its underside. */
+    private static final double FLOOR_TOP = 0.7;
+
+    /**
+     * Where the Locomotive's Driver sits, in the cab, above the floor's underside and forward of the
+     * middle. Only a Locomotive is ridden.
+     */
+    public static final Point CAB_SEAT = new Point(0.0, 1.2, 0.8);
+    /**
+     * Where the Locomotive's Rider stands, mob or player: on the bay's floor, not raised to a seat,
+     * halfway between the cab's back and the car's back end.
+     */
+    public static final Point BAY_SPOT = new Point(0.0, FLOOR_TOP, (CAB_BACK - LOCOMOTIVE_LENGTH / 2.0) / 2.0);
 
     public static final CarBody LOCOMOTIVE = locomotive();
     public static final CarBody ELECTRIC = electric();
     public static final CarBody CARGO = cargo();
     public static final CarBody FLUID = fluid();
 
-    /** Where the Locomotive's rider's eye is. */
+    /** Where the Locomotive's Driver's eye is. */
     public static Point eye() {
-        return new Point(0.0, SEAT_Y + EYE_ABOVE_SEAT, SEAT_Z);
+        return new Point(CAB_SEAT.x(), CAB_SEAT.y() + EYE_ABOVE_SEAT, CAB_SEAT.z());
     }
 
     /** What every car shares: the skirts and the floor, along a body {@code length} long. */
@@ -142,7 +148,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         double half = length / 2.0;
         List<Part> parts = new ArrayList<>();
         sides(parts, new Part(Paint.DARK_RUST, 0.17, 0.0, -half + 0.01, 0.49, 0.62, half - 0.01));
-        parts.add(new Part(Paint.SHELL, -0.5, 0.55, -half, 0.5, 0.7, half));
+        parts.add(new Part(Paint.SHELL, -0.5, 0.55, -half, 0.5, FLOOR_TOP, half));
         return parts;
     }
 

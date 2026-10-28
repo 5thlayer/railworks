@@ -40,6 +40,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -68,7 +69,8 @@ import org.jspecify.annotations.Nullable;
  * of view stops where it would have in view. How the level decides what to show is {@code ViewsTest}'s.
  * These tests share the {@code far_} prefix, but for a Fluid car's (#10), whose names share
  * {@code fluid_} with {@code FluidTests}: a Train carrying fluid out of view, and a Fluid car's tank
- * kept while its view is gone.
+ * kept while its view is gone; and for a mob Rider seated again in the bay beside a Driver, which
+ * shares {@code loco_seats_} with {@code LocomotiveSeatTests}.
  */
 final class FarAwayTests {
 
@@ -113,6 +115,8 @@ final class FarAwayTests {
                 FarAwayTests::runsItsJob);
         tests.testOnItsOwn("far_a_rider_is_carried_out_of_view_seated", 3_000, FarAwayTests::carriesRider);
         tests.testOnItsOwn("far_a_mob_riding_a_car_whose_view_goes_comes_back_seated", 1_200, FarAwayTests::mobRidesOn);
+        tests.testOnItsOwn("loco_seats_a_mob_rider_whose_view_goes_comes_back_in_the_bay", 1_200,
+                FarAwayTests::mobBackInTheBay);
         tests.testOnItsOwn("far_a_train_whose_span_is_cut_out_of_view_comes_off_the_rail_as_its_chunk_loads", 1_200,
                 FarAwayTests::cutOutOfView);
         tests.testOnItsOwn("far_a_manual_train_coasts_out_of_view_and_stops_where_it_would_in_view", 2_000,
@@ -385,6 +389,73 @@ final class FarAwayTests {
                     clearAway(helper, train);
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * A Locomotive standing on the far stretch, its chunk in view, carries a Driver in its cab and a pig
+     * that got in after them in its bay. The Driver gets off and the view goes, the pig kept in the
+     * car's record; brought back, the pig stands in the bay again, and a player boarding takes the cab.
+     */
+    private static void mobBackInTheBay(GameTestHelper helper) {
+        RailNetwork network = line(helper);
+        Locomotive car = Locomotive.burner();
+        Train train = standing(helper, network, car);
+        inView(helper, YARD, true);
+        UUID[] pig = new UUID[1];
+        ServerPlayer[] players = new ServerPlayer[2];
+        helper.startSequence()
+                .thenWaitUntil(() -> expectInView(helper, train))
+                .thenExecute(() -> {
+                    LocomotiveEntity view = (LocomotiveEntity) LevelRails.of(helper.getLevel()).view(car);
+                    players[0] = LocomotiveTests.board(helper, view);
+                    Pig mob = EntityType.PIG.create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
+                    mob.snapTo(view.position());
+                    helper.getLevel().addFreshEntity(mob);
+                    helper.assertTrue(mob.startRiding(view), "the pig could not get in behind the Driver");
+                    pig[0] = mob.getUUID();
+                    expectInBay(helper, view, mob);
+                    players[0].setShiftKeyDown(true);
+                    players[0].rideTick();
+                    helper.assertTrue(players[0].getVehicle() == null && mob.getVehicle() == view, "the Driver did not get off alone");
+                    inView(helper, YARD, false);
+                })
+                .thenWaitUntil(() -> {
+                    expectOutOfView(helper, train);
+                    helper.assertTrue(helper.getLevel().getEntity(pig[0]) == null, "the pig stayed in the world without its car");
+                    helper.assertTrue(riderKept(helper, car), "the car's record keeps no rider");
+                })
+                .thenExecute(() -> inView(helper, YARD, true))
+                .thenWaitUntil(() -> {
+                    CarEntity view = LevelRails.of(helper.getLevel()).view(car);
+                    helper.assertTrue(view != null && view.getPassengers().size() == 1
+                                    && view.getFirstPassenger() instanceof Pig back && back.getUUID().equals(pig[0]),
+                            "the pig is not seated in the car's view: " + (view == null ? "no view" : view.getPassengers()));
+                })
+                .thenExecute(() -> {
+                    LocomotiveEntity view = (LocomotiveEntity) LevelRails.of(helper.getLevel()).view(car);
+                    Entity back = view.getFirstPassenger();
+                    expectInBay(helper, view, back);
+                    players[1] = LocomotiveTests.board(helper, view);
+                    players[1].rideTick();
+                    Vec3 cab = view.position().add(new Vec3(0.0, 0.6, 0.8).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
+                    helper.assertTrue(players[1].position().distanceTo(cab) < 1e-3,
+                            "the player boarding after the pig came back is at " + players[1].position().subtract(view.position())
+                                    + " from the car's middle, not in the cab");
+                    players[1].stopRiding();
+                    back.discard();
+                    inView(helper, YARD, false);
+                    clearAway(helper, train);
+                })
+                .thenSucceed();
+    }
+
+    /** {@code mob} stands in {@code view}'s bay, 0.9 behind its middle on the floor, 0.7 up, facing the car's way. */
+    private static void expectInBay(GameTestHelper helper, CarEntity view, Entity mob) {
+        view.positionRider(mob);
+        Vec3 bay = view.position().add(new Vec3(0.0, 0.7, -0.9).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
+        helper.assertTrue(mob.position().distanceTo(bay) < 1e-3 && Math.abs(Mth.wrapDegrees(mob.getYRot() - view.getYRot())) < 1e-3,
+                "the pig is at " + mob.position().subtract(view.position()) + " from the car's middle facing " + mob.getYRot()
+                        + ", not in the bay facing the car's " + view.getYRot());
     }
 
     /** Whether {@code car}'s record keeps a mob riding it. */

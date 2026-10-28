@@ -115,6 +115,12 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
             SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Byte> DATA_LINKS =
             SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.BYTE);
+    /** The entity id of the player in the cab, the Driver, or {@link #NO_DRIVER}: the server's say, so a client seats them alike. */
+    private static final EntityDataAccessor<Integer> DATA_CAB =
+            SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.INT);
+    private static final int NO_DRIVER = -1;
+    /** How far beyond the car's side, past half the one getting out, they are set down. */
+    private static final double STEP_OUT = 0.05;
 
     /** Steps the client's car toward each position the server sends, as a boat's does, rather than snapping to it. */
     private final InterpolationHandler interpolation = new InterpolationHandler(this, 3);
@@ -367,7 +373,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (player.isSecondaryUseActive()) {
             return openMenu(player);
         }
-        if (held.is(Items.LEAD) && getFirstPassenger() instanceof Mob mob && mob instanceof Leashable leashable
+        if (held.is(Items.LEAD) && mobRider() instanceof Mob mob && mob instanceof Leashable leashable
                 && leashable.canBeLeashed()) {
             if (!level().isClientSide()) {
                 leadOut(player, held, mob, leashable);
@@ -378,7 +384,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (used != InteractionResult.PASS) {
             return used;
         }
-        if (canAddPassenger(player)) {
+        // A led mob goes in the bay, and only there; its leader boards once it is in, or once it cannot be.
+        if (bayFree()) {
             Mob led = ledMob(player);
             if (led != null) {
                 if (!level().isClientSide()) {
@@ -490,39 +497,117 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return false;
     }
 
+    // ---- the seats ----
+
+    /**
+     * Two seats: the cab, which only a player takes, and the bay behind it, which one mob or a second
+     * player takes. A player takes the cab while it is free and the bay after; a mob takes the bay.
+     */
     @Override
     protected boolean canAddPassenger(Entity passenger) {
-        return rideable() && getPassengers().isEmpty();
+        return rideable() && (passenger instanceof Player && driver() == null || bayFree());
+    }
+
+    /** The player in the cab, who drives; null for none. Never anyone else, whoever boarded first. */
+    public @Nullable Player driver() {
+        int id = entityData.get(DATA_CAB);
+        for (Entity passenger : getPassengers()) {
+            if (passenger.getId() == id && passenger instanceof Player player) {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    /** Whether nobody stands in the bay: no passenger but the Driver. */
+    private boolean bayFree() {
+        Player driver = driver();
+        return getPassengers().stream().allMatch(passenger -> passenger == driver);
+    }
+
+    /** Whether {@code passenger} sits in the cab, or got out of it, rather than the bay. */
+    private boolean inCab(Entity passenger) {
+        return passenger.getId() == entityData.get(DATA_CAB);
+    }
+
+    /** Whether {@code passenger} rides in a car's bay: what a client asks to draw them standing. */
+    public static boolean standsInBay(Entity passenger) {
+        return passenger.getVehicle() instanceof CarEntity car && !car.inCab(passenger);
     }
 
     /**
-     * The seat, in the cab forward of the car's middle, stands square to the car's floor, so a rider
+     * The cab's seat, forward of the car's middle, or the spot on the bay's floor behind it, feet on
+     * the floor whatever the passenger sits on. Both stand square to the car's floor, so a passenger
      * leans back on a climb and forward on a descent.
      */
     @Override
     protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
-        Vec3 seat = new Vec3(0.0, CarBody.SEAT_Y, CarBody.SEAT_Z);
-        return seat.xRot(-getXRot() * Mth.DEG_TO_RAD).yRot(-getYRot() * Mth.DEG_TO_RAD);
+        if (inCab(passenger)) {
+            return turned(CarBody.CAB_SEAT);
+        }
+        return turned(CarBody.BAY_SPOT).add(passenger.getVehicleAttachmentPoint(this));
+    }
+
+    /** {@code point}, in the car's own coordinates, turned as the car is. */
+    private Vec3 turned(CarBody.Point point) {
+        return new Vec3(point.x(), point.y(), point.z()).xRot(-getXRot() * Mth.DEG_TO_RAD).yRot(-getYRot() * Mth.DEG_TO_RAD);
+    }
+
+    /** A mob in the bay faces the way the car does; a player looks where they like. */
+    @Override
+    protected void positionRider(Entity passenger, MoveFunction moveFunction) {
+        super.positionRider(passenger, moveFunction);
+        if (!(passenger instanceof Player) && !inCab(passenger)) {
+            passenger.setYRot(getYRot());
+            passenger.setYHeadRot(getYRot());
+            if (passenger instanceof LivingEntity living) {
+                living.yBodyRot = getYRot();
+                living.yBodyRotO = getYRot();
+            }
+        }
     }
 
     // No getControllingPassenger: the server drives the car, and a controlling passenger would make
     // it client-authoritative, so the client would drop the server's positions for it and the rider
     // would not move until they got off.
 
-    /** Off the car onto the first floor below it, since it rides well above the ground. */
+    /**
+     * Out beside their own seat, along the car, onto the first open floor below the car's side: the side
+     * they look to first, then the other, then below the car's middle, since it rides well above the
+     * ground.
+     */
     @Override
     public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
-        BlockPos.MutableBlockPos probe = BlockPos.containing(getX(), getY(), getZ()).mutable();
+        CarBody.Point seat = inCab(passenger) ? CarBody.CAB_SEAT : CarBody.BAY_SPOT;
+        Vec3 along = Vec3.directionFromRotation(0.0F, getYRot());
+        Vec3 right = new Vec3(-along.z, 0.0, along.x);
+        // Toward the side the passenger looks; a mob faces ahead, and takes the right first.
+        int first = Vec3.directionFromRotation(0.0F, passenger.getYRot()).dot(right) >= -1e-6 ? 1 : -1;
+        Vec3 beside = position().add(along.scale(seat.z()));
+        double out = CarBody.WIDTH / 2.0 + passenger.getBbWidth() / 2.0 + STEP_OUT;
+        for (int side : new int[] {first, -first}) {
+            Vec3 spot = floorBelow(passenger, beside.add(right.scale(side * out)));
+            if (spot != null) {
+                return spot;
+            }
+        }
+        Vec3 spot = floorBelow(passenger, position());
+        return spot != null ? spot : super.getDismountLocationForPassenger(passenger);
+    }
+
+    /** The first open floor {@code passenger} fits on below the car's height at {@code from}, or null for none near. */
+    private @Nullable Vec3 floorBelow(LivingEntity passenger, Vec3 from) {
+        BlockPos.MutableBlockPos probe = BlockPos.containing(from.x, getY(), from.z).mutable();
         for (int drop = 0; drop < 24 && !level().isOutsideBuildHeight(probe); drop++) {
             double floor = level().getBlockFloorHeight(probe);
-            Vec3 spot = new Vec3(getX(), probe.getY() + floor, getZ());
+            Vec3 spot = new Vec3(from.x, probe.getY() + floor, from.z);
             if (Double.isFinite(floor) && level().noCollision(passenger, passenger.getBoundingBox().move(
                     spot.subtract(passenger.position())))) {
                 return spot;
             }
             probe.move(0, -1, 0);
         }
-        return super.getDismountLocationForPassenger(passenger);
+        return null;
     }
 
     // ---- logging out ----
@@ -582,7 +667,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         drop();
     }
 
-    /** The mob riding it, not a player; null for none. */
+    /** The mob riding it, in the bay, not a player; null for none. */
     private @Nullable Entity mobRider() {
         return getPassengers().stream().filter(passenger -> !(passenger instanceof Player)).findFirst().orElse(null);
     }
@@ -609,12 +694,21 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      */
     @Override
     protected void addPassenger(Entity passenger) {
+        // The server seats them, a player in the cab while it is free; a client follows its say.
+        boolean driving = passenger instanceof Player && driver() == null && !level().isClientSide();
         super.addPassenger(passenger);
+        if (driving) {
+            entityData.set(DATA_CAB, passenger.getId());
+        }
         if (!(passenger instanceof Player) && level() instanceof ServerLevel server) {
             setRider(server, saved(passenger));
         }
     }
 
+    /**
+     * Nobody moves up a seat: the cab stays empty until a player boards into it. The cab keeps the id
+     * of the one who left it, who gets out beside it; with them gone, {@link #driver()} finds nobody.
+     */
     @Override
     protected void removePassenger(Entity passenger) {
         super.removePassenger(passenger);
@@ -638,7 +732,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         }
     }
 
-    /** Seats again the mob its car's record says rode it out of view, as the view comes back. */
+    /** Seats again, in the bay, the mob its car's record says rode it out of view, as the view comes back. */
     void seatRider(ServerLevel level) {
         Entity rider = takeRider(level, position());
         if (rider != null) {
@@ -817,6 +911,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         entityData.define(DATA_TO_FRONT, 0.0F);
         entityData.define(DATA_SPEED, 0.0F);
         entityData.define(DATA_LINKS, (byte) 0);
+        entityData.define(DATA_CAB, NO_DRIVER);
     }
 
     /** Its car's id; the Train is saved once, with the level's {@link LevelRails}. */
