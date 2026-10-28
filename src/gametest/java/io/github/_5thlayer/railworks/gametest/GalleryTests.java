@@ -18,6 +18,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Train;
@@ -29,6 +30,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -40,9 +42,9 @@ import net.minecraft.world.phys.Vec3;
  * strung and not joined. Beyond the build, the coupling scene's sign, clicked, builds it again,
  * leaving one Train and nothing loose, and the two logistics scenes are built working: each
  * requester's chest gets what it asks for, as the refuel scene's does once its dry Train is fuelled,
- * and the charge scene's once its Train is charged, by a Creative Charger and by a Charger its Burner
- * Generator feeds,
- * and the far-away scene's Train fetches ore from its far end out of view. How a Train plans and runs its jobs is the mechanics' own
+ * the charge scene's once its Train is charged, by a Creative Charger and by a Charger its Burner
+ * Generator feeds, the far-away scene's Train fetches ore from its far end out of view, and the Fluid
+ * car scene's carries its lava across. How a Train plans and runs its jobs is the mechanics' own
  * game tests' to check, never the Gallery's. Each test turns the pack on, which reloads the server's
  * data, and off again, passing or failing, so each runs in a batch of its own.
  */
@@ -63,6 +65,11 @@ final class GalleryTests {
     private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);
     private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(22, 0, -7);
     private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
+    /** The Fluid car scene's requester Fluid hatch beside Smelter's first car spot, from where it is run. */
+    private static final BlockPos FLUID_REQUESTER = new BlockPos(22, 2, -7);
+    /** The buckets of lava the Fluid car scene's requester asks for, half what its provider holds once built. */
+    private static final int FLUID_BUCKETS = 16;
+    private static final int BUCKET = (int) Logistics.MILLIBUCKETS_PER_BUCKET;
     /** The refuel scene's provider of coal beside Mine's leading car's place, from where it is run. */
     private static final BlockPos LEADING_FUEL = new BlockPos(5, 2, -5);
     /** The charge scene's Creative Charger beside Mine's leading car's place, and the Charger by Smelter fed by its Burner Generator, from where it is run. */
@@ -103,7 +110,8 @@ final class GalleryTests {
                 new Scene("flyover", HIGH_LINE.getLast(), pylon),
                 new Scene("refuel", LEADING_FUEL, RailworksRegistries.HATCH.get()),
                 new Scene("charge", CREATIVE_CHARGER, RailworksRegistries.CREATIVE_CHARGER.get()),
-                new Scene("far_away", PROVIDER, RailworksRegistries.HATCH.get()));
+                new Scene("far_away", PROVIDER, RailworksRegistries.HATCH.get()),
+                new Scene("fluid", PROVIDER, RailworksRegistries.FLUID_HATCH.get()));
     }
 
     static void register(RailworksGameTests.Registrar tests) {
@@ -117,6 +125,8 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::refuelDelivers);
         tests.testOnItsOwn("electric_the_gallery_charge_scene_charges_its_train_at_both_stations_and_it_delivers",
                 GalleryCheck.TICKS, GalleryTests::chargeDelivers);
+        tests.testOnItsOwn("fluid_the_gallery_scene_carries_its_lava_to_the_requester",
+                GalleryCheck.TICKS, GalleryTests::fluidDelivers);
         // Its Train runs out 240 blocks and back, after the scene is built twice.
         tests.testOnItsOwn("far_the_gallery_scene_brings_ore_back_from_its_far_end_out_of_view",
                 3 * GalleryCheck.TICKS, GalleryTests::farAwayDelivers);
@@ -214,6 +224,20 @@ final class GalleryTests {
         GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "refuel")))
                 .thenWaitUntil(() -> holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE))).thenSucceed();
+    }
+
+    /** The Fluid car scene: its Train carries the 16 buckets of lava Smelter's requester asks for from Mine's 32. */
+    private static void fluidDelivers(GameTestHelper helper) {
+        var at = helper.absolutePos(ORIGIN);
+        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+                .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "fluid")))
+                .thenWaitUntil(() -> {
+                    var requester = LevelHatches.of(helper.getLevel()).at(at.offset(FLUID_REQUESTER)).orElseThrow();
+                    var provider = LevelHatches.of(helper.getLevel()).at(at.offset(PROVIDER)).orElseThrow();
+                    helper.assertTrue(requester.tank().fluid().is(Fluids.LAVA) && requester.tank().amount() == FLUID_BUCKETS * BUCKET
+                                    && provider.tank().amount() == FLUID_BUCKETS * BUCKET,
+                            "the requester holds " + requester.tank().amount() + " of lava and the provider " + provider.tank().amount());
+                })).thenSucceed();
     }
 
     /**

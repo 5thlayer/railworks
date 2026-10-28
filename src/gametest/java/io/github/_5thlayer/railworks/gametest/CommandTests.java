@@ -156,7 +156,7 @@ final class CommandTests {
         }
     }
 
-    private static void refused(GameTestHelper helper, String command, BlockPos... at) {
+    static void refused(GameTestHelper helper, String command, BlockPos... at) {
         try {
             dispatch(helper, command, at);
         } catch (CommandSyntaxException e) {

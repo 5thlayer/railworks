@@ -15,14 +15,18 @@ import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.ResourceArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
@@ -44,6 +48,11 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  *       {@code requester}, has the requester hatch there ask for that many, a stack at a time as a
  *       player's uses of the item do, refused past its slots. A hatch set by a command a moment
  *       before counts; a Fluid hatch is refused as the other kind.</li>
+ *   <li>{@code /railworks fluid_hatch <pos> provider <fluid> <buckets>} pours {@code buckets}
+ *       buckets of {@code fluid} into the provider Fluid hatch at {@code pos}, refused without room
+ *       for them all; with {@code requester}, has the requester Fluid hatch there ask for that many,
+ *       eight buckets at a time as a player's uses of a filled bucket do, so rounded up to the next
+ *       eight, and refused past its tank. A hatch of items is refused as the other kind.</li>
  *   <li>{@code /railworks automatic <locomotive>} switches the Locomotive's Train to automatic, as
  *       its menu's toggle does, so it takes jobs between hatches (ADR 0008).</li>
  * </ul>
@@ -73,6 +82,8 @@ public final class RailworksCommands {
             new DynamicCommandExceptionType(pos -> Component.translatable("commands.railworks.hatch.no_room", pos));
     private static final DynamicCommandExceptionType TOO_MANY_STACKS =
             new DynamicCommandExceptionType(slots -> Component.translatable("commands.railworks.hatch.too_many_stacks", slots));
+    private static final DynamicCommandExceptionType TOO_MANY_BUCKETS =
+            new DynamicCommandExceptionType(buckets -> Component.translatable("commands.railworks.fluid_hatch.too_many_buckets", buckets));
     private static final SimpleCommandExceptionType NOT_A_LOCOMOTIVE =
             new SimpleCommandExceptionType(Component.translatable("commands.railworks.automatic.not_a_locomotive"));
 
@@ -99,6 +110,13 @@ public final class RailworksCommands {
                             .then(Commands.argument("stacks", IntegerArgumentType.integer(1))
                                     .executes(context -> hatch(context, mode)))));
         }
+        var fluidHatchAt = Commands.argument("pos", BlockPosArgument.blockPos());
+        for (HatchMode mode : HatchMode.values()) {
+            fluidHatchAt.then(Commands.literal(mode.getSerializedName())
+                    .then(Commands.argument("fluid", ResourceArgument.resource(event.getBuildContext(), Registries.FLUID))
+                            .then(Commands.argument("buckets", IntegerArgumentType.integer(1))
+                                    .executes(context -> fluidHatch(context, mode)))));
+        }
         event.getDispatcher().register(Commands.literal(Railworks.MOD_ID)
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("span")
@@ -107,6 +125,7 @@ public final class RailworksCommands {
                                         .executes(RailworksCommands::span))))
                 .then(car)
                 .then(Commands.literal("hatch").then(hatchAt))
+                .then(Commands.literal("fluid_hatch").then(fluidHatchAt))
                 .then(Commands.literal("automatic")
                         .then(Commands.argument("locomotive", EntityArgument.entity())
                                 .executes(RailworksCommands::automatic))));
@@ -202,6 +221,46 @@ public final class RailworksCommands {
             asked = hatch.ask(item).count();
         }
         return asked;
+    }
+
+    /** @return how many buckets the Fluid hatch holds more of it, or asks for */
+    private static int fluidHatch(CommandContext<CommandSourceStack> context, HatchMode mode) throws CommandSyntaxException {
+        ServerLevel level = context.getSource().getLevel();
+        BlockPos pos = BlockPosArgument.getLoadedBlockPos(context, "pos");
+        if (!(level.getBlockEntity(pos) instanceof HatchBlockEntity entity)) {
+            throw NOT_A_HATCH.create(pos.toShortString());
+        }
+        Hatches.Hatch hatch = entity.hatch().orElseThrow(() -> NOT_A_HATCH.create(pos.toShortString()));
+        if (hatch.mode() != mode || hatch.holds() != Goods.Kind.FLUID) {
+            throw WRONG_MODE.create(pos.toShortString());
+        }
+        Fluid fluid = ResourceArgument.getResource(context, "fluid", Registries.FLUID).value();
+        int buckets = IntegerArgumentType.getInteger(context, "buckets");
+        int readied;
+        if (mode == HatchMode.PROVIDER) {
+            int amount = Tank.capacityOf(buckets);
+            try (var transaction = Transaction.openRoot()) {
+                if (hatch.tank().insert(FluidResource.of(fluid), amount, transaction) < amount) {
+                    throw NO_ROOM.create(pos.toShortString());
+                }
+                transaction.commit();
+            }
+            readied = buckets;
+        } else {
+            int tank = hatch.tank().capacity() / Tank.capacityOf(1);
+            if (buckets > tank) {
+                throw TOO_MANY_BUCKETS.create(tank);
+            }
+            hatch.clearRequest();
+            readied = 0;
+            while (readied < buckets) {
+                readied = hatch.ask(fluid).count();
+            }
+        }
+        int told = readied;
+        context.getSource().sendSuccess(() -> Component.translatable("commands.railworks.fluid_hatch." + mode.getSerializedName(),
+                pos.toShortString(), told, Ware.of(fluid).name()), true);
+        return readied;
     }
 
     private static int automatic(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
