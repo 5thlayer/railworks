@@ -18,15 +18,15 @@ public final class ChargeSpec {
     public static final long DEFAULT_LOCOMOTIVE_CAPACITY = 10_000_000L;
     public static final long DEFAULT_CHARGER_RATE = 10_000L;
     public static final long DEFAULT_CHARGER_BUFFER = 10_000_000L;
-    public static final double DEFAULT_GENERATOR_KILOWATTS = LocomotiveSpec.POWER_WATTS / 1_000.0;
+    public static final double DEFAULT_BURNER_GENERATOR_KILOWATTS = LocomotiveSpec.POWER_WATTS / 1_000.0;
     /** How many ticks of its output a Burner Generator buffers. */
-    public static final int GENERATOR_BUFFER_TICKS = 10;
+    public static final int BURNER_GENERATOR_BUFFER_TICKS = 10;
 
     private static volatile long joulesPerFe = DEFAULT_JOULES_PER_FE;
     private static volatile long locomotiveCapacity = DEFAULT_LOCOMOTIVE_CAPACITY;
     private static volatile long chargerRate = DEFAULT_CHARGER_RATE;
     private static volatile long chargerBuffer = DEFAULT_CHARGER_BUFFER;
-    private static volatile double generatorWatts = LocomotiveSpec.POWER_WATTS;
+    private static volatile double burnerGeneratorWatts = LocomotiveSpec.POWER_WATTS;
 
     private ChargeSpec() {
     }
@@ -43,13 +43,13 @@ public final class ChargeSpec {
         ChargeSpec.locomotiveCapacity = locomotiveCapacity;
         ChargeSpec.chargerRate = chargerRate;
         ChargeSpec.chargerBuffer = chargerBuffer;
-        ChargeSpec.generatorWatts = generatorKilowatts * 1_000.0;
+        ChargeSpec.burnerGeneratorWatts = generatorKilowatts * 1_000.0;
     }
 
     /** Sets every number back to its default. */
     public static void reset() {
         configure(DEFAULT_JOULES_PER_FE, DEFAULT_LOCOMOTIVE_CAPACITY, DEFAULT_CHARGER_RATE, DEFAULT_CHARGER_BUFFER,
-                DEFAULT_GENERATOR_KILOWATTS);
+                DEFAULT_BURNER_GENERATOR_KILOWATTS);
     }
 
     /** What one FE is worth, in joules. */
@@ -73,18 +73,18 @@ public final class ChargeSpec {
     }
 
     /** What a Burner Generator burns each tick, in joules. */
-    public static long generatorJoulesPerTick() {
-        return Math.round(generatorWatts / LocomotiveSpec.TICKS_PER_SECOND);
+    public static long burnerGeneratorJoulesPerTick() {
+        return Math.round(burnerGeneratorWatts / LocomotiveSpec.TICKS_PER_SECOND);
     }
 
     /** How many FE a Burner Generator makes a tick, rounded down: what its buffer is sized by. */
-    public static long generatorFePerTick() {
-        return Math.max(1L, generatorJoulesPerTick() / joulesPerFe);
+    public static long burnerGeneratorFePerTick() {
+        return Math.max(1L, burnerGeneratorJoulesPerTick() / joulesPerFe);
     }
 
-    /** How many FE a Burner Generator buffers: {@link #GENERATOR_BUFFER_TICKS} ticks of its output. */
-    public static long generatorBuffer() {
-        return GENERATOR_BUFFER_TICKS * generatorFePerTick();
+    /** How many FE a Burner Generator buffers: {@link #BURNER_GENERATOR_BUFFER_TICKS} ticks of its output. */
+    public static long burnerGeneratorBuffer() {
+        return BURNER_GENERATOR_BUFFER_TICKS * burnerGeneratorFePerTick();
     }
 
     /** How many whole FE pay at least {@code joules}. */

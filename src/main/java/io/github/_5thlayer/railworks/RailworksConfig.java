@@ -37,7 +37,7 @@ public final class RailworksConfig {
     private static final ModConfigSpec.LongValue ELECTRIC_CAPACITY;
     private static final ModConfigSpec.LongValue CHARGER_RATE;
     private static final ModConfigSpec.LongValue CHARGER_BUFFER;
-    private static final ModConfigSpec.DoubleValue GENERATOR_KILOWATTS;
+    private static final ModConfigSpec.DoubleValue BURNER_GENERATOR_KILOWATTS;
     private static final ModConfigSpec.EnumValue<DriveSide> DRIVE_SIDE;
     private static final ModConfigSpec.IntValue PLATFORM_CARS;
     private static final ModConfigSpec.IntValue HATCH_SLOTS;
@@ -83,8 +83,8 @@ public final class RailworksConfig {
                 .defineInRange("chargerRate", ChargeSpec.DEFAULT_CHARGER_RATE, 1L, Integer.MAX_VALUE);
         CHARGER_BUFFER = builder.comment("How many FE a Charger buffers at most.")
                 .defineInRange("chargerBuffer", ChargeSpec.DEFAULT_CHARGER_BUFFER, 1L, Long.MAX_VALUE / 2);
-        GENERATOR_KILOWATTS = builder.comment("How hard a Burner Generator burns its fuel into FE, in kilowatts. 600 is the Burner Locomotive's full power, so coal lasts as long in either.")
-                .defineInRange("burnerGeneratorKilowatts", ChargeSpec.DEFAULT_GENERATOR_KILOWATTS, 1.0, 1_000_000.0);
+        BURNER_GENERATOR_KILOWATTS = builder.comment("How hard a Burner Generator burns its fuel into FE, in kilowatts. 600 is the Burner Locomotive's full power, so coal lasts as long in either.")
+                .defineInRange("burnerGeneratorKilowatts", ChargeSpec.DEFAULT_BURNER_GENERATOR_KILOWATTS, 1.0, 1_000_000.0);
         builder.pop();
         SPEC = builder.build();
     }
@@ -122,7 +122,7 @@ public final class RailworksConfig {
                     LOCOMOTIVE_BRAKING.get(), LOCOMOTIVE_FRICTION.get());
             LocomotiveSpec.configureFuel(LOCOMOTIVE_JOULES_PER_BURN_TICK.get());
             ChargeSpec.configure(JOULES_PER_FE.get(), ELECTRIC_CAPACITY.get(), CHARGER_RATE.get(), CHARGER_BUFFER.get(),
-                    GENERATOR_KILOWATTS.get());
+                    BURNER_GENERATOR_KILOWATTS.get());
             DriveSide.configure(DRIVE_SIDE.get());
             Platform.configure(PLATFORM_CARS.get());
             Hatches.configure(HATCH_SLOTS.get());

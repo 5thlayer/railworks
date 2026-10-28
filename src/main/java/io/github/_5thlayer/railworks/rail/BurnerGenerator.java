@@ -7,13 +7,13 @@ import java.util.function.LongSupplier;
 
 /**
  * A Burner Generator's burning: a {@link FuelBuffer} of joules, filled by lighting fuel as a Burner
- * Locomotive's is, burnt at {@link ChargeSpec#generatorJoulesPerTick()} into a small buffer of FE,
- * {@link ChargeSpec#generatorBuffer()} at most. It burns a tick only while that buffer has room for
+ * Locomotive's is, burnt at {@link ChargeSpec#burnerGeneratorJoulesPerTick()} into a small buffer of FE,
+ * {@link ChargeSpec#burnerGeneratorBuffer()} at most. It burns a tick only while that buffer has room for
  * the tick's FE, so no joule is lost, and keeps the joules short of a whole FE for the next tick.
  *
  * <p>Pure: no Minecraft types.
  */
-public final class Generator {
+public final class BurnerGenerator {
 
     private final FuelBuffer fuel = new FuelBuffer();
     /** FE made and not yet given away. */
@@ -37,7 +37,7 @@ public final class Generator {
 
     /** FE it holds at most. */
     public static long capacity() {
-        return ChargeSpec.generatorBuffer();
+        return ChargeSpec.burnerGeneratorBuffer();
     }
 
     /**
@@ -46,7 +46,7 @@ public final class Generator {
      * it, and banks them as FE. Whether it burnt.
      */
     public boolean tick(LongSupplier ignite) {
-        long perTick = ChargeSpec.generatorJoulesPerTick();
+        long perTick = ChargeSpec.burnerGeneratorJoulesPerTick();
         long perFe = ChargeSpec.joulesPerFe();
         if (stored + (joules + perTick) / perFe > capacity()) {
             return false;

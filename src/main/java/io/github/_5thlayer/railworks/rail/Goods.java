@@ -65,5 +65,5 @@ public interface Goods<I> {
      * Moves up to {@code most} FE from {@code from}'s buffer into {@code into}'s charge, as far as the
      * buffer holds it, a Creative Charger's never running out, and the charge has room; how many moved.
      */
-    long charge(Logistics.Charger from, Locomotive into, long most);
+    long giveCharge(Logistics.Charger from, Locomotive into, long most);
 }

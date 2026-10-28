@@ -69,6 +69,14 @@ public final class ChargerBlockEntity extends BlockEntity {
     }
 
     /**
+     * Its record, as {@link #charger()} makes it, while it stands: empty once it is broken, so a cable
+     * still holding its handler puts no record back where no Charger is.
+     */
+    private Optional<Chargers.Charger> standing() {
+        return isRemoved() ? Optional.empty() : charger();
+    }
+
+    /**
      * The insert-only handler over its record's buffer. What it took this tick is counted against the
      * Charger's rate, and both that count and the buffer roll back with a transaction.
      */
@@ -83,7 +91,7 @@ public final class ChargerBlockEntity extends BlockEntity {
 
         @Override
         public long getAmountAsLong() {
-            return charger().map(Chargers.Charger::shown).orElse(0L);
+            return standing().map(Chargers.Charger::shown).orElse(0L);
         }
 
         @Override
@@ -94,7 +102,7 @@ public final class ChargerBlockEntity extends BlockEntity {
         @Override
         public int insert(int amount, TransactionContext transaction) {
             TransferPreconditions.checkNonNegative(amount);
-            Chargers.Charger charger = charger().orElse(null);
+            Chargers.Charger charger = standing().orElse(null);
             if (charger == null || charger.creative() || level == null) {
                 return 0;
             }
@@ -120,19 +128,19 @@ public final class ChargerBlockEntity extends BlockEntity {
 
         @Override
         protected State createSnapshot() {
-            return new State(charger().map(Chargers.Charger::stored).orElse(0L), tick, taken);
+            return new State(standing().map(Chargers.Charger::stored).orElse(0L), tick, taken);
         }
 
         @Override
         protected void revertToSnapshot(State snapshot) {
-            charger().ifPresent(charger -> charger.setStored(snapshot.stored()));
+            standing().ifPresent(charger -> charger.setStored(snapshot.stored()));
             tick = snapshot.tick();
             taken = snapshot.taken();
         }
 
         @Override
         protected void onRootCommit(State originalState) {
-            charger().ifPresent(Chargers.Charger::changed);
+            standing().ifPresent(Chargers.Charger::changed);
         }
     }
 }

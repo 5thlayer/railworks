@@ -238,7 +238,7 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public long charge(Logistics.Charger from, Locomotive into, long most) {
+    public long giveCharge(Logistics.Charger from, Locomotive into, long most) {
         CarRecords.Contents record = record(into);
         Chargers.Charger charger = LevelChargers.of(level).at(new BlockPos(from.x(), from.y(), from.z())).orElse(null);
         if (record == null || charger == null) {
