@@ -191,10 +191,7 @@ public final class LocomotiveEntity extends CarEntity {
 
     /** Puts what fits of {@code stack} in its fuel slots, as fuel in hand fills them, and says how many went in. */
     int addFuel(ItemStack stack) {
-        int before = stack.getCount();
-        ItemStack left = stack.copy();
-        fillFuel(left);
-        return before - left.getCount();
+        return fit(stack, stack.getCount(), true);
     }
 
     // ---- using it ----
@@ -213,36 +210,44 @@ public final class LocomotiveEntity extends CarEntity {
 
     /** How many of {@code held} the fuel slots take: each holds the same fuel or nothing. */
     private int fuelRoomFor(ItemStack held) {
-        int room = 0;
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END; slot++) {
-            ItemStack in = cab.getItem(slot);
-            if (in.isEmpty()) {
-                room += held.getMaxStackSize();
-            } else if (ItemStack.isSameItemSameComponents(in, held)) {
-                room += in.getMaxStackSize() - in.getCount();
-            }
-        }
-        return room;
+        return fit(held, Integer.MAX_VALUE, false);
     }
 
-    /** Moves what fits of {@code held} into the fuel slots, those holding the same fuel first, then empty ones, and nowhere else in the cab. */
+    /** Moves what fits of {@code held} into the fuel slots, and nowhere else in the cab. */
     private void fillFuel(ItemStack held) {
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && !held.isEmpty(); slot++) {
-            ItemStack in = cab.getItem(slot);
-            if (!in.isEmpty() && ItemStack.isSameItemSameComponents(in, held)) {
-                int moved = Math.min(in.getMaxStackSize() - in.getCount(), held.getCount());
-                in.grow(moved);
-                held.shrink(moved);
+        held.shrink(fit(held, held.getCount(), true));
+    }
+
+    /**
+     * How many of up to {@code count} of {@code stack} fit in the fuel slots, those holding the same
+     * fuel first, then empty ones; put there when {@code apply}, {@code stack} itself left as it is.
+     */
+    private int fit(ItemStack stack, int count, boolean apply) {
+        int fitted = 0;
+        for (boolean same : new boolean[] {true, false}) {
+            for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && fitted < count; slot++) {
+                ItemStack in = cab.getItem(slot);
+                int moved;
+                if (same && !in.isEmpty() && ItemStack.isSameItemSameComponents(in, stack)) {
+                    moved = Math.min(in.getMaxStackSize() - in.getCount(), count - fitted);
+                    if (apply) {
+                        in.grow(moved);
+                    }
+                } else if (!same && in.isEmpty()) {
+                    moved = Math.min(stack.getMaxStackSize(), count - fitted);
+                    if (apply) {
+                        cab.setItem(slot, stack.copyWithCount(moved));
+                    }
+                } else {
+                    continue;
+                }
+                fitted += moved;
             }
         }
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && !held.isEmpty(); slot++) {
-            if (cab.getItem(slot).isEmpty()) {
-                int moved = Math.min(held.getMaxStackSize(), held.getCount());
-                cab.setItem(slot, held.copyWithCount(moved));
-                held.shrink(moved);
-            }
+        if (apply && fitted > 0) {
+            cab.setChanged();
         }
-        cab.setChanged();
+        return fitted;
     }
 
     /** The menu, from the inventory key while riding and from sneaking at the car. */

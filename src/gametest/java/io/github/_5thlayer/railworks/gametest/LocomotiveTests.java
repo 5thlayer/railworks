@@ -21,8 +21,14 @@ import io.github._5thlayer.railworks.rail.Span;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.inventory.ContainerInput;
@@ -30,16 +36,19 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * The Burner Locomotive through the item, the entity and a real player: placing it on a
- * Span the player looks along, the fuel slot, boarding and getting off, and driving. The drive's
- * numbers are {@code TrainTest}'s; what only a server can show is that the keys, the fuel slot
- * and the Rail reach the model and that the entity ends up where the model says. All of these tests
- * share the {@code locomotive_} prefix.
+ * Span the player looks along, the fuel slots, boarding and getting off, and driving. The drive's
+ * numbers are {@code TrainTest}'s; what only a server can show is that the keys, the fuel slots
+ * and the Rail reach the model and that the entity ends up where the model says. These tests share
+ * the {@code locomotive_} prefix, but for the four fuel slots' (#53), which share {@code refuel_}
+ * with the refuelling tests.
  */
 final class LocomotiveTests {
 
@@ -60,7 +69,7 @@ final class LocomotiveTests {
         tests.test("locomotive_plan_is_refused_off_a_span", 20, LocomotiveTests::refusedOffSpan);
         tests.test("locomotive_plan_is_refused_where_the_car_would_sit_in_a_block", 20, LocomotiveTests::refusedBlocked);
         tests.test("locomotive_plan_is_refused_on_a_span_another_holds", 20, LocomotiveTests::refusedTaken);
-        tests.test("locomotive_fuel_goes_in_its_four_slots_the_same_fuels_first", 20, LocomotiveTests::fuelSlot);
+        tests.test("refuel_fuel_in_hand_goes_in_the_four_slots_the_same_fuels_first", 20, LocomotiveTests::fuelSlot);
         tests.test("locomotive_is_boarded_by_using_it_and_left_by_sneaking", 20, LocomotiveTests::boardsAndLeaves);
         tests.test("locomotive_sneaking_at_the_car_opens_its_menu", 20, LocomotiveTests::sneakOpensMenu);
         tests.test("locomotive_the_inventory_key_opens_the_menu_while_riding", 20, LocomotiveTests::inventoryKeyOpensMenu);
@@ -74,8 +83,9 @@ final class LocomotiveTests {
         tests.test("locomotive_comes_off_the_rail_when_its_span_is_cut", 20, LocomotiveTests::derails);
         tests.test("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
         tests.test("locomotive_is_saved_with_its_place_speed_and_fuel", 20, LocomotiveTests::saves);
-        tests.test("locomotive_fuel_slots_keep_their_order_across_a_save", 20, LocomotiveTests::savesSlotOrder);
-        tests.test("locomotive_menu_fills_any_fuel_slot_and_the_first_holding_fuel_burns_first", 20, LocomotiveTests::burnsInOrder);
+        tests.test("refuel_the_fuel_slots_keep_their_order_across_a_save", 20, LocomotiveTests::savesSlotOrder);
+        tests.test("refuel_a_cab_saved_with_one_fuel_slot_loads_into_the_first", 20, LocomotiveTests::loadsOneSlotSave);
+        tests.test("refuel_the_menu_fills_any_fuel_slot_and_the_first_holding_fuel_burns_first", 20, LocomotiveTests::burnsInOrder);
         tests.test("locomotive_saved_before_trains_had_cars_loads_in_place", 20, LocomotiveTests::loadsLegacySave);
         tests.test("locomotive_cab_seats_its_rider_forward_facing_east", 20, helper -> seatsForward(helper, -45.0F, 1));
         tests.test("locomotive_cab_seats_its_rider_forward_facing_west", 20, helper -> seatsForward(helper, 45.0F, -1));
@@ -252,7 +262,7 @@ final class LocomotiveTests {
         LocomotiveEntity car = placed(helper);
         ServerPlayer driver = board(helper, car);
         // The inventory key sends OPEN_INVENTORY, which the server answers for a vehicle like this.
-        if (!(driver.getVehicle() instanceof net.minecraft.world.entity.HasCustomInventoryScreen vehicle)) {
+        if (!(driver.getVehicle() instanceof HasCustomInventoryScreen vehicle)) {
             helper.fail("the car does not answer the inventory key", STAND);
             return;
         }
@@ -496,13 +506,13 @@ final class LocomotiveTests {
         ServerPlayer driver = board(helper, car);
         press(driver, true, false);
         run(car, 20);
-        var output = net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(
-                net.minecraft.util.ProblemReporter.DISCARDING);
+        var output = TagValueOutput.createWithoutContext(
+                ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
         var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
-                net.minecraft.world.entity.EntitySpawnReason.LOAD);
-        reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
-                net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+                EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(
+                ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
         var was = car.train();
         var now = reloaded.train();
         if (now == null || reloaded.locomotive() == null || !now.head().equals(was.head()) || now.speed() != was.speed()
@@ -520,15 +530,32 @@ final class LocomotiveTests {
         putInSlot(opened, 1, new ItemStack(Items.COAL, 10));
         putInSlot(opened, 2, new ItemStack(Items.CHARCOAL, 5));
         putInSlot(opened, 3, new ItemStack(Items.COAL, 20));
-        var output = net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(
-                net.minecraft.util.ProblemReporter.DISCARDING);
+        var output = TagValueOutput.createWithoutContext(
+                ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
         var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
-                net.minecraft.world.entity.EntitySpawnReason.LOAD);
-        reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
-                net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+                EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(
+                ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
         expectSlots(helper, reloaded, List.of(ItemStack.EMPTY, new ItemStack(Items.COAL, 10),
                 new ItemStack(Items.CHARCOAL, 5), new ItemStack(Items.COAL, 20)));
+        helper.succeed();
+    }
+
+    private static void loadsOneSlotSave(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        var output = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
+        car.saveWithoutId(output);
+        CompoundTag tag = output.buildResult();
+        // The cab as a build with one fuel slot saved it: vanilla's item list, its stacks only.
+        SimpleContainer oneSlot = new SimpleContainer(1);
+        oneSlot.setItem(0, new ItemStack(Items.COAL, 7));
+        var old = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
+        oneSlot.storeAsItemList(old.list("cab", ItemStack.OPTIONAL_CODEC));
+        tag.put("cab", old.buildResult().get("cab"));
+        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
+        expectSlots(helper, reloaded, List.of(new ItemStack(Items.COAL, 7), ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY));
         helper.succeed();
     }
 
@@ -571,19 +598,19 @@ final class LocomotiveTests {
         ServerPlayer driver = board(helper, car);
         press(driver, true, false);
         run(car, 20);
-        var output = net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(
-                net.minecraft.util.ProblemReporter.DISCARDING);
+        var output = TagValueOutput.createWithoutContext(
+                ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
         // The entity as a world saved before Trains had cars holds it: the Locomotive was the Train,
         // saved with the entity and not with the level.
         var tag = output.buildResult();
         tag.remove("car_id");
         Place head = car.train().head();
-        var span = new net.minecraft.nbt.CompoundTag();
+        var span = new CompoundTag();
         span.put("a", arm(head.span().a()));
         span.put("b", arm(head.span().b()));
         span.putInt("cost", head.span().cost());
-        var locomotive = new net.minecraft.nbt.CompoundTag();
+        var locomotive = new CompoundTag();
         locomotive.put("span", span);
         locomotive.put("front", arm(head.front()));
         locomotive.putDouble("to_front", head.toFront());
@@ -592,9 +619,9 @@ final class LocomotiveTests {
         locomotive.putLong("last_lit", car.locomotive().fuel().lastLitJoules());
         tag.put("locomotive", locomotive);
         var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
-                net.minecraft.world.entity.EntitySpawnReason.LOAD);
-        reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
-                net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
+                EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(
+                ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
         var now = reloaded.train();
         if (now == null || reloaded.locomotive() == null || now.cars().size() != 1
                 || !now.head().equals(car.train().head()) || now.speed() != car.train().speed()
@@ -606,8 +633,8 @@ final class LocomotiveTests {
     }
 
     /** An Arm as the old record wrote it: its three coordinates. */
-    private static net.minecraft.nbt.IntArrayTag arm(Arm arm) {
-        return new net.minecraft.nbt.IntArrayTag(new int[] {arm.x(), arm.y(), arm.z()});
+    private static IntArrayTag arm(Arm arm) {
+        return new IntArrayTag(new int[] {arm.x(), arm.y(), arm.z()});
     }
 
     // ---- setup ----

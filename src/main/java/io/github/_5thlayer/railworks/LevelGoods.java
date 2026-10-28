@@ -158,7 +158,10 @@ final class LevelGoods implements Goods<Item> {
         return held;
     }
 
-    /** The room for the first stack of {@code item} that {@code from} holds, components and all, which {@link #refuel} moves first. */
+    /**
+     * The room for the first stack of {@code item} that {@code from} holds that the fuel slots take
+     * any of, components and all, which {@link #refuel} moves first.
+     */
     @Override
     public long fuelRoom(Logistics.Hatch<Item> from, Locomotive locomotive, Item item) {
         ItemStacksResourceHandler contents = hatchContents(from);
@@ -167,8 +170,9 @@ final class LevelGoods implements Goods<Item> {
         }
         for (int slot = 0; slot < contents.size(); slot++) {
             ItemResource resource = contents.getResource(slot);
-            if (resource.is(item)) {
-                return view.fuelRoomFromHatch(resource.toStack(1));
+            long room = resource.is(item) ? view.fuelRoomFromHatch(resource.toStack(1)) : 0;
+            if (room > 0) {
+                return room;
             }
         }
         return 0;
@@ -189,7 +193,8 @@ final class LevelGoods implements Goods<Item> {
             ItemStack stack = resource.toStack(contents.getAmountAsInt(slot));
             int taking = (int) Math.min(most - moved, Math.min(stack.getCount(), view.fuelRoomFromHatch(stack)));
             if (taking <= 0) {
-                break;
+                // Its components match no slot's: the next stack may still fit.
+                continue;
             }
             int fitted = view.addFuel(stack.copyWithCount(taking));
             if (fitted > 0) {

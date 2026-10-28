@@ -112,6 +112,16 @@ public final class Driver {
         return train.atRest() && distance(network, train, way, station) <= ARRIVE;
     }
 
+    /** The way {@code train}, at rest, runs to stand at {@code station}, as {@link #standsAt} says; 0 where it does not stand there. */
+    static int wayAt(RailNetwork network, Train train, Station station) {
+        for (int way : new int[] {1, -1}) {
+            if (standsAt(network, train, way, station)) {
+                return way;
+            }
+        }
+        return 0;
+    }
+
     /** The way to push it this tick, +1 the Train's heading, -1 against it and 0 for neither. */
     private int push(RailNetwork network, Train train, Predicate<Locomotive> slotsFuelled) {
         // At rest unable to pull its way, it looks for the other; moving, it runs on, out of fuel or not.
@@ -122,7 +132,7 @@ public final class Driver {
             lost = true;
             return hold(train);
         }
-        double d = distance(network, train, way);
+        double d = distance(network, train, way, station);
         lost = Double.isNaN(d);
         if (lost) {
             // Cut off from it, or left too far behind: the next tick looks again.
@@ -158,7 +168,7 @@ public final class Driver {
             if (!train.pulls(way, slotsFuelled)) {
                 continue;
             }
-            double d = distance(network, train, way);
+            double d = distance(network, train, way, station);
             if (d > ARRIVE && d < nearest) {
                 nearest = d;
                 best = way;
@@ -172,10 +182,6 @@ public final class Driver {
      * along the Line through the Arms: negative when the car has run past it by up to a Station's
      * stretch, and NaN when it is out of reach or would arrive against the Station's serving way.
      */
-    private double distance(RailNetwork network, Train train, int way) {
-        return distance(network, train, way, station);
-    }
-
     private static double distance(RailNetwork network, Train train, int way, Station station) {
         Place lead = train.lead(network, way);
         return Platform.of(network, station)
