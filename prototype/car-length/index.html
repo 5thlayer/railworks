@@ -236,13 +236,14 @@ function build(key) {
   const hatchColours = [[0.85, 0.68, 0.25], [0.35, 0.55, 0.75]];
   for (let s = -1; s < SPOTS; s++) {
     const front = s < 0 ? FRONT : FRONT - lead - s * spot, len = s < 0 ? lead : spot;
-    for (let c = Math.ceil(front - len); c < front; c++) {
+    // Blocks are centred on whole x, and a spot's edges fall on block edges, half a block off.
+    for (let c = front - len + 0.5; c < front; c++) {
       for (const z of [-1, 1]) {
-        const station = s < 0 && z === 1 && c === Math.ceil(FRONT - 1);
+        const station = s < 0 && z === 1 && c === FRONT - 0.5;
         const col = station ? [0.55, 0.3, 0.65] : s < 0 ? [0.6, 0.6, 0.6] : hatchColours[s % 2];
-        box(world, col, c + 0.02, R - 1, z - 0.48, c + 0.98, R - 0.02, z + 0.48);
+        box(world, col, c - 0.48, R - 1, z - 0.48, c + 0.48, R - 0.02, z + 0.48);
         // Supports down to the ground, so the hatches do not float.
-        box(world, [0.5, 0.45, 0.4], c + 0.35, 0, z - 0.15, c + 0.65, R - 1, z + 0.15);
+        box(world, [0.5, 0.45, 0.4], c - 0.15, 0, z - 0.15, c + 0.15, R - 1, z + 0.15);
       }
     }
   }
