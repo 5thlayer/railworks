@@ -43,7 +43,7 @@ Spans joined Arm to Arm that a Train can run along without leaving the Rail. A l
 _Avoid_: route, track
 
 **Clearance**:
-The space above a Span, and down both sides of the Rail, that a car straddling it passes through, which no block may fill.
+The space above a Span, and down both sides of the Rail, that a car straddling it passes through, three blocks across, which no block may fill.
 _Avoid_: loading gauge, hitbox
 
 ### Trains
@@ -53,11 +53,11 @@ Cars coupled on the Rail that move as one.
 _Avoid_: monorail, consist
 
 **Car**:
-One of the Locomotives, Cargo cars and Fluid cars a Train is made of, coupled to the car ahead and the car behind. It faces the Train's way or the other, so a Train can have a Locomotive facing out at each end. Placing one beside an end of a Train at rest couples it there; shears uncouple it.
+One of the Locomotives, Cargo cars and Fluid cars a Train is made of, coupled to the car ahead and the car behind. Every car is five blocks long and two wide. It faces the Train's way or the other, so a Train can have a Locomotive facing out at each end. Placing one beside an end of a Train at rest couples it there; shears uncouple it.
 _Avoid_: wagon, carriage, vehicle, rolling stock
 
 **Locomotive**:
-A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside it at a Station; the Electric Locomotive runs on a charge of FE, put in only by a Charger beside it at a Station. Each pulls only while it holds fuel or charge. Each is three blocks long, with a cab for its driver and a bay behind for one rider. Locomotives stand only at a Train's ends, alone or several together: nothing but Locomotives lies between one and an end.
+A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside its Engine room at a Station; the Electric Locomotive runs on a charge of FE, put in only by a Charger beside its Engine room at a Station. Each pulls only while it holds fuel or charge. Each has a cab at its front for its Driver, its Engine room, and a bay at its back for one Rider. Locomotives stand only at a Train's ends, alone or several together: nothing but Locomotives lies between one and an end.
 _Avoid_: engine (Wireworks' steam engine), loco
 
 **Driver**:
@@ -67,6 +67,10 @@ _Avoid_: passenger, operator, conductor
 **Rider**:
 Whoever rides a Locomotive but does not drive it, in the bay behind the cab: one mob, or a second player.
 _Avoid_: passenger (for every entity mounted), mob rider, seat 1
+
+**Engine room**:
+A Locomotive's middle block, closed, between its cab and its bay: a provider beside it fuels the Locomotive, and a Charger beside it charges an Electric one.
+_Avoid_: hood, engine bay, fuel hatch
 
 **Cargo car**:
 A car that carries items, loaded and unloaded by the hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand through what it holds, which using it opens. Nobody rides one.
@@ -89,7 +93,7 @@ Rail without a bend, square to the blocks: Spans each in line through both their
 _Avoid_: straight track
 
 **Station**:
-A named block beside the Rail, by a Straight leg, serving the Trains that have it on their drive side and letting the others pass. A Train stops with its leading car at it, its cars on its platform (ADRs 0007, 0008). Several may share a name, which is only shown.
+A named block beside the Rail where a hatch would stand, by a Straight leg, serving the Trains that have it on their drive side and letting the others pass. A Train stops with its leading car at it, its cars on its platform (ADRs 0007, 0008). Several may share a name, which is only shown.
 _Avoid_: stop (Voidworks' Stop), train stop, depot
 
 **Drive side**:
@@ -101,7 +105,7 @@ The Straight leg behind a Station where a Train stopped there stands: its leadin
 _Avoid_: siding, bay, loading area
 
 **Car spot**:
-The two blocks of a platform where a stopped car behind the leading car stands, counted back from the leading car; the first is the place of the car coupled to it. The leading car, usually a Locomotive, has no car spot, but a hatch may stand beside its place as beside a car spot.
+The five blocks of a platform where a stopped car behind the leading car stands, a car's length, counted back from the leading car; the first is the place of the car coupled to it. The leading car, usually a Locomotive, has no car spot, but a hatch may stand beside its place as beside a car spot.
 _Avoid_: slot (an inventory's), position, bay
 
 **Automatic**:
@@ -119,7 +123,7 @@ What automatic Trains carry between hatches, of two kinds: items, held by a hatc
 _Avoid_: freight, wares (for the domain; `Ware` is only the code's name for one good, an item's kind or a fluid)
 
 **Hatch**:
-A container beside a Station's platform at a car's floor, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: a hatch of items trades with a Cargo car, and its provider fuels a Locomotive; a **Fluid hatch** trades with a Fluid car. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
+A container beside a Station's platform, two blocks off the Rail at the height of a Cargo car's chests, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: a hatch of items trades with a Cargo car, and its provider fuels a Locomotive whose Engine room it stands beside; a **Fluid hatch** trades with a Fluid car. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
 _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 
 **Fluid hatch**:
@@ -127,7 +131,7 @@ A hatch holding one fluid in a tank, filled and emptied by any mod's pipes, whic
 _Avoid_: tank, fluid port, fluid loader
 
 **Charger**:
-A block beside a Station's platform at a car's floor, joining that Station as a hatch does, which takes FE from any mod's cable and charges the Electric Locomotive standing beside it, of any Train at rest there, manual or automatic. It holds no items and neither offers nor asks. The Creative Charger, for creative play and tests, never runs out and fills a Locomotive at once.
+A block beside a Station's platform where a hatch would stand, joining that Station as a hatch does, which takes FE from any mod's cable and charges the Electric Locomotive whose Engine room it stands beside, of any Train at rest there, manual or automatic. It holds no items and neither offers nor asks. The Creative Charger, for creative play and tests, never runs out and fills a Locomotive at once.
 _Avoid_: charging hatch, charging station, battery
 
 **Burner Generator**:
@@ -135,7 +139,7 @@ A block that burns furnace fuel into FE and gives it to the energy blocks touchi
 _Avoid_: generator (any mod's), boiler, steam engine (Wireworks')
 
 **Provider**:
-A hatch offering what is put in it to requesters at the same car spot of other Stations, and fuelling the Locomotive of an automatic Train beside it from what no job claims; it never asks.
+A hatch offering what is put in it to requesters at the same car spot of other Stations, and fuelling the Locomotive of an automatic Train whose Engine room it stands beside from what no job claims; it never asks.
 _Avoid_: source, output hatch, giver
 
 **Requester**:

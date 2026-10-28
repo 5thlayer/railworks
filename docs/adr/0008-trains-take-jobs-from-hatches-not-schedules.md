@@ -4,6 +4,8 @@ status: accepted
 
 # Trains take jobs from hatches, not Schedules
 
+> Amended by [ADR 0010](0010-cars-are-five-blocks-long-and-two-wide.md): only a provider or a Charger beside a Locomotive's Engine room fuels or charges it, and a car spot is five blocks.
+
 > Amended in #10: goods are of two kinds, items and fluid, and a hatch is of one. A Fluid hatch, a block of its own, holds one fluid in a tank kept in the level's saved data as a hatch's slots are, gives the fluid capability on every side so any mod's pipes reach it, and trades only with the Fluid car standing beside it, two buckets each hatch turn, as a hatch of items trades only with a Cargo car; neither trades with the other kind, and a job plans a load only at a car spot where hatch and car agree. A Fluid requester asks for so many buckets of one fluid. A provider Fluid hatch fuels no Locomotive. The Fluid car keeps its tank in its car's record and gives no fluid capability, as the Cargo car gives no item capability: without a player, fluid goes in and out only through Fluid hatches, and by hand a bucket at a time.
 
 > Amended in #6: a Cargo car's cargo and a Locomotive's fuel slots are kept in the level's saved data beside the hatches, keyed by the car, whole stacks with their components, in view or not; the car's view is a window onto that record, as a hatch's block is onto its own. Nothing moves when a Train goes abstract or comes back into view, so a hatch trades with a car and a provider fuels a Locomotive the same with its chunks loaded or not, and where #37 and #53 said the car's side waits for #6, it no longer does.
