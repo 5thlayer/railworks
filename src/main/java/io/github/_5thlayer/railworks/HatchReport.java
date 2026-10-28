@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 import io.github._5thlayer.railworks.rail.HatchRequest;
+import io.github._5thlayer.railworks.rail.Platform;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -67,7 +68,9 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, 
             lines.add(Component.translatable("tooltip.railworks.hatch.jade.requester"));
             lines.add(requesting(request));
         }
-        lines.add(joined.map(at -> Component.translatable("tooltip.railworks.hatch.jade.station", at.station(), at.spot() + 1))
+        lines.add(joined.map(at -> at.spot() == Platform.LEADING
+                        ? Component.translatable("tooltip.railworks.hatch.jade.station_leading", at.station())
+                        : Component.translatable("tooltip.railworks.hatch.jade.station", at.station(), at.spot() + 1))
                 .orElseGet(() -> Component.translatable("tooltip.railworks.hatch.jade.no_station")));
         return lines;
     }

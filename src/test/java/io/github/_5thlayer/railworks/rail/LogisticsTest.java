@@ -123,7 +123,7 @@ class LogisticsTest {
         logistics.tick(network, trains, hatches, goods);
         for (Train train : trains.all()) {
             if (train.automatic()) {
-                logistics.drive(network, train, goods, locomotive -> 0L, trains.takenFrom(network, train));
+                logistics.drive(network, train, goods, goods::ignite, trains.takenFrom(network, train));
             }
         }
     }
@@ -392,6 +392,20 @@ class LogisticsTest {
         assertEquals(16, goods.held(coal, "coal"));
     }
 
+    @Test
+    void aCargoCarLeadingItsTrainTradesWithTheHatchesBesideTheLeadingCarsPlace() {
+        line();
+        Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "iron", 64);
+        Logistics.Hatch<String> depot = requester(DEPOT, Platform.LEADING, "iron", 1);
+        // A Cargo car leading, its Locomotive behind it facing the same way.
+        Train train = automatic(Train.of(onLine(5.0), List.of(CargoCar.create(), fuelled())));
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(64, goods.held(cargo(train, 0), "iron"));
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING, "unloaded");
+        assertEquals(0, goods.held(quarry, "iron"));
+        assertEquals(64, goods.held(depot, "iron"));
+    }
+
     // ---- at the Station ----
 
     @Test
@@ -535,6 +549,102 @@ class LogisticsTest {
         Logistics.Status<String> status = logistics.status(train, goods);
         assertEquals(Logistics.Kind.CANNOT_REACH, status.kind());
         assertEquals("Mine", status.station());
+    }
+
+    // ---- fuel ----
+
+    @Test
+    void aProviderFuelsTheLocomotiveBesideItAStackATurnUntilItsFourStacksAreFull() {
+        line();
+        Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "coal", 100);
+        // Waiting with no job, its Locomotive at the Quarry's leading car's place.
+        Train train = eastbound(8.5, 1);
+        Locomotive locomotive = (Locomotive) train.cars().getFirst();
+        step();
+        assertEquals(16, goods.fuel(locomotive, "coal"), "the first stack on the first tick");
+        runFor(Logistics.hatchTicksPerStack() - 1);
+        assertEquals(16, goods.fuel(locomotive, "coal"));
+        step();
+        assertEquals(32, goods.fuel(locomotive, "coal"));
+        runFor(200);
+        assertEquals(64, goods.fuel(locomotive, "coal"), "four stacks of coal");
+        assertEquals(36, goods.held(quarry, "coal"));
+    }
+
+    @Test
+    void aManualTrainIsNeverFuelled() {
+        line();
+        provider(QUARRY, Platform.LEADING, "coal", 100);
+        Train train = eastbound(8.5, 1);
+        train.setAutomatic(false);
+        runFor(100);
+        assertEquals(0, goods.fuel((Locomotive) train.cars().getFirst(), "coal"));
+    }
+
+    @Test
+    void onlyAProviderBesideALocomotiveFuelsIt() {
+        line();
+        Logistics.Hatch<String> asking = requester(QUARRY, Platform.LEADING, "coal", 1);
+        goods.put(asking, "coal", 16);
+        Logistics.Hatch<String> besideTheCar = provider(QUARRY, 0, "coal", 16);
+        Train train = eastbound(8.5, 1);
+        runFor(100);
+        assertEquals(0, goods.fuel((Locomotive) train.cars().getFirst(), "coal"));
+        assertEquals(16, goods.held(asking, "coal"));
+        assertEquals(16, goods.held(besideTheCar, "coal"));
+        assertTrue(goods.empty(cargo(train, 1)));
+    }
+
+    @Test
+    void onlyFuelThatBurnsLeavingNothingGoesIn() {
+        line();
+        Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "lava_bucket", 1);
+        goods.put(quarry, "wood", 10);
+        Train train = eastbound(8.5, 1);
+        runFor(100);
+        Locomotive locomotive = (Locomotive) train.cars().getFirst();
+        assertEquals(0, goods.fuel(locomotive, "lava_bucket"));
+        assertEquals(10, goods.fuel(locomotive, "wood"));
+    }
+
+    @Test
+    void aLocomotiveTakesOnlyTheFuelNoJobHasClaimed() {
+        line();
+        provider(QUARRY, Platform.LEADING, "coal", 20);
+        Logistics.Hatch<String> depot = requester(DEPOT, Platform.LEADING, "coal", 1);
+        // Its Locomotive at the Quarry's leading car's place, manual until a job of the other has claimed a stack.
+        Train standing = eastbound(8.5, 0);
+        standing.setAutomatic(false);
+        // A Cargo car leading, behind it.
+        Train other = automatic(Train.of(onLine(3.0), List.of(CargoCar.create(), fuelled())));
+        runUntil(() -> kind(other) == Logistics.Kind.TO_LOAD, "planned");
+        standing.setAutomatic(true);
+        runUntil(() -> goods.held(depot, "coal") == 16, "delivered the claimed stack");
+        assertEquals(4, goods.fuel((Locomotive) standing.cars().getFirst(), "coal"), "the four no job claims");
+    }
+
+    @Test
+    void aTrainOnAJobWaitsAtTheStationWhileFuelGoesIn() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        provider(QUARRY, Platform.LEADING, "coal", 64);
+        requester(DEPOT, 0, "iron", 1);
+        Train train = eastbound(3.0, 1);
+        runUntil(() -> kind(train) == Logistics.Kind.LOADING, "at the Quarry");
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(64, goods.held(cargo(train, 1), "iron"), "a stack on the first turn");
+        assertEquals(64, goods.fuel((Locomotive) train.cars().getFirst(), "coal"), "four stacks over four turns");
+    }
+
+    @Test
+    void aTrainThatRanDryWaitingIsFuelledAndTakesJobsAgain() {
+        line();
+        provider(QUARRY, Platform.LEADING, "coal", 64);
+        provider(QUARRY, 0, "iron", 64);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        // Nothing in its buffer or its slots: it cannot pull, so no job is planned for it.
+        Train train = automatic(Train.of(onLine(8.5), List.of(Locomotive.burner(), CargoCar.create())));
+        runUntil(() -> goods.held(depot, "iron") == 64, "delivered");
     }
 
     // ---- claims break ----
@@ -831,6 +941,7 @@ class LogisticsTest {
 
         private final Map<Integer, Map<String, Long>> inHatches = new HashMap<>();
         private final Map<UUID, Map<String, Long>> inCars = new HashMap<>();
+        private final Map<UUID, Map<String, Long>> inLocomotives = new HashMap<>();
         int slots = 27;
         long hatchRoom = Long.MAX_VALUE / 4;
 
@@ -904,8 +1015,59 @@ class LogisticsTest {
         }
 
         @Override
+        public Map<String, Long> contents(Logistics.Hatch<String> hatch) {
+            Map<String, Long> contents = new LinkedHashMap<>();
+            inHatches.getOrDefault(hatch.x(), Map.of()).forEach((item, count) -> {
+                if (count > 0) {
+                    contents.put(item, count);
+                }
+            });
+            return contents;
+        }
+
+        /** How many of {@code item} {@code locomotive}'s fuel slots hold. */
+        long fuel(Locomotive locomotive, String item) {
+            return inLocomotives.getOrDefault(locomotive.id(), Map.of()).getOrDefault(item, 0L);
+        }
+
+        /** Coal and wood burn and leave nothing; a lava bucket leaves its bucket, and iron does not burn. */
+        @Override
+        public long fuelRoom(Locomotive locomotive, String item) {
+            if (!item.equals("coal") && !item.equals("wood")) {
+                return 0;
+            }
+            Map<String, Long> slots = inLocomotives.getOrDefault(locomotive.id(), Map.of());
+            long used = 0;
+            for (var held : slots.entrySet()) {
+                used += (held.getValue() + stackSize(held.getKey()) - 1) / stackSize(held.getKey());
+            }
+            long have = slots.getOrDefault(item, 0L);
+            long slack = (stackSize(item) - have % stackSize(item)) % stackSize(item);
+            return (Locomotive.FUEL_SLOTS - used) * stackSize(item) + slack;
+        }
+
+        @Override
+        public long refuel(Logistics.Hatch<String> from, Locomotive into, String item, long most) {
+            long moved = Math.min(most, Math.min(held(from, item), fuelRoom(into, item)));
+            put(from, item, held(from, item) - moved);
+            inLocomotives.computeIfAbsent(into.id(), id -> new HashMap<>()).merge(item, moved, Long::sum);
+            return moved;
+        }
+
+        /** Burns one item from {@code locomotive}'s first fuel slot holding any, coal's 4 MJ whatever it is; 0 for none. */
+        long ignite(Locomotive locomotive) {
+            for (var held : inLocomotives.getOrDefault(locomotive.id(), Map.of()).entrySet()) {
+                if (held.getValue() > 0) {
+                    held.setValue(held.getValue() - 1);
+                    return 4_000_000L;
+                }
+            }
+            return 0L;
+        }
+
+        @Override
         public boolean slotFuelled(Locomotive locomotive) {
-            return false;
+            return inLocomotives.getOrDefault(locomotive.id(), Map.of()).values().stream().anyMatch(count -> count > 0);
         }
     }
 }

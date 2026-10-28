@@ -60,7 +60,7 @@ final class LocomotiveTests {
         tests.test("locomotive_plan_is_refused_off_a_span", 20, LocomotiveTests::refusedOffSpan);
         tests.test("locomotive_plan_is_refused_where_the_car_would_sit_in_a_block", 20, LocomotiveTests::refusedBlocked);
         tests.test("locomotive_plan_is_refused_on_a_span_another_holds", 20, LocomotiveTests::refusedTaken);
-        tests.test("locomotive_fuel_goes_in_its_slot", 20, LocomotiveTests::fuelSlot);
+        tests.test("locomotive_fuel_goes_in_its_four_slots_the_same_fuels_first", 20, LocomotiveTests::fuelSlot);
         tests.test("locomotive_is_boarded_by_using_it_and_left_by_sneaking", 20, LocomotiveTests::boardsAndLeaves);
         tests.test("locomotive_sneaking_at_the_car_opens_its_menu", 20, LocomotiveTests::sneakOpensMenu);
         tests.test("locomotive_the_inventory_key_opens_the_menu_while_riding", 20, LocomotiveTests::inventoryKeyOpensMenu);
@@ -175,18 +175,39 @@ final class LocomotiveTests {
         LocomotiveEntity car = placed(helper);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
-        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL, 5));
-        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (car.fuelItem().getCount() != 5 || !player.getMainHandItem().isEmpty()) {
-            helper.fail("coal in hand should fill the slot with 5, slot holds " + car.fuelItem(), STAND);
+        fillByHand(car, player, new ItemStack(Items.COAL, 5));
+        fillByHand(car, player, new ItemStack(Items.OAK_PLANKS, 2));
+        // Topping up the coal, then the rest into the first empty slot.
+        fillByHand(car, player, new ItemStack(Items.COAL, 64));
+        expectSlots(helper, car, List.of(new ItemStack(Items.COAL, 64), new ItemStack(Items.OAK_PLANKS, 2),
+                new ItemStack(Items.COAL, 5), ItemStack.EMPTY));
+        if (!player.getMainHandItem().isEmpty() || !car.fuelItem().is(Items.COAL)) {
+            helper.fail("the coal and planks did not all go in, or the first slot's coal is not burnt next: hand "
+                    + player.getMainHandItem() + ", next " + car.fuelItem(), STAND);
         }
-        // Fuel the slot cannot take, another fuel or more than fits, boards the player instead.
-        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.OAK_PLANKS, 2));
+        fillByHand(car, player, new ItemStack(Items.CHARCOAL, 64));
+        // Fuel the slots cannot take, all four holding another, boards the player instead.
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.BLAZE_ROD, 2));
         car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
-        if (car.fuelItem().getCount() != 5 || player.getMainHandItem().getCount() != 2 || player.getVehicle() != car) {
-            helper.fail("a different fuel should stay in hand and board, with the slot still holding 5 coal", STAND);
+        if (car.fuelSlot(3).getCount() != 64 || player.getMainHandItem().getCount() != 2 || player.getVehicle() != car) {
+            helper.fail("a fuel no slot takes should stay in hand and board, the last slot holding 64 charcoal: "
+                    + car.fuelSlot(3), STAND);
         }
         helper.succeed();
+    }
+
+    private static void fillByHand(LocomotiveEntity car, ServerPlayer player, ItemStack fuel) {
+        player.setItemInHand(InteractionHand.MAIN_HAND, fuel);
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+    }
+
+    /** {@code car}'s fuel slots hold {@code expected}, slot by slot. */
+    static void expectSlots(GameTestHelper helper, LocomotiveEntity car, List<ItemStack> expected) {
+        for (int slot = 0; slot < expected.size(); slot++) {
+            if (!ItemStack.matches(car.fuelSlot(slot), expected.get(slot))) {
+                helper.fail("fuel slot " + slot + " holds " + car.fuelSlot(slot) + ", not " + expected.get(slot), STAND);
+            }
+        }
     }
 
     private static void boardsAndLeaves(GameTestHelper helper) {

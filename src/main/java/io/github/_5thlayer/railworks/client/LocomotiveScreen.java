@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks.client;
 
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.LocomotiveMenu;
+import io.github._5thlayer.railworks.rail.Locomotive;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -16,8 +17,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Burner Locomotive's menu as a plain container: vanilla's one-row chest panel with the row's
- * other slots painted over, leaving the fuel slot where the menu puts it, an Automatic toggle for
- * its Train beside it, and the Train's status line under the row. The mode and the status line are
+ * other slots painted over, leaving the fuel slots where the menu puts them, an Automatic toggle for
+ * its Train beside them, and the Train's status line under the row. The mode and the status line are
  * the Locomotive entity's synched data, so they follow the server while the menu is open.
  * Placeholder.
  */
@@ -26,7 +27,8 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
     private static final Identifier BACKGROUND = Identifier.withDefaultNamespace("textures/gui/container/generic_54.png");
     /** The panel's own grey, to paint the chest row's unused slots out. */
     private static final int PANEL = 0xFFC6C6C6;
-    private static final int FUEL_COLUMN = 4;
+    /** The chest row's columns the fuel slots take, from the first. */
+    private static final int FUEL_COLUMNS = Locomotive.FUEL_SLOTS;
     /** The status line's grey, a label's. */
     private static final int LABEL = 0xFF404040;
 
@@ -40,9 +42,9 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
     @Override
     protected void init() {
         super.init();
-        // Over the painted-out slots right of the fuel slot.
+        // Over the painted-out slots right of the fuel slots, a column clear of them.
         automatic = addRenderableWidget(Button.builder(label(), button -> toggle())
-                .bounds(leftPos + 7 + (FUEL_COLUMN + 1) * 18 + 2, topPos + 17, 4 * 18 - 4, 18).build());
+                .bounds(leftPos + 7 + (FUEL_COLUMNS + 1) * 18 + 2, topPos + 17, (8 - FUEL_COLUMNS) * 18 - 4, 18).build());
     }
 
     /** The Locomotive, as this client sees it; null once it is out of sight. */
@@ -88,7 +90,7 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, left, top + 18 + 17, 0.0F, 4.0F, this.imageWidth, 12, 256, 256);
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, left, top + 18 + 17 + 12, 0.0F, 126.0F, this.imageWidth, 96, 256, 256);
         for (int column = 0; column < 9; column++) {
-            if (column != FUEL_COLUMN) {
+            if (column >= FUEL_COLUMNS) {
                 graphics.fill(left + 7 + column * 18, top + 17, left + 7 + (column + 1) * 18, top + 17 + 18, PANEL);
             }
         }

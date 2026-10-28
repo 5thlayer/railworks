@@ -35,7 +35,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A hatch: a container beside a Station's platform at a car's floor, joining that Station, which
- * trades with the Cargo car standing at its car spot (ADR 0008). No Train trades with one yet. What
+ * trades with the Cargo car standing at its car spot or the leading car's place, and, a provider,
+ * fuels the Locomotive standing there (ADR 0008, amended in #53). What
  * it holds is its record in the level's {@link LevelHatches}, filled and emptied by hoppers and pipes
  * through its block ({@link HatchBlockEntity}). It is placed a provider or a requester, as the
  * {@link HatchItem} placing it is, and drops as what it is; an empty-hand sneak-use switches it,

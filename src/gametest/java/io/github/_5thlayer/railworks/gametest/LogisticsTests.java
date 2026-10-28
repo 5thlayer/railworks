@@ -51,8 +51,10 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * automatic, the level saves the mode, a driver takes it over, the status line follows it, and one
  * Train runs unattended from a provider Station to a requester Station through the level's tick, the
  * Stations and hatches real blocks and the fuel burnt from the slot, and what it loaded for a requester
- * broken on the way is held until a requester asks for it again (#38). How jobs are planned, stacks
- * moved and claims broken is {@code LogisticsTest}'s. All of these tests share the {@code logistics_} prefix.
+ * broken on the way is held until a requester asks for it again (#38); and a provider beside the
+ * leading car's place fills an automatic Train's Locomotive with fuel that leaves nothing behind (#53),
+ * those tests sharing the {@code logistics_refuel_} prefix. How jobs are planned, stacks
+ * moved, claims broken and fuel moved is {@code LogisticsTest}'s. All of these tests share the {@code logistics_} prefix.
  */
 final class LogisticsTests {
 
@@ -81,6 +83,10 @@ final class LogisticsTests {
         // Its line runs out past the structure, as the unattended run's does, so the two would cross side by side.
         tests.testOnItsOwn("logistics_a_broken_requester_leaves_a_leftover_delivered_once_one_asks_again", 1_600,
                 LogisticsTests::brokenRequester);
+        // Its line, too, runs out past the structure.
+        tests.testOnItsOwn("logistics_refuel_a_provider_by_the_leading_car_fills_the_locomotive_with_clean_fuel", 400,
+                LogisticsTests::refuels);
+        tests.testOnItsOwn("logistics_refuel_a_manual_train_is_left_alone", 200, LogisticsTests::refuelsNoManualTrain);
     }
 
     // ---- the mode ----
@@ -245,6 +251,73 @@ final class LogisticsTests {
                 })
                 .thenExecute(() -> forceLoad(helper, false))
                 .thenSucceed();
+    }
+
+    // ---- refuelling ----
+
+    /**
+     * The Depot alone, a provider beside its leading car's place holding a lava bucket and 300 coal,
+     * and a Locomotive heading east, a Cargo car behind it, standing at the Depot with nothing in its
+     * fuel slots. The Locomotive.
+     */
+    private static LocomotiveEntity atTheDepot(GameTestHelper helper) {
+        Span last = line(helper);
+        station(helper, DEPOT);
+        BlockPos fuel = besideTheLeadingCar(helper, DEPOT);
+        helper.setBlock(fuel, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        insert(record(helper, fuel), new ItemStack(Items.LAVA_BUCKET));
+        insert(record(helper, fuel), new ItemStack(Items.COAL, 300));
+        Locomotive east = Locomotive.burner();
+        CargoCar wagon = CargoCar.create();
+        // Its middle half a block short of the line's end, where the Depot's leading car stands.
+        Train train = Train.of(new Place(last, last.b(), 0.5), List.of(east, wagon));
+        LocomotiveEntity locomotive = spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
+        spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
+        return locomotive;
+    }
+
+    private static void refuels(GameTestHelper helper) {
+        LocomotiveEntity locomotive = atTheDepot(helper);
+        BlockPos fuel = besideTheLeadingCar(helper, DEPOT);
+        locomotive.train().setAutomatic(true);
+        ItemStack full = new ItemStack(Items.COAL, 64);
+        helper.startSequence()
+                .thenWaitUntil(() -> LocomotiveTests.expectSlots(helper, locomotive, List.of(full, full, full, full)))
+                .thenExecute(() -> {
+                    long coal = record(helper, fuel).contents().getResource(0).is(Items.LAVA_BUCKET)
+                            ? held(record(helper, fuel)) - 1 : -1;
+                    if (coal != 300 - 4 * 64) {
+                        helper.fail("the provider was left with " + coal + " coal beside its lava bucket, not 44", fuel);
+                    }
+                })
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    private static void refuelsNoManualTrain(GameTestHelper helper) {
+        LocomotiveEntity locomotive = atTheDepot(helper);
+        helper.startSequence()
+                .thenIdle(100)
+                .thenExecute(() -> LocomotiveTests.expectSlots(helper, locomotive,
+                        List.of(ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY)))
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    /** A block beside the leading car's place of the Station at {@code station}, clear of the Station's own. */
+    private static BlockPos besideTheLeadingCar(GameTestHelper helper, BlockPos station) {
+        var network = LevelRails.of(helper.getLevel()).network();
+        BlockPos at = helper.absolutePos(station);
+        return LevelStations.of(helper.getLevel()).stations().all().stream()
+                .filter(s -> s.x() == at.getX() && s.y() == at.getY() && s.z() == at.getZ())
+                .flatMap(s -> Platform.of(network, s).stream())
+                .flatMap(p -> p.besideBlocks(network).stream())
+                .filter(b -> b.spot() == Platform.LEADING)
+                // Back to the test's own positions: from its origin, as absolutePos counts them.
+                .map(b -> new BlockPos(b.x(), b.y(), b.z()).subtract(helper.absolutePos(BlockPos.ZERO)))
+                .filter(pos -> !pos.equals(station))
+                .findFirst()
+                .orElseThrow(() -> helper.assertionException(station, Component.literal("nothing beside its leading car's place")));
     }
 
     // ---- setup ----

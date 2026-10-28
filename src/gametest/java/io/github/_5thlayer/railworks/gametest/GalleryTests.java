@@ -38,7 +38,7 @@ import net.minecraft.world.phys.Vec3;
  * Stations scene's Stations in the level's Stations under their names, and the flyover's two lines
  * strung and not joined. Beyond the build, the coupling scene's sign, clicked, builds it again,
  * leaving one Train and nothing loose, and the two logistics scenes are built working: each
- * requester's chest gets what it asks for. How a Train plans and runs its jobs is the mechanics' own
+ * requester's chest gets what it asks for, as the refuel scene's does once its dry Train is fuelled. How a Train plans and runs its jobs is the mechanics' own
  * game tests' to check, never the Gallery's. Each test turns the pack on, which reloads the server's
  * data, and off again, passing or failing, so each runs in a batch of its own.
  */
@@ -59,6 +59,8 @@ final class GalleryTests {
     private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);
     private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(22, 0, -7);
     private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
+    /** The refuel scene's provider of coal beside Mine's leading car's place, from where it is run. */
+    private static final BlockPos LEADING_FUEL = new BlockPos(5, 2, -5);
     /** The flyover's Arms, from where it is run: the low line's, west to east, and the high line's, south to north. */
     private static final List<BlockPos> LOW_LINE = List.of(
             new BlockPos(3, 1, -6), new BlockPos(11, 1, -6), new BlockPos(19, 1, -6), new BlockPos(25, 1, -6));
@@ -85,7 +87,8 @@ final class GalleryTests {
                 new Scene("stations", QUARRY, RailworksRegistries.STATION.get()),
                 new Scene("logistics", PROVIDER, RailworksRegistries.HATCH.get()),
                 new Scene("two_loads", PROVIDER, RailworksRegistries.HATCH.get()),
-                new Scene("flyover", HIGH_LINE.getLast(), pylon));
+                new Scene("flyover", HIGH_LINE.getLast(), pylon),
+                new Scene("refuel", LEADING_FUEL, RailworksRegistries.HATCH.get()));
     }
 
     static void register(RailworksGameTests.Registrar tests) {
@@ -95,6 +98,8 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::signReplays);
         tests.testOnItsOwn("gallery_logistics_scenes_deliver_what_each_requester_asks_for",
                 GalleryCheck.TICKS, GalleryTests::logisticsDeliver);
+        tests.testOnItsOwn("gallery_refuel_scene_fuels_its_dry_train_which_then_delivers",
+                GalleryCheck.TICKS, GalleryTests::refuelDelivers);
     }
 
     /**
@@ -181,6 +186,14 @@ final class GalleryTests {
                     holds(helper, second.offset(SECOND_SPOT_CHEST), Items.RAW_COPPER);
                     holds(helper, second.offset(FIRST_SPOT_CHEST), Items.RAW_GOLD);
                 })).thenSucceed();
+    }
+
+    /** The refuel scene: its Train, set down dry, is fuelled at Mine and carries the ore to the Smelter's chest. */
+    private static void refuelDelivers(GameTestHelper helper) {
+        var at = helper.absolutePos(ORIGIN);
+        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+                .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "refuel")))
+                .thenWaitUntil(() -> holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE))).thenSucceed();
     }
 
     /** The Arms at {@code line}, from {@code origin}. */

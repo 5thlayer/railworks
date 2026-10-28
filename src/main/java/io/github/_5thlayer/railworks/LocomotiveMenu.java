@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.railworks.rail.Locomotive;
 import net.minecraft.world.Container;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
@@ -18,21 +19,22 @@ import org.jspecify.annotations.Nullable;
 /**
  * A Burner Locomotive's menu: the cab's slots over the player's inventory, laid out as a vanilla
  * container's, and an Automatic toggle for its Train (ADR 0008), its status line beneath. The cab
- * holds the fuel slot only, which takes furnace fuel, so {@link #CAB_SLOTS} is the number of slots
- * the cab holds, not "one". Vanilla's packets carry all of it: the Locomotive's entity id goes to
+ * holds the fuel slots only, which take furnace fuel, so {@link #CAB_SLOTS} is the number of slots
+ * the cab holds, not of fuel slots alone. Vanilla's packets carry all of it: the Locomotive's entity id goes to
  * the client in two of the menu's data slots, each sending a short, so the client's screen reads the
  * Train's mode and status line from the entity's synched data, and the toggle is a menu button.
  */
 public final class LocomotiveMenu extends AbstractContainerMenu {
 
+    /** The first fuel slot; the rest follow it. */
     public static final int FUEL = 0;
-    public static final int CAB_SLOTS = 1;
+    public static final int CAB_SLOTS = Locomotive.FUEL_SLOTS;
     /** The menu button that switches its Train between automatic and manual. */
     public static final int TOGGLE_AUTOMATIC = 0;
 
     /** How far from the car the player may stand with its menu open, in blocks. */
     private static final double REACH = 8.0;
-    private static final int FUEL_X = 80;
+    private static final int FUEL_X = 8;
     private static final int FUEL_Y = 18;
     private static final int INVENTORY_Y = 61;
 
@@ -79,12 +81,14 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     private void addSlots(Inventory inventory) {
         checkContainerSize(cab, CAB_SLOTS);
         Level level = inventory.player.level();
-        addSlot(new Slot(cab, FUEL, FUEL_X, FUEL_Y) {
-            @Override
-            public boolean mayPlace(ItemStack stack) {
-                return LocomotiveEntity.fuelValue(level, stack) > 0L;
-            }
-        });
+        for (int fuel = 0; fuel < Locomotive.FUEL_SLOTS; fuel++) {
+            addSlot(new Slot(cab, FUEL + fuel, FUEL_X + fuel * 18, FUEL_Y) {
+                @Override
+                public boolean mayPlace(ItemStack stack) {
+                    return LocomotiveEntity.fuelValue(level, stack) > 0L;
+                }
+            });
+        }
         addStandardInventorySlots(inventory, 8, INVENTORY_Y);
         addDataSlots(carId);
     }
@@ -97,7 +101,7 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
         return car.isAlive() && (car.hasPassenger(player) || player.distanceToSqr(car) < REACH * REACH);
     }
 
-    /** Shift-click: the cab's slots to the inventory, and the inventory's fuel to the fuel slot. */
+    /** Shift-click: the cab's slots to the inventory, and the inventory's fuel to the fuel slots. */
     @Override
     public ItemStack quickMoveStack(Player player, int slotIndex) {
         Slot slot = slots.get(slotIndex);

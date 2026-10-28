@@ -24,10 +24,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * A hatch in hand, a provider's or a requester's, which places the hatch as that and which the hatch
  * drops as what it is. Sneak-used in the air, the whole stack turns into the other. The block's own
- * item, the one its recipe makes, is the provider's. It places only beside a car spot of a Station's
- * platform ({@link PlatformsNear#joined}), so the Placement Preview and the click ask one rule; a refused
- * click says why on the action bar. While one is held, the free blocks beside the car spots of the
- * platforms near are drawn.
+ * item, the one its recipe makes, is the provider's. It places only beside a car spot or the leading
+ * car's place of a Station's platform ({@link PlatformsNear#joined}), so the Placement Preview and the
+ * click ask one rule; a refused click says why on the action bar. While one is held, the free blocks
+ * beside them on the platforms near are drawn.
  */
 public final class HatchItem extends BlockItem implements PlansPlacement {
 
