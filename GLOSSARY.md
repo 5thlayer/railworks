@@ -53,7 +53,7 @@ Cars coupled on the Rail that move as one.
 _Avoid_: monorail, consist
 
 **Car**:
-One of the Locomotives and Cargo cars a Train is made of, coupled to the car ahead and the car behind. It faces the Train's way or the other, so a Train can have a Locomotive facing out at each end. Placing one beside an end of a Train at rest couples it there; shears uncouple it.
+One of the Locomotives, Cargo cars and Fluid cars a Train is made of, coupled to the car ahead and the car behind. It faces the Train's way or the other, so a Train can have a Locomotive facing out at each end. Placing one beside an end of a Train at rest couples it there; shears uncouple it.
 _Avoid_: wagon, carriage, vehicle, rolling stock
 
 **Locomotive**:
@@ -63,6 +63,10 @@ _Avoid_: engine (Wireworks' steam engine), loco
 **Cargo car**:
 A car that carries items, loaded and unloaded by the hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand through what it holds, which using it opens. Nobody rides one.
 _Avoid_: wagon, freight car
+
+**Fluid car**:
+A car that carries one fluid in its tank, filled and emptied by the Fluid hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand a bucket at a time. Nobody rides one.
+_Avoid_: tank car, tanker, fluid wagon
 
 **View**:
 A car's entity in a loaded chunk, showing where its Train puts it and what it holds. The Train, the car and its cargo and fuel are the level's; the view only shows them, and a car out of view has none.
@@ -97,7 +101,7 @@ A Train taking jobs, as against one driven by hand, which is manual.
 _Avoid_: autopilot, scheduled, unattended
 
 **Status line**:
-What a Train is doing, as a player reads it in its Locomotive's menu and in Jade: manual, waiting for a job, heading for or at a Station to load or unload, unable to reach one, or holding cargo with nowhere to deliver. When it heads to unload or has nowhere to deliver, the line also shows the items it carries.
+What a Train is doing, as a player reads it in its Locomotive's menu and in Jade: manual, waiting for a job, heading for or at a Station to load or unload, unable to reach one, or holding cargo with nowhere to deliver. When it heads to unload or has nowhere to deliver, the line also shows the items and fluids it carries.
 _Avoid_: state, status text, train info
 
 ### Logistics
@@ -106,12 +110,16 @@ _Avoid_: state, status text, train info
 A container beside a Station's platform at a car's floor, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: it trades with a Cargo car, and a provider fuels a Locomotive. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
 _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 
+**Fluid hatch**:
+A hatch holding one fluid in a tank, filled and emptied by any mod's pipes, which trades only with a Fluid car, as a hatch of items trades only with a Cargo car. A provider Fluid hatch fuels no Locomotive.
+_Avoid_: tank, fluid port, fluid loader
+
 **Provider**:
 A hatch offering what is put in it to requesters at the same car spot of other Stations, and fuelling the Locomotive of an automatic Train beside it from what no job claims; it never asks.
 _Avoid_: source, output hatch, giver
 
 **Requester**:
-A hatch asking for one item, so many stacks of it: automatic Trains deliver it there until it holds that many, counting the loads already on their way, and it never gives.
+A hatch asking for one item, so many stacks of it, or a Fluid hatch asking for one fluid, so many buckets of it: automatic Trains deliver it there until it holds that many, counting the loads already on their way, and it never gives.
 _Avoid_: sink, input hatch, receiver
 
 **Job**:
@@ -119,7 +127,7 @@ An automatic Train's errand: from a provider Station to a requester Station, wit
 _Avoid_: Trip (Voidworks'), order, route, schedule, task
 
 **Leftover**:
-What a Cargo car holds that no job of its Train claims, left after a requester stopped wanting it or a job was given up as cut off from its requester, or put in by hand; its Train takes only delivery jobs until it is gone.
+What a Cargo car or a Fluid car holds that no job of its Train claims, left after a requester stopped wanting it or a job was given up as cut off from its requester, or put in by hand; its Train takes only delivery jobs until it is gone.
 _Avoid_: stowed load, surplus
 
 ### Dev runs
