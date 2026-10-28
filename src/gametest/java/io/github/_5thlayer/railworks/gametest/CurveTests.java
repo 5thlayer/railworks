@@ -160,7 +160,7 @@ final class CurveTests {
         if (car.getXRot() > -10.0F) {
             helper.fail("a car climbing a quarter is pitched " + car.getXRot(), STAND);
         }
-        // Square to the floor, the Driver's seat (1.2 up, 1.8 forward in the cab) leans back down the climb and
+        // Square to the floor, the Driver's seat in the cab leans back down the climb and
         // its forward offset rises with it; the car faces east. A seated player's feet are 0.6 below it.
         Vec3 seat = driver.position().subtract(car.position());
         double climb = Math.toRadians(-car.getXRot());

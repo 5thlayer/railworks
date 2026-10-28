@@ -17,6 +17,7 @@ import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.CarBody;
+import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailGeometry;
@@ -126,7 +127,7 @@ final class LocomotiveTests {
             helper.fail("placing the only Locomotive left one in hand", STAND);
         }
         // Five blocks long, coupler to coupler, as every car is.
-        if (car.car().length() != 5.0) {
+        if (car.car().length() != Locomotive.LENGTH) {
             helper.fail("the placed Locomotive is " + car.car().length() + " blocks long, not five", STAND);
         }
         helper.succeed();
@@ -407,8 +408,8 @@ final class LocomotiveTests {
     }
 
     /**
-     * A rider sits in the cab, {@link CarBody#CAB_SEAT}'s 1.8 forward of the car's middle the way it
-     * faces, their eye at 2.22.
+     * A rider sits in the cab, {@link CarBody#CAB_SEAT}, forward of the car's middle the way it
+     * faces.
      */
     private static void seatsForward(GameTestHelper helper, float lookYaw, int east) {
         ServerPlayer placer = player(helper, lookYaw);

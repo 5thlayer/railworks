@@ -33,13 +33,11 @@ import net.minecraft.world.phys.Vec3;
 final class LocomotiveSeatTests {
 
     /**
-     * The cab's seat, {@link CarBody#CAB_SEAT}: in the car's front block, 1.8 forward of its middle,
-     * a seated player's feet 0.6 below it, 0.6 over the floor's underside.
+     * The cab's seat, {@link CarBody#CAB_SEAT}: in the cab, a seated player's feet 0.6 below it, 0.6 over the floor's underside.
      */
     private static final Vec3 CAB = new Vec3(CarBody.CAB_SEAT.x(), CarBody.CAB_SEAT.y() - 0.6, CarBody.CAB_SEAT.z());
     /**
-     * Standing in the bay, {@link CarBody#BAY_SPOT}: behind the Engine room, 1.45 behind the car's
-     * middle, on the floor's top 0.7 over its underside.
+     * Standing in the bay, {@link CarBody#BAY_SPOT}: mid-bay behind the Engine room, on the floor's top 0.7 over its underside.
      */
     private static final Vec3 BAY = new Vec3(CarBody.BAY_SPOT.x(), CarBody.BAY_SPOT.y(), CarBody.BAY_SPOT.z());
 
