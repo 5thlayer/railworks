@@ -1,0 +1,363 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: what do a Locomotive and a Cargo car look like at 5 blocks long,
+  against today's (3 and 2) and a matched 3? Five variants, switchable by ?variant= and the bottom bar
+  (or the arrow keys). The boxes are CarBody's (rail/CarBody.java), ported by hand and stretched; the
+  5-block variants are guesses at what fills the extra length. Not the mod's code; never shipped.
+  Open the file in a browser: drag to orbit, scroll to zoom, right-drag to pan.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Length Prototype</title>
+<style>
+  :root { --bg: #9cc7e8; --panel: rgba(20,14,12,.82); --ink: #f3ece6; --accent: #e8b04a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #info { position: fixed; top: 12px; left: 12px; max-width: min(420px, calc(100vw - 48px)); background: var(--panel); color: var(--ink); padding: 12px 14px; border-radius: 10px; }
+  #info h1 { font-size: 16px; margin: 0 0 6px; color: var(--accent); }
+  #info p { margin: 4px 0 8px; }
+  #info table { border-collapse: collapse; width: 100%; }
+  #info td { padding: 2px 0; vertical-align: top; }
+  #info td:last-child { text-align: right; font-variant-numeric: tabular-nums; padding-left: 12px; }
+  #legend { margin-top: 8px; font-size: 12px; opacity: .85; }
+  #legend span { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 8px; vertical-align: -1px; border-radius: 2px; }
+  #bar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: #111; color: #fff; padding: 8px 12px; border-radius: 999px; box-shadow: 0 4px 16px rgba(0,0,0,.4); font-weight: 600; white-space: nowrap; }
+  #bar button { background: #333; color: #fff; border: 0; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; }
+  #bar button:hover { background: #555; }
+  #views { position: fixed; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; }
+  #views button { background: var(--panel); color: var(--ink); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  @media (max-width: 640px) { #info { font-size: 12px; } #views { top: auto; bottom: 70px; } }
+</style>
+</head>
+<body>
+<div id="info"></div>
+<div id="views">
+  <button data-view="side">Side</button>
+  <button data-view="three">¾</button>
+  <button data-view="top">Top</button>
+  <button data-view="eye">Beside, eye height</button>
+</div>
+<div id="bar"><button id="prev" aria-label="Previous variant">←</button><span id="label"></span><button id="next" aria-label="Next variant">→</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ---- CarBody's paints -------------------------------------------------------------------------
+const PAINT = {
+  SHELL: [0.62, 0.27, 0.18], DARK_RUST: [0.40, 0.17, 0.12], TRIM: [0.13, 0.08, 0.07],
+  DEEP_RED: [0.30, 0.10, 0.08], LAMP: [0.95, 0.90, 0.62], TANK: [0.72, 0.42, 0.33],
+  CHEST: [0.55, 0.36, 0.17], CHEST_DARK: [0.30, 0.19, 0.09], LATCH: [0.75, 0.75, 0.75],
+};
+const GAP = 0.2, BAND_BOTTOM = 1.64, BAND_TOP = 2.5, WINDOW_SILL = 1.7, WINDOW_HEAD = 2.44, BAY_WALL_TOP = 1.3;
+
+// A part is [paint, minX, minY, minZ, maxX, maxY, maxZ] in the car's own coordinates: x across,
+// y up from the floor's underside, z along the car, +z its front.
+const P = (paint, x0, y0, z0, x1, y1, z1) => [paint, x0, y0, z0, x1, y1, z1];
+const mirrored = p => [p[0], -p[4], p[2], p[3], -p[1], p[5], p[6]];
+const turned = p => [p[0], p[1], p[2], -p[6], p[4], p[5], -p[3]];
+const sides = (parts, p) => { parts.push(p, mirrored(p)); };
+const ends = (parts, p) => { parts.push(p, turned(p)); };
+
+function shell(length) {
+  const h = length / 2, parts = [];
+  sides(parts, P('DARK_RUST', 0.17, 0, -h + 0.01, 0.49, 0.62, h - 0.01));
+  parts.push(P('SHELL', -0.5, 0.55, -h, 0.5, 0.7, h));
+  return parts;
+}
+const roof = (back, front, top = 2.75) => P('SHELL', -0.5, top - 0.15, back, 0.5, top, front);
+
+// A cab from cabBack to the front end h, as CarBody.locomotive() draws it: side walls round an open
+// window, the band, a back wall with its door, an open front framed dark, the nose and two lamps.
+function cab(parts, cabBack, h) {
+  const wb = cabBack + 0.65, wf = h - 0.16;
+  parts.push(roof(cabBack, h));
+  sides(parts, P('SHELL', 0.42, 0.68, cabBack + 0.015, 0.49, WINDOW_SILL - 0.005, h - 0.06));
+  sides(parts, P('SHELL', 0.42, WINDOW_HEAD + 0.005, cabBack + 0.015, 0.49, 2.62, h - 0.06));
+  sides(parts, P('SHELL', 0.425, BAND_BOTTOM + 0.05, cabBack + 0.02, 0.485, BAND_TOP - 0.05, wb + 0.005));
+  sides(parts, P('SHELL', 0.425, BAND_BOTTOM + 0.05, wf - 0.005, 0.485, BAND_TOP - 0.05, h - 0.065));
+  sides(parts, P('TRIM', 0.47, BAND_BOTTOM, cabBack, 0.5, BAND_TOP, wb));
+  sides(parts, P('TRIM', 0.47, BAND_BOTTOM, wf, 0.5, BAND_TOP, h));
+  sides(parts, P('TRIM', 0.472, BAND_BOTTOM + 0.005, wb - 0.005, 0.498, WINDOW_SILL, wf + 0.005));
+  sides(parts, P('TRIM', 0.472, WINDOW_HEAD, wb - 0.005, 0.498, BAND_TOP - 0.005, wf + 0.005));
+  parts.push(P('SHELL', -0.45, 0.67, cabBack + 0.01, 0.45, 2.63, cabBack + 0.08));
+  parts.push(P('DARK_RUST', -0.25, 0.75, cabBack, 0.25, 2.35, cabBack + 0.03));
+  sides(parts, P('TRIM', 0.3, 0.66, h - 0.14, 0.495, 2.64, h - 0.015));
+  parts.push(P('TRIM', -0.49, 2.45, h - 0.05, 0.49, 2.65, h - 0.005));
+  parts.push(P('TRIM', -0.31, 0.65, h - 0.12, 0.31, 1.6, h - 0.02));
+  parts.push(P('DEEP_RED', -0.5, 0.72, h - 0.04, 0.5, 1.45, h - 0.01));
+  sides(parts, P('LAMP', 0.22, 1.1, h - 0.025, 0.36, 1.3, h));
+}
+
+// The bay's low wall from back to front, with its dark rail; closed across the back when asked.
+function bay(parts, back, front, closeBack = true) {
+  sides(parts, P('SHELL', 0.425, 0.685, back + 0.015, 0.485, BAY_WALL_TOP, front + 0.02));
+  sides(parts, P('TRIM', 0.41, BAY_WALL_TOP - 0.005, back, 0.5, BAY_WALL_TOP + 0.08, front + 0.03));
+  if (closeBack) {
+    parts.push(P('SHELL', -0.45, 0.69, back + 0.01, 0.45, BAY_WALL_TOP - 0.01, back + 0.07));
+    parts.push(P('TRIM', -0.495, BAY_WALL_TOP - 0.015, back + 0.005, 0.495, BAY_WALL_TOP + 0.075, back + 0.065));
+  }
+}
+
+// A closed engine room from back to front, lower than the cab, louvred along its sides.
+function hood(parts, back, front) {
+  parts.push(P('SHELL', -0.45, 0.69, back, 0.45, 2.2, front));
+  parts.push(roof(back - 0.02, front, 2.32));
+  for (let z = back + 0.2; z + 0.12 < front - 0.1; z += 0.3) {
+    sides(parts, P('TRIM', 0.45, 1.2, z, 0.47, 2.05, z + 0.12));
+  }
+  sides(parts, P('DARK_RUST', 0.45, 0.75, back + 0.1, 0.48, 1.1, front - 0.1));
+}
+
+// The Locomotive of today: a cab 1.8 deep at the front, an open bay behind it.
+function locoCabBay(carLength, cabDepth = 1.8) {
+  const len = carLength - GAP, h = len / 2, parts = shell(len), cb = h - cabDepth;
+  cab(parts, cb, h);
+  bay(parts, -h, cb);
+  return { parts, chests: [], seats: [{ z: h - 0.6, y: 1.2, kind: 'cab' }, { z: (cb - h) / 2, y: 0.7, kind: 'bay' }] };
+}
+
+// A cab at the front, an engine room, a short bay at the back.
+function locoHood(carLength) {
+  const len = carLength - GAP, h = len / 2, parts = shell(len), cb = h - 1.8, hb = -h + 1.3;
+  cab(parts, cb, h);
+  hood(parts, hb, cb);
+  bay(parts, -h, hb);
+  return { parts, chests: [], seats: [{ z: h - 0.6, y: 1.2, kind: 'cab' }, { z: (-h + hb) / 2, y: 0.7, kind: 'bay' }] };
+}
+
+// A cab at each end, facing out, and the bay between them.
+function locoDoubleCab(carLength) {
+  const len = carLength - GAP, h = len / 2, parts = shell(len), cb = h - 1.8;
+  const front = [];
+  cab(front, cb, h);
+  parts.push(...front, ...front.map(turned));
+  bay(parts, -cb, cb, false);
+  return { parts, chests: [], seats: [{ z: h - 0.6, y: 1.2, kind: 'cab' }, { z: 0, y: 0.7, kind: 'bay' }] };
+}
+
+// The Cargo car, as CarBody.cargo() draws it, with a recessed chest on each side at each of
+// chestAt (along z, from the middle), the facing filling the side between and around the recesses.
+function cargo(carLength, chestAt) {
+  const len = carLength - GAP, h = len / 2, parts = shell(len), R = 0.23;
+  parts.push(roof(-h, h));
+  sides(parts, P('TRIM', 0.47, BAND_BOTTOM, -h, 0.5, BAND_TOP, h));
+  ends(parts, P('SHELL', -0.45, 0.67, h - 0.08, 0.45, 2.63, h - 0.01));
+  ends(parts, P('DARK_RUST', -0.25, 0.75, h - 0.03, 0.25, 2.35, h));
+  sides(parts, P('SHELL', 0.33, 0.68, -h + 0.015, 0.39, 2.62, h - 0.015));
+  const edges = [-h + 0.02, ...chestAt.flatMap(c => [c - R + 0.01, c + R - 0.01]), h - 0.02];
+  for (let i = 0; i < edges.length; i += 2) {
+    sides(parts, P('SHELL', 0.38, 0.665, edges[i], 0.49, 2.635, edges[i + 1]));
+  }
+  for (const c of chestAt) {
+    sides(parts, P('SHELL', 0.382, 1.48, c - R, 0.488, 2.625, c + R));
+    sides(parts, P('SHELL', 0.382, 0.675, c - R, 0.488, 1.07, c + R));
+  }
+  return { parts, chests: chestAt, seats: [] };
+}
+
+// ---- The variants ------------------------------------------------------------------------------
+const VARIANTS = {
+  A: { name: 'Today: L 3, C 2', loco: 3, car: 2, build: () => [locoCabBay(3), cargo(2, [0])],
+       note: 'What #62 shipped: a three-block Locomotive and a two-block Cargo car. Car spots are 2, the leading place 3.' },
+  B: { name: 'Matched 3: L 3, C 3', loco: 3, car: 3, build: () => [locoCabBay(3), cargo(3, [-0.65, 0.65])],
+       note: 'Every car three blocks, the Cargo car with two chests a side (54 slots, a double chest).' },
+  C: { name: '5: cab and a long bay', loco: 5, car: 5, build: () => [locoCabBay(5), cargo(5, [-1.5, 0, 1.5])],
+       note: "Today's cab at the front, the bay stretched to 3 blocks behind it; Cargo with three chests a side." },
+  D: { name: '5: cab, hood and bay', loco: 5, car: 5, build: () => [locoHood(5), cargo(5, [-1.5, 0, 1.5])],
+       note: 'A closed engine room between the cab and a short bay, as a road diesel has. The extra length becomes machinery.' },
+  E: { name: '5: a cab at each end', loco: 5, car: 5, build: () => [locoDoubleCab(5), cargo(5, [-1.2, 1.2])],
+       note: 'Double-ended: a cab facing out at each end and the bay between. One Locomotive drives both ways; Cargo with two chests a side.' },
+};
+const KEYS = Object.keys(VARIANTS);
+
+// ---- Scene -------------------------------------------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9cc7e8);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x556644, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.position.set(20, 40, 25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 25, bottom: -25 });
+scene.add(sun);
+
+const mats = {};
+const mat = rgb => {
+  const k = rgb.join();
+  return mats[k] || (mats[k] = new THREE.MeshLambertMaterial({ color: new THREE.Color(...rgb) }));
+};
+const box = (group, rgb, x0, y0, z0, x1, y1, z1) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat(rgb));
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  m.castShadow = m.receiveShadow = true;
+  group.add(m);
+  return m;
+};
+
+// World: the Rail runs along x on the block-centre line z = 0, its flange's top at y = R.
+// Ground blocks fill y < 0; a block's centre is at whole x and z.
+const R = 4, FRONT = 12.5, SPOTS = 4;
+let world;
+
+function build(key) {
+  if (world) scene.remove(world);
+  world = new THREE.Group();
+  scene.add(world);
+  const v = VARIANTS[key];
+  const lead = v.loco, spot = v.car;
+  const platform = lead + SPOTS * spot;
+  const railBack = FRONT - platform - 14;
+
+  // Ground and its block grid.
+  box(world, [0.36, 0.55, 0.25], railBack - 4, -1, -12, FRONT + 12, 0, 12);
+  const grid = new THREE.GridHelper(80, 80, 0x2e4a1c, 0x2e4a1c);
+  grid.material.opacity = 0.35; grid.material.transparent = true;
+  grid.position.set(Math.round((railBack + FRONT) / 2) + 0.5, 0.002, 0.5);
+  world.add(grid);
+
+  // The Rail: flange and web, and Pylons every 8 blocks.
+  box(world, PAINT.SHELL, railBack, R - 0.15, -0.45, FRONT + 6, R, 0.45);
+  box(world, PAINT.SHELL, railBack, R, -0.15, FRONT + 6, R + 0.5, 0.15);
+  for (let x = FRONT + 4.5; x > railBack; x -= 8) {
+    box(world, [0.45, 0.45, 0.48], x - 0.3, 0, -0.3, x + 0.3, R - 0.15, 0.3);
+    box(world, [0.35, 0.35, 0.38], x - 0.45, R - 0.45, -0.45, x + 0.45, R - 0.15, 0.45);
+  }
+
+  // The platform: the leading car's place and four car spots, a hatch block beside every block
+  // of each, both sides, coloured by spot; the Station block at the front on the drive side (+z).
+  const hatchColours = [[0.85, 0.68, 0.25], [0.35, 0.55, 0.75]];
+  for (let s = -1; s < SPOTS; s++) {
+    const front = s < 0 ? FRONT : FRONT - lead - s * spot, len = s < 0 ? lead : spot;
+    for (let c = Math.ceil(front - len); c < front; c++) {
+      for (const z of [-1, 1]) {
+        const station = s < 0 && z === 1 && c === Math.ceil(FRONT - 1);
+        const col = station ? [0.55, 0.3, 0.65] : s < 0 ? [0.6, 0.6, 0.6] : hatchColours[s % 2];
+        box(world, col, c + 0.02, R - 1, z - 0.48, c + 0.98, R - 0.02, z + 0.48);
+        // Supports down to the ground, so the hatches do not float.
+        box(world, [0.5, 0.45, 0.4], c + 0.35, 0, z - 0.15, c + 0.65, R - 1, z + 0.15);
+      }
+    }
+  }
+
+  // The Train: the Locomotive, then three Cargo cars, coupled their lengths apart.
+  const [locoBody, cargoBody] = v.build();
+  const cars = [[locoBody, lead], [cargoBody, spot], [cargoBody, spot], [cargoBody, spot]];
+  let front = FRONT;
+  for (const [body, len] of cars) {
+    const middle = front - len / 2;
+    addCar(body, middle);
+    front -= len;
+  }
+
+  // Players for scale: one in the cab, one in the bay, one standing on the hatches beside.
+  const seats = locoBody.seats;
+  for (const seat of seats) {
+    player(FRONT - lead / 2 + seat.z, R + seat.y - (seat.kind === 'cab' ? 0.6 : 0), 0, seat.kind === 'cab');
+  }
+  player(FRONT - lead / 2 - 0.5, R, 1.0, false);
+  player(FRONT + 2, 0, 2.5, false);
+
+  // The info panel.
+  const fiveCar = lead + 4 * spot;
+  document.getElementById('info').innerHTML = `
+    <h1>${key}: ${v.name}</h1>
+    <p>${v.note}</p>
+    <table>
+      <tr><td>Locomotive, coupler to coupler</td><td>${lead} blocks</td></tr>
+      <tr><td>Cargo car, coupler to coupler</td><td>${spot} blocks</td></tr>
+      <tr><td>Chests a side (drawn)</td><td>${cargoBody.chests.length}</td></tr>
+      <tr><td>Platform, lead + 4 spots</td><td>${platform} blocks</td></tr>
+      <tr><td>Hatch blocks per spot, each side</td><td>${spot}</td></tr>
+      <tr><td>Train, L + 4 Cargo</td><td>${fiveCar} blocks</td></tr>
+      <tr><td>Today's platform, for scale</td><td>11 blocks</td></tr>
+    </table>
+    <div id="legend">Hatch blocks by spot:<span style="background:#999"></span>leading<span style="background:#d9ad40"></span>spots 0, 2<span style="background:#598cbf"></span>spots 1, 3<span style="background:#8c4da6"></span>Station</div>`;
+  document.getElementById('label').textContent = `${key} (${v.name})`;
+}
+
+function addCar(body, middle) {
+  const g = new THREE.Group();
+  for (const [paint, x0, y0, z0, x1, y1, z1] of body.parts) {
+    // Car z (along, +z front) is world x; car x (across) is world z.
+    box(g, PAINT[paint], z0, y0, x0, z1, y1, x1);
+  }
+  for (const c of body.chests) {
+    for (const s of [1, -1]) {
+      const zIn = s > 0 ? 0.05 : -0.44, zOut = s > 0 ? 0.44 : -0.05;
+      box(g, PAINT.CHEST, c - 0.195, 1.075, zIn, c + 0.195, 1.465, zOut);
+      box(g, PAINT.CHEST_DARK, c - 0.2, 1.33, zIn - 0.003, c + 0.2, 1.35, zOut + 0.003);
+      const face = s > 0 ? zOut : zIn;
+      box(g, PAINT.LATCH, c - 0.03, 1.27, face - 0.02, c + 0.03, 1.36, face + 0.02);
+    }
+  }
+  g.position.set(middle, R, 0);
+  world.add(g);
+}
+
+// A Steve-sized player: 0.6 wide, 1.8 tall standing, 1.2 seated.
+function player(x, y, z, seated) {
+  const g = new THREE.Group();
+  const skin = [0.85, 0.65, 0.5], shirt = [0.2, 0.6, 0.65], legs = [0.25, 0.25, 0.55];
+  if (seated) {
+    box(g, legs, -0.12, 0.6, -0.25, 0.25, 0.72, 0.25);
+  } else {
+    box(g, legs, -0.12, 0, -0.25, 0.12, 0.72, 0.25);
+  }
+  box(g, shirt, -0.12, 0.72, -0.25, 0.12, 1.35, 0.25);
+  box(g, skin, -0.2, 1.35, -0.2, 0.2, 1.8, 0.2);
+  g.position.set(x, y, z);
+  world.add(g);
+}
+
+// ---- Views and the switcher --------------------------------------------------------------------
+function view(name) {
+  const v = VARIANTS[current()], mid = FRONT - (v.loco + 3 * v.car) / 2;
+  const t = new THREE.Vector3(mid, R + 1, 0);
+  const pos = {
+    side: [mid, R + 1.5, 22], three: [mid + 12, R + 9, 18], top: [mid, R + 30, 0.01], eye: [FRONT - v.loco - 1, R + 1.62, 2.5],
+  }[name];
+  if (name === 'eye') t.set(FRONT, R + 1.5, 0.5);
+  camera.position.set(...pos);
+  controls.target.copy(t);
+  controls.update();
+}
+document.querySelectorAll('#views button').forEach(b => b.onclick = () => view(b.dataset.view));
+
+function current() {
+  const v = new URLSearchParams(location.search).get('variant');
+  return KEYS.includes(v) ? v : 'A';
+}
+function go(step) {
+  const k = KEYS[(KEYS.indexOf(current()) + step + KEYS.length) % KEYS.length];
+  const u = new URL(location.href);
+  u.searchParams.set('variant', k);
+  history.replaceState(null, '', u);
+  build(k);
+}
+document.getElementById('prev').onclick = () => go(-1);
+document.getElementById('next').onclick = () => go(1);
+addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') go(-1);
+  if (e.key === 'ArrowRight') go(1);
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+build(current());
+view('three');
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
