@@ -16,7 +16,7 @@ import java.util.function.ToLongFunction;
 
 /**
  * Automatic Trains running jobs between hatches (ADR 0008): the one place that plans jobs, claims
- * loads against the hatches, drives each automatic Train to its job's Stations, moves stacks between
+ * loads against the hatches, drives each automatic Train to its job's Stations, moves goods between
  * hatches and the cars standing at their car spots, decides when a Train leaves, and gives its status.
  * The server {@link #tick ticks} it once a tick with the level's hatches and a {@link Goods} view of
  * what they, the Cargo cars and the Fluid cars hold, and {@link #drive drives} each automatic Train in
@@ -24,11 +24,11 @@ import java.util.function.ToLongFunction;
  *
  * <p>Once every {@link #PLAN_TICKS} it plans: requesters in the order they were placed, each with
  * need left (its request less what it holds and what is on its way to it), are paired with the
- * nearest provider Station offering that item, never their own Station, and the nearest free Train,
+ * nearest provider Station offering those goods, never their own Station, and the nearest free Train,
  * one automatic with no job and empty Cargo cars and Fluid cars, that reaches the provider arriving
  * its way and the requester after it, takes the job. The job carries a load for every car spot of the requester
  * Station whose hatch asks for what the provider Station's hatch offers at the spot that car stood
- * at there, the same spot for a Train running on the same way, so one Train carries a different item
+ * at there, the same spot for a Train running on the same way, so one Train carries different goods
  * in each car, and two in one car where two hatch pairs share a spot. Each load is the least of the
  * need, the provider's unclaimed stock and the car's room.
  *
@@ -379,8 +379,8 @@ public final class Logistics<I> {
     private static <I> List<Cargo<I>> holding(Train train, Goods<I> goods) {
         Map<I, Long> items = new LinkedHashMap<>();
         for (Car car : train.cars()) {
-            if (car instanceof GoodsCar cargo) {
-                goods.contents(cargo).forEach((item, count) -> items.merge(item, count, Long::sum));
+            if (car instanceof GoodsCar goodsCar) {
+                goods.contents(goodsCar).forEach((item, count) -> items.merge(item, count, Long::sum));
             }
         }
         return counted(items);
@@ -590,13 +590,17 @@ public final class Logistics<I> {
 
     /** How far short of {@code request} {@code requester} is: what it asks for less what it holds of it. */
     private static <I> long shortOf(Hatch<I> requester, HatchRequest<I> request, Goods<I> goods) {
-        long each = requester.holds() == Goods.Kind.FLUID ? MILLIBUCKETS_PER_BUCKET : goods.stackSize(request.goods());
-        return request.count() * each - goods.held(requester, request.goods());
+        return request.count() * unit(requester.holds(), request.goods(), goods) - goods.held(requester, request.goods());
     }
 
     /** How much of {@code item} a hatch of {@code kind} moves in one turn: a stack of an item, {@link #FLUID_BUCKETS_PER_STEP} buckets of a fluid. */
     private static <I> long turn(Goods.Kind kind, I item, Goods<I> goods) {
-        return kind == Goods.Kind.FLUID ? FLUID_BUCKETS_PER_STEP * MILLIBUCKETS_PER_BUCKET : goods.stackSize(item);
+        return kind == Goods.Kind.FLUID ? FLUID_BUCKETS_PER_STEP * unit(kind, item, goods) : unit(kind, item, goods);
+    }
+
+    /** What a request of {@code kind} counts {@code item} in: a stack of an item, a bucket of a fluid. */
+    private static <I> long unit(Goods.Kind kind, I item, Goods<I> goods) {
+        return kind == Goods.Kind.FLUID ? MILLIBUCKETS_PER_BUCKET : goods.stackSize(item);
     }
 
     /**
@@ -787,7 +791,7 @@ public final class Logistics<I> {
             return false;
         }
         for (Car car : train.cars()) {
-            if (car instanceof GoodsCar cargo && !goods.empty(cargo)) {
+            if (car instanceof GoodsCar goodsCar && !goods.empty(goodsCar)) {
                 return false;
             }
         }

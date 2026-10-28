@@ -1286,6 +1286,15 @@ class LogisticsTest {
         assertEquals(buckets(10), goods.held(quarry, "oil"));
     }
 
+    @Test
+    void aChargerBesideAFluidCarGivesNothing() {
+        line();
+        Logistics.Charger besideTheFluidCar = charger(QUARRY, 0, 1_000_000L);
+        eastbound(8.5, FluidCar.create());
+        runFor(50);
+        assertEquals(1_000_000L, goods.buffers.get(besideTheFluidCar.x()));
+    }
+
     private void replace(Logistics.Hatch<String> hatch, Logistics.Hatch<String> with) {
         hatches.set(hatches.indexOf(hatch), with);
     }
