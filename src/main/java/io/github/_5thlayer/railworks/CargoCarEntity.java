@@ -96,7 +96,7 @@ public final class CargoCarEntity extends CarEntity {
 
     @Override
     protected Item getDropItem() {
-        return RailworksRegistries.CARGO_CAR.get();
+        return carKind().item();
     }
 
     @Override
