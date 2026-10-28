@@ -287,6 +287,46 @@ public final class Train {
     }
 
     /**
+     * Whether {@code car} coupled at {@code end} keeps Locomotives at the Train's ends: nothing but
+     * Locomotives between a Locomotive and an end, so L, L-C-L and L-L-C-C-L, never C-L-C. A Train
+     * saved breaking the rule runs on, but takes no car.
+     */
+    public boolean takes(End end, Car car) {
+        return takes(end, car instanceof Locomotive);
+    }
+
+    /** Whether a Locomotive, or else a Cargo car, coupled at {@code end} keeps Locomotives at the Train's ends. */
+    public boolean takes(End end, boolean locomotive) {
+        List<Boolean> makeup = new ArrayList<>(cars.size() + 1);
+        for (Car car : cars) {
+            makeup.add(car instanceof Locomotive);
+        }
+        if (end == End.FRONT) {
+            makeup.addFirst(locomotive);
+        } else {
+            makeup.addLast(locomotive);
+        }
+        return locomotivesAtEnds(makeup);
+    }
+
+    /** Whether {@code makeup}, true for each Locomotive front to back, is Locomotives, then other cars, then Locomotives. */
+    private static boolean locomotivesAtEnds(List<Boolean> makeup) {
+        boolean pastFront = false;
+        boolean intoBack = false;
+        for (boolean locomotive : makeup) {
+            if (!locomotive) {
+                if (intoBack) {
+                    return false;
+                }
+                pastFront = true;
+            } else if (pastFront) {
+                intoBack = true;
+            }
+        }
+        return true;
+    }
+
+    /**
      * The coupler on {@code car}'s {@code side}, +1 ahead of it the way it faces and -1 behind: the
      * index of the first car behind that coupler in the Train, or, when that side of the car has no
      * car coupled, the other side's. -1 for a Train of one car.

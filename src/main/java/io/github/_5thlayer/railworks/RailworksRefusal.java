@@ -18,6 +18,11 @@ public enum RailworksRefusal implements Refusal {
     OFF_SPAN,
     /** A car aimed at a Span a Train already holds, other than where it would couple: one Train holds a Span at a time. */
     SPAN_TAKEN,
+    /**
+     * A car whose coupling would leave a Locomotive between other cars of its Train: Locomotives
+     * stand only at a Train's ends ({@code Train.takes}).
+     */
+    LOCOMOTIVE_BETWEEN_CARS,
     /** A car that would sit in a block, so the Span's Clearance is not clear. */
     BLOCKED_CAR,
     /** A Station by no Rail: not beside a Span. */

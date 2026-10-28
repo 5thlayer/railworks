@@ -111,11 +111,14 @@ public final class CarPlacement {
         Car car = kind.create();
         Coupling coupling = level instanceof ServerLevel server
                 ? serverCoupling(server, network, aimed, car)
-                : clientCoupling(level, network, aimed, kind.length());
+                : clientCoupling(level, network, aimed, kind);
         Place place = coupling == null ? aimed : coupling.place();
         Vec3 rail = railPoint(network, place);
         AABB box = carBox(rail);
         BlockPos at = BlockPos.containing(box.getCenter());
+        if (coupling != null && coupling.betweenCars()) {
+            return refused(PlacementPlan.refused(at, state, RailworksRefusal.LOCOMOTIVE_BETWEEN_CARS));
+        }
         if (coupling == null ? taken(level, network, Train.of(aimed, car)) : coupling.taken()) {
             return refused(PlacementPlan.refused(at, state, RailworksRefusal.SPAN_TAKEN));
         }
@@ -146,9 +149,9 @@ public final class CarPlacement {
     /**
      * Where the car would couple, its middle with the Train's heading, and the slot the server
      * couples it into (null on a client); {@code taken} when the coupled Train would stand on a Span
-     * another Train holds.
+     * another Train holds, and {@code betweenCars} when it would leave a Locomotive between other cars.
      */
-    private record Coupling(Place place, Trains.@Nullable Slot slot, boolean taken) {
+    private record Coupling(Place place, Trains.@Nullable Slot slot, boolean taken, boolean betweenCars) {
     }
 
     private static @Nullable Coupling serverCoupling(ServerLevel level, RailNetwork network, Place aimed, Car car) {
@@ -159,15 +162,18 @@ public final class CarPlacement {
         }
         Train coupled = slot.train().coupled(network, slot.end(), car, false);
         var taken = trains.takenFrom(network, slot.train());
-        return new Coupling(slot.place(), slot, coupled == null || coupled.spans(network).stream().anyMatch(taken));
+        return new Coupling(slot.place(), slot, coupled == null || coupled.spans(network).stream().anyMatch(taken),
+                !slot.train().takes(slot.end(), car));
     }
 
     /** The nearest place a client sees a car would couple: past a first or last car of a Train at rest. */
-    private static @Nullable Coupling clientCoupling(Level level, RailNetwork network, Place aimed, double length) {
+    private static @Nullable Coupling clientCoupling(Level level, RailNetwork network, Place aimed, CarKind kind) {
+        double length = kind.length();
         Vec3 at = railPoint(network, aimed);
         AABB around = new AABB(at, at).inflate(CarEntity.HEIGHT + Trains.COUPLING_REACH + 2.0);
         Place.Point aim = aimed.point(network);
         Place best = null;
+        boolean bestBetween = false;
         double bestDistance = Trains.COUPLING_REACH * Trains.COUPLING_REACH;
         for (CarEntity car : level.getEntitiesOfClass(CarEntity.class, around, CarEntity::seenAtRest)) {
             Place seen = car.seenPlace(network);
@@ -190,10 +196,11 @@ public final class CarPlacement {
                 if (distance <= bestDistance) {
                     bestDistance = distance;
                     best = moved.place();
+                    bestBetween = !car.seenTaking(kind);
                 }
             }
         }
-        return best == null ? null : new Coupling(best, null, false);
+        return best == null ? null : new Coupling(best, null, false, bestBetween);
     }
 
     /** Whether a new {@code train} would stand on a Span some Train holds: one Train holds a Span at a time. */
