@@ -130,6 +130,14 @@ _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 A hatch holding one fluid in a tank, filled and emptied by any mod's pipes, which trades only with a Fluid car, as a hatch of items trades only with a Cargo car. A provider Fluid hatch fuels no Locomotive.
 _Avoid_: tank, fluid port, fluid loader
 
+**Bellows**:
+What a hatch of items stretches across the half block to the Cargo car standing at its spot, shown while the car stands there.
+_Avoid_: chute (Create's), coupling (cars'), gangway, dock seal
+
+**Loading arm**:
+What a Fluid hatch swings across the half block to the Fluid car standing at its spot, shown while the car stands there, as a hatch of items stretches its Bellows. Not a Pylon's Arm.
+_Avoid_: pump (Pipeworks' Pump), hose, transfer hose, Bellows (for a Fluid hatch)
+
 **Charger**:
 A block beside a Station's platform where a hatch would stand, joining that Station as a hatch does, which takes FE from any mod's cable and charges the Electric Locomotive whose Engine room it stands beside, of any Train at rest there, manual or automatic. It holds no items and neither offers nor asks. The Creative Charger, for creative play and tests, never runs out and fills a Locomotive at once.
 _Avoid_: charging hatch, charging station, battery
