@@ -20,9 +20,10 @@ import org.jspecify.annotations.Nullable;
  * A Burner Locomotive's menu: the cab's slots over the player's inventory, laid out as a vanilla
  * container's, and an Automatic toggle for its Train (ADR 0008), its status line beneath. The cab
  * holds the fuel slots only, which take furnace fuel, so {@link #CAB_SLOTS} is the number of slots
- * the cab holds, not of fuel slots alone. Vanilla's packets carry all of it: the Locomotive's entity id goes to
- * the client in two of the menu's data slots, each sending a short, so the client's screen reads the
- * Train's mode and status line from the entity's synched data, and the toggle is a menu button.
+ * the cab holds, not of fuel slots alone. Vanilla's packets carry all of it: the Locomotive's
+ * entity id goes to the client in two of the menu's data slots, each sending a short, so the
+ * client's screen reads the Train's mode and status line from the entity's synched data, and the
+ * toggle is a menu button.
  */
 public final class LocomotiveMenu extends AbstractContainerMenu {
 

@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * a stack of one fuel, the fuels free to differ, and burn from the first that holds any.
  *
  * <p>Fuel in hand fills the fuel slots rather than boarding, as a provider beside it at a Station
- * does (ADR 0008, amended in #53); the rest is {@link CarEntity}'s.
+ * does (ADR 0008); the rest is {@link CarEntity}'s.
  */
 public final class LocomotiveEntity extends CarEntity {
 
@@ -50,6 +50,9 @@ public final class LocomotiveEntity extends CarEntity {
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Component> DATA_STATUS =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.COMPONENT);
+
+    /** One past its last fuel slot in the cab. */
+    private static final int FUEL_END = LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS;
 
     /** What the cab holds, which the menu shows: the fuel slots. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
@@ -137,7 +140,7 @@ public final class LocomotiveEntity extends CarEntity {
 
     /** The first of its fuel slots holding fuel; -1 for none. */
     private int firstFuelled() {
-        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS; slot++) {
+        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END; slot++) {
             if (fuelValue(level(), cab.getItem(slot)) > 0L) {
                 return slot;
             }
@@ -211,7 +214,7 @@ public final class LocomotiveEntity extends CarEntity {
     /** How many of {@code held} the fuel slots take: each holds the same fuel or nothing. */
     private int fuelRoomFor(ItemStack held) {
         int room = 0;
-        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS; slot++) {
+        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END; slot++) {
             ItemStack in = cab.getItem(slot);
             if (in.isEmpty()) {
                 room += held.getMaxStackSize();
@@ -224,7 +227,7 @@ public final class LocomotiveEntity extends CarEntity {
 
     /** Moves what fits of {@code held} into the fuel slots, those holding the same fuel first, then empty ones, and nowhere else in the cab. */
     private void fillFuel(ItemStack held) {
-        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS && !held.isEmpty(); slot++) {
+        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && !held.isEmpty(); slot++) {
             ItemStack in = cab.getItem(slot);
             if (!in.isEmpty() && ItemStack.isSameItemSameComponents(in, held)) {
                 int moved = Math.min(in.getMaxStackSize() - in.getCount(), held.getCount());
@@ -232,7 +235,7 @@ public final class LocomotiveEntity extends CarEntity {
                 held.shrink(moved);
             }
         }
-        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS && !held.isEmpty(); slot++) {
+        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && !held.isEmpty(); slot++) {
             if (cab.getItem(slot).isEmpty()) {
                 int moved = Math.min(held.getMaxStackSize(), held.getCount());
                 cab.setItem(slot, held.copyWithCount(moved));
@@ -289,10 +292,14 @@ public final class LocomotiveEntity extends CarEntity {
         entityData.define(DATA_STATUS, Component.empty());
     }
 
+    /** Its cab, every slot in its place, empty ones too, so a gap or two stacks of one fuel come back as they were. */
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
         super.addAdditionalSaveData(output);
-        cab.storeAsItemList(output.list("cab", ItemStack.OPTIONAL_CODEC));
+        var cabList = output.list("cab", ItemStack.OPTIONAL_CODEC);
+        for (int slot = 0; slot < cab.getContainerSize(); slot++) {
+            cabList.add(cab.getItem(slot));
+        }
     }
 
     @Override
@@ -305,6 +312,13 @@ public final class LocomotiveEntity extends CarEntity {
                     train -> adoptLegacy(train, input.getIntOr("car", 0)),
                     () -> input.read("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC).ifPresent(train -> adoptLegacy(train, 0)));
         }
-        cab.fromItemList(input.listOrEmpty("cab", ItemStack.OPTIONAL_CODEC));
+        // Slot by slot; a cab saved with one fuel slot fills the first.
+        cab.clearContent();
+        int slot = 0;
+        for (ItemStack stack : input.listOrEmpty("cab", ItemStack.OPTIONAL_CODEC)) {
+            if (slot < cab.getContainerSize()) {
+                cab.setItem(slot++, stack);
+            }
+        }
     }
 }

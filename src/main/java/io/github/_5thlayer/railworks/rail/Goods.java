@@ -7,8 +7,8 @@ import java.util.Map;
 
 /**
  * What only Minecraft knows of the goods {@link Logistics} moves: what hatches and Cargo cars hold,
- * and moving it between them, and what a Locomotive's fuel slots hold and take. Counts are items, of one
- * kind each, its components ignored.
+ * and moving it between them, and what a Locomotive's fuel slots hold and take. Counts are items,
+ * of one kind each, its components ignored.
  *
  * <p>Pure: no Minecraft types. {@code I} is the item's kind, the game's {@code Item}.
  */
@@ -42,14 +42,15 @@ public interface Goods<I> {
     Map<I, Long> contents(Logistics.Hatch<I> hatch);
 
     /**
-     * How many of {@code item} {@code locomotive}'s fuel slots take from a hatch: none for an item
-     * that is not fuel, or that leaves something behind when burnt, or for a Locomotive out of view.
+     * How many of {@code item} {@code locomotive}'s fuel slots take from {@code from}, as
+     * {@link #refuel} would move it: none for an item that is not fuel, or that leaves something
+     * behind when burnt, or for a Locomotive out of view.
      */
-    long fuelRoom(Locomotive locomotive, I item);
+    long fuelRoom(Logistics.Hatch<I> from, Locomotive locomotive, I item);
 
     /** Moves up to {@code most} of {@code item} from {@code from} into {@code into}'s fuel slots, as far as it holds them and they take them; how many moved. */
     long refuel(Logistics.Hatch<I> from, Locomotive into, I item, long most);
 
     /** Whether fuel waits in {@code locomotive}'s slots, so it can pull before its buffer is lit. */
-    boolean slotFuelled(Locomotive locomotive);
+    boolean slotsFuelled(Locomotive locomotive);
 }

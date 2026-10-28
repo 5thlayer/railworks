@@ -24,8 +24,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * A level's goods as {@link Logistics} asks for them: a hatch's are its record in the level's
  * {@link LevelHatches}, there with its chunk unloaded, and a Cargo car's and a Locomotive's fuel
- * slots their entity's, so a car out of view holds nothing, has no room and is not empty. An item's kind is its {@link Item}, its components
- * ignored: a stack of it moves as it is, components and all.
+ * slots their entity's, so a car out of view holds nothing, has no room and is not empty. An item's
+ * kind is its {@link Item}, its components ignored: a stack of it moves as it is, components and
+ * all.
  */
 final class LevelGoods implements Goods<Item> {
 
@@ -44,7 +45,7 @@ final class LevelGoods implements Goods<Item> {
 
     @Override
     public long held(Logistics.Hatch<Item> hatch, Item item) {
-        ItemStacksResourceHandler contents = handler(hatch);
+        ItemStacksResourceHandler contents = hatchContents(hatch);
         long held = 0;
         for (int slot = 0; contents != null && slot < contents.size(); slot++) {
             if (contents.getResource(slot).is(item)) {
@@ -86,7 +87,7 @@ final class LevelGoods implements Goods<Item> {
 
     @Override
     public long load(Logistics.Hatch<Item> from, CargoCar into, Item item, long most) {
-        ItemStacksResourceHandler contents = handler(from);
+        ItemStacksResourceHandler contents = hatchContents(from);
         SimpleContainer cargo = cargo(into);
         if (contents == null || cargo == null) {
             return 0;
@@ -116,7 +117,7 @@ final class LevelGoods implements Goods<Item> {
 
     @Override
     public long unload(CargoCar from, Logistics.Hatch<Item> into, Item item, long most) {
-        ItemStacksResourceHandler contents = handler(into);
+        ItemStacksResourceHandler contents = hatchContents(into);
         SimpleContainer cargo = cargo(from);
         if (contents == null || cargo == null) {
             return 0;
@@ -146,7 +147,7 @@ final class LevelGoods implements Goods<Item> {
 
     @Override
     public Map<Item, Long> contents(Logistics.Hatch<Item> hatch) {
-        ItemStacksResourceHandler contents = handler(hatch);
+        ItemStacksResourceHandler contents = hatchContents(hatch);
         Map<Item, Long> held = new LinkedHashMap<>();
         for (int slot = 0; contents != null && slot < contents.size(); slot++) {
             ItemResource resource = contents.getResource(slot);
@@ -157,14 +158,25 @@ final class LevelGoods implements Goods<Item> {
         return held;
     }
 
+    /** The room for the first stack of {@code item} that {@code from} holds, components and all, which {@link #refuel} moves first. */
     @Override
-    public long fuelRoom(Locomotive locomotive, Item item) {
-        return rails.view(locomotive) instanceof LocomotiveEntity view ? view.fuelRoomFromHatch(new ItemStack(item)) : 0;
+    public long fuelRoom(Logistics.Hatch<Item> from, Locomotive locomotive, Item item) {
+        ItemStacksResourceHandler contents = hatchContents(from);
+        if (contents == null || !(rails.view(locomotive) instanceof LocomotiveEntity view)) {
+            return 0;
+        }
+        for (int slot = 0; slot < contents.size(); slot++) {
+            ItemResource resource = contents.getResource(slot);
+            if (resource.is(item)) {
+                return view.fuelRoomFromHatch(resource.toStack(1));
+            }
+        }
+        return 0;
     }
 
     @Override
     public long refuel(Logistics.Hatch<Item> from, Locomotive into, Item item, long most) {
-        ItemStacksResourceHandler contents = handler(from);
+        ItemStacksResourceHandler contents = hatchContents(from);
         if (contents == null || !(rails.view(into) instanceof LocomotiveEntity view)) {
             return 0;
         }
@@ -195,11 +207,11 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public boolean slotFuelled(Locomotive locomotive) {
+    public boolean slotsFuelled(Locomotive locomotive) {
         return rails.view(locomotive) instanceof LocomotiveEntity view && view.hasFuel();
     }
 
-    private @Nullable ItemStacksResourceHandler handler(Logistics.Hatch<Item> hatch) {
+    private @Nullable ItemStacksResourceHandler hatchContents(Logistics.Hatch<Item> hatch) {
         return LevelHatches.of(level).at(new BlockPos(hatch.x(), hatch.y(), hatch.z()))
                 .map(Hatches.Hatch::contents)
                 .orElse(null);

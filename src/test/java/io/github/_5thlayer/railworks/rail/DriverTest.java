@@ -34,7 +34,7 @@ class DriverTest {
 
     private final RailNetwork network = new RailNetwork();
     private final Stations stations = new Stations();
-    private final List<Locomotive> slotFuelled = new ArrayList<>();
+    private final List<Locomotive> slotsFuelled = new ArrayList<>();
 
     @BeforeEach
     void spec() {
@@ -79,7 +79,7 @@ class DriverTest {
     }
 
     private boolean tick(Driver driver, Train train) {
-        return driver.tick(network, train, slotFuelled::contains, locomotive -> 0L, span -> false);
+        return driver.tick(network, train, slotsFuelled::contains, locomotive -> 0L, span -> false);
     }
 
     /** Ticks until the driver has it at its Station, failing past the budget; how many ticks it took. */
@@ -195,11 +195,11 @@ class DriverTest {
         Locomotive locomotive = Locomotive.burner();
         Span span = network.get(A, B);
         Train train = Train.of(new Place(span, B, 15.0), locomotive);
-        slotFuelled.add(locomotive);
+        slotsFuelled.add(locomotive);
         Driver driver = new Driver(DEPOT);
         boolean there = false;
         for (int i = 0; i < BUDGET && !there; i++) {
-            there = driver.tick(network, train, slotFuelled::contains, l -> 1_000_000_000L, s -> false);
+            there = driver.tick(network, train, slotsFuelled::contains, l -> 1_000_000_000L, s -> false);
         }
         assertTrue(there, "never got there: " + train);
     }
@@ -262,7 +262,7 @@ class DriverTest {
         Driver driver = new Driver(DEPOT);
         Span held = network.get(B, C);
         for (int i = 0; i < 200; i++) {
-            driver.tick(network, train, slotFuelled::contains, l -> 0L, span -> span.equals(held));
+            driver.tick(network, train, slotsFuelled::contains, l -> 0L, span -> span.equals(held));
         }
         assertTrue(train.atRest());
         assertTrue(alongLine(train, train.cars().getFirst()) < 20.0, "it should stop short of B: " + train);

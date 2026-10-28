@@ -1032,7 +1032,7 @@ class LogisticsTest {
 
         /** Coal and wood burn and leave nothing; a lava bucket leaves its bucket, and iron does not burn. */
         @Override
-        public long fuelRoom(Locomotive locomotive, String item) {
+        public long fuelRoom(Logistics.Hatch<String> from, Locomotive locomotive, String item) {
             if (!item.equals("coal") && !item.equals("wood")) {
                 return 0;
             }
@@ -1048,7 +1048,7 @@ class LogisticsTest {
 
         @Override
         public long refuel(Logistics.Hatch<String> from, Locomotive into, String item, long most) {
-            long moved = Math.min(most, Math.min(held(from, item), fuelRoom(into, item)));
+            long moved = Math.min(most, Math.min(held(from, item), fuelRoom(from, into, item)));
             put(from, item, held(from, item) - moved);
             inLocomotives.computeIfAbsent(into.id(), id -> new HashMap<>()).merge(item, moved, Long::sum);
             return moved;
@@ -1066,7 +1066,7 @@ class LogisticsTest {
         }
 
         @Override
-        public boolean slotFuelled(Locomotive locomotive) {
+        public boolean slotsFuelled(Locomotive locomotive) {
             return inLocomotives.getOrDefault(locomotive.id(), Map.of()).values().stream().anyMatch(count -> count > 0);
         }
     }

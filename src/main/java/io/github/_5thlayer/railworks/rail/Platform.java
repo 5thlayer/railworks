@@ -14,7 +14,7 @@ import java.util.OptionalInt;
  * Station block's front edge, and the cars behind it stand back along the platform at car spots
  * {@link #SPOT} blocks apart, the first the place of the car coupled behind the leading car. The leading car,
  * usually a Locomotive, has no spot, but a hatch may stand beside its place as beside a spot, which
- * {@link #LEADING} numbers (ADR 0008, amended in #53). The platform runs back up to
+ * {@link #LEADING} numbers (ADR 0008). The platform runs back up to
  * {@link #cars()} spots, ending where the Straight leg ends, at a bend or a line's end, so no spot is
  * where a car stands on a bend. A Station at a line's end has its spots too: the leading car's front
  * stands over the end Arm, half a block past it, as a car runs on until its middle meets the end.
@@ -49,13 +49,16 @@ public final class Platform {
     public record Joined(Station station, int spot) {
     }
 
-    /** A block beside a car spot or the leading car's place, where a hatch may stand: the spot's index, or {@link #LEADING}, and the block's position. */
+    /**
+     * A block beside a car spot or the leading car's place, where a hatch may stand: the spot's
+     * index, or {@link #LEADING}, and the block's position.
+     */
     public record Beside(int spot, int x, int y, int z) {
     }
 
     /**
-     * The blocks beside one car spot, or the leading car's place, on one side of the Rail, the two a hatch may stand in there,
-     * and whether the Line runs along x there, rather than z.
+     * The blocks beside one car spot, or the leading car's place, on one side of the Rail, the two
+     * a hatch may stand in there, and whether the Line runs along x there, rather than z.
      */
     public record Side(List<Beside> blocks, boolean alongX) {
 
