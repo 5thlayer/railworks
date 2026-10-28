@@ -104,7 +104,7 @@ final class CargoCarTests {
         }
         // Five blocks apart, middle to middle: half a five-block Locomotive and half a five-block Cargo car.
         double gap = locomotive.getX() - cargo.getX();
-        if (Math.abs(gap - 5.0) > 1e-6) {
+        if (Math.abs(gap - (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0) > 1e-6) {
             helper.fail("the coupled car stands " + gap + " behind the Locomotive", STAND);
         }
         helper.succeed();
@@ -123,7 +123,7 @@ final class CargoCarTests {
             helper.fail("the Cargo car did not couple ahead of the Locomotive: " + train, STAND);
             return;
         }
-        if (Math.abs(cargo.getX() - locomotive.getX() - 5.0) > 1e-6) {
+        if (Math.abs(cargo.getX() - locomotive.getX() - (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0) > 1e-6) {
             helper.fail("the car coupled ahead stands " + (cargo.getX() - locomotive.getX()) + " ahead of the Locomotive, not five", STAND);
         }
         helper.succeed();
@@ -160,7 +160,7 @@ final class CargoCarTests {
             helper.fail("placing the only Cargo car left one in hand", STAND);
         }
         // Five blocks long, coupler to coupler, as every car is.
-        if (cargo.car().length() != 5.0) {
+        if (cargo.car().length() != CargoCar.LENGTH) {
             helper.fail("the placed Cargo car is " + cargo.car().length() + " blocks long, not five", STAND);
         }
         helper.succeed();

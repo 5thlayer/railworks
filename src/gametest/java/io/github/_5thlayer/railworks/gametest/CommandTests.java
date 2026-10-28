@@ -9,6 +9,8 @@ import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
+import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -129,7 +131,7 @@ final class CommandTests {
         helper.assertTrue(trains.size() == 1 && trains.getFirst() != null && trains.getFirst().cars().size() == 2,
                 "the Cargo car did not couple into the Locomotive's Train: " + trains);
         double apart = Math.abs(cars.get(0).getX() - cars.get(1).getX());
-        helper.assertTrue(Math.abs(apart - 5.0) < 1e-6, "the coupled cars stand " + apart + " apart, not five");
+        helper.assertTrue(Math.abs(apart - (Locomotive.LENGTH + CargoCar.LENGTH) / 2.0) < 1e-6, "the coupled cars stand " + apart + " apart, not five");
         helper.succeed();
     }
 

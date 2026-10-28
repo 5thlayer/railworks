@@ -28,8 +28,8 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
     public static final double HEIGHT = 2.75;
     /**
      * What a car's body falls short of its length, coupler to coupler, half at each end: two coupled
-     * bodies stand this far apart. Every car is five blocks long, so a stopped Train's cars line up
-     * with the blocks.
+     * bodies stand this far apart. Every car is a whole number of blocks long, so a stopped Train's
+     * cars line up with the blocks.
      */
     public static final double GAP = 0.2;
 
@@ -131,12 +131,12 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
      * its bay begins, along z: the Engine room is the car's middle block, and the cab and the bay its
      * two blocks either side.
      */
-    public static final double CAB_BACK = 0.5;
-    public static final double BAY_FRONT = -0.5;
+    static final double CAB_BACK = 0.5;
+    static final double BAY_FRONT = -0.5;
 
     /**
      * Where the Locomotive's Driver sits, in the cab, above the floor's underside and 0.6 short of
-     * the car's front. Only a Locomotive is ridden.
+     * its body's front. Only a Locomotive is ridden.
      */
     public static final Point CAB_SEAT = new Point(0.0, 1.2, LOCOMOTIVE_LENGTH / 2.0 - 0.6);
     /**
@@ -148,7 +148,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
     /** Where a Cargo car's chests are along z, one a side at each: over its three inner blocks. */
     private static final double[] CHESTS_AT = {-1.0, 0.0, 1.0};
     /** Half a chest's recess along z. */
-    private static final double RECESS = 0.23;
+    private static final double HALF_RECESS = 0.23;
 
     public static final CarBody LOCOMOTIVE = locomotive();
     public static final CarBody ELECTRIC = electric();
@@ -250,8 +250,8 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         sides(parts, new Part(Paint.SHELL, 0.33, 0.68, -half + 0.015, 0.39, 2.62, half - 0.015));
         List<Double> edges = new ArrayList<>(List.of(-half + 0.02));
         for (double at : CHESTS_AT) {
-            edges.add(at - RECESS + 0.01);
-            edges.add(at + RECESS - 0.01);
+            edges.add(at - HALF_RECESS + 0.01);
+            edges.add(at + HALF_RECESS - 0.01);
         }
         edges.add(half - 0.02);
         for (int i = 0; i < edges.size(); i += 2) {
@@ -259,8 +259,8 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         }
         List<Box> chests = new ArrayList<>();
         for (double at : CHESTS_AT) {
-            sides(parts, new Part(Paint.SHELL, 0.382, 1.48, at - RECESS, 0.488, 2.625, at + RECESS));
-            sides(parts, new Part(Paint.SHELL, 0.382, 0.675, at - RECESS, 0.488, 1.07, at + RECESS));
+            sides(parts, new Part(Paint.SHELL, 0.382, 1.48, at - HALF_RECESS, 0.488, 2.625, at + HALF_RECESS));
+            sides(parts, new Part(Paint.SHELL, 0.382, 0.675, at - HALF_RECESS, 0.488, 1.07, at + HALF_RECESS));
             // The chest fills a cube in the recess, its lock just behind the facing.
             Box chest = new Box(0.05, 1.075, at - 0.195, 0.44, 1.465, at + 0.195);
             chests.add(chest);
