@@ -57,8 +57,16 @@ One of the Locomotives, Cargo cars and Fluid cars a Train is made of, coupled to
 _Avoid_: wagon, carriage, vehicle, rolling stock
 
 **Locomotive**:
-A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside it at a Station; the Electric Locomotive runs on a charge of FE, put in only by a Charger beside it at a Station. Each pulls only while it holds fuel or charge.
+A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside it at a Station; the Electric Locomotive runs on a charge of FE, put in only by a Charger beside it at a Station. Each pulls only while it holds fuel or charge. Each is three blocks long, with a cab for its driver and a bay behind for one rider. Locomotives stand only at a Train's ends, alone or several together: nothing but Locomotives lies between one and an end.
 _Avoid_: engine (Wireworks' steam engine), loco
+
+**Driver**:
+The player in a Locomotive's cab, who drives a manual Train. Only a player drives.
+_Avoid_: passenger, operator, conductor
+
+**Rider**:
+Whoever rides a Locomotive but does not drive it, in the bay behind the cab: one mob, or a second player.
+_Avoid_: passenger (for every entity mounted), mob rider, seat 1
 
 **Cargo car**:
 A car that carries items, loaded and unloaded by the hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand through what it holds, which using it opens. Nobody rides one.
