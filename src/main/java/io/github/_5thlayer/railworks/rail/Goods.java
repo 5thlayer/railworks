@@ -23,7 +23,7 @@ public interface Goods<I> {
     /** How many of {@code item} {@code car} holds. */
     long held(CargoCar car, I item);
 
-    /** What {@code car} holds, item by item in the order of its slots; nothing for a car out of view. */
+    /** What {@code car} holds, item by item in the order of its slots; nothing for a car whose goods are not known. */
     Map<I, Long> contents(CargoCar car);
 
     /** Whether {@code car} holds nothing at all. */
@@ -44,7 +44,7 @@ public interface Goods<I> {
     /**
      * How many of {@code item} {@code locomotive}'s fuel slots take from {@code from}, as
      * {@link #refuel} would move it: none for an item that is not fuel, or that leaves something
-     * behind when burnt, or for a Locomotive out of view.
+     * behind when burnt, or for a Locomotive whose fuel slots are not known.
      */
     long fuelRoom(Logistics.Hatch<I> from, Locomotive locomotive, I item);
 

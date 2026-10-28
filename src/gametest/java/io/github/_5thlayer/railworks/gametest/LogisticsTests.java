@@ -4,6 +4,7 @@
 package io.github._5thlayer.railworks.gametest;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.Optional;
 
 import io.github._5thlayer.railworks.CarEntity;
@@ -12,6 +13,7 @@ import io.github._5thlayer.railworks.HatchBlock;
 import io.github._5thlayer.railworks.HatchBlockEntity;
 import io.github._5thlayer.railworks.HatchMode;
 import io.github._5thlayer.railworks.Hatches;
+import io.github._5thlayer.railworks.LevelCarRecords;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
 import io.github._5thlayer.railworks.LocomotiveEntity;
@@ -40,6 +42,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -59,8 +62,9 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * planned, stacks moved, claims broken and fuel moved is {@code LogisticsTest}'s. These tests share
  * the {@code logistics_} prefix, but for a provider beside the leading car's place filling an
  * automatic Train's Locomotive with fuel that leaves nothing behind (#53), whose names share
- * {@code refuel_}, and for a rider logging out of a Train on its job (#56), whose names share
- * {@code logout_} with {@code LocomotiveTests}' logging out.
+ * {@code refuel_}, for a rider logging out of a Train on its job (#56), whose names share
+ * {@code logout_} with {@code LocomotiveTests}' logging out, and for a job run with its Cargo car
+ * out of view (#59), whose name shares {@code record_} with {@code CarRecordTests}.
  */
 final class LogisticsTests {
 
@@ -95,6 +99,7 @@ final class LogisticsTests {
         tests.testOnItsOwn("refuel_a_manual_train_is_left_alone", 200, LogisticsTests::refuelsNoManualTrain);
         tests.testOnItsOwn("refuel_a_stack_the_fuel_slots_cannot_take_is_passed_over", 400, LogisticsTests::refuelsPastAStack);
         tests.testOnItsOwn("logout_leaves_the_riders_car_in_its_train_on_its_job", 1_200, LogisticsTests::riderLogsOut);
+        tests.testOnItsOwn("record_a_job_loads_and_unloads_a_cargo_car_out_of_view", 1_200, LogisticsTests::cargoOutOfView);
     }
 
     // ---- the mode ----
@@ -221,6 +226,38 @@ final class LogisticsTests {
                 })
                 .thenExecute(() -> forceLoad(helper, false))
                 .thenSucceed();
+    }
+
+    /** The unattended run with the Cargo car's view gone, as its chunk unloads: the hatches trade with its record. */
+    private static void cargoOutOfView(GameTestHelper helper) {
+        Shuttle shuttle = running(helper);
+        LocomotiveEntity leading = shuttle.leading();
+        UUID wagon = shuttle.cargo().carId();
+        shuttle.cargo().remove(Entity.RemovalReason.UNLOADED_TO_CHUNK);
+        helper.startSequence()
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.to_unload"))
+                .thenExecute(() -> {
+                    if (carried(helper, wagon) != 64) {
+                        helper.fail("the Cargo car out of view left the Mine with " + carried(helper, wagon)
+                                + " iron, not the stack the Depot asks for", MINE);
+                    }
+                })
+                .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.waiting"))
+                .thenExecute(() -> {
+                    long delivered = held(record(helper, REQUESTER));
+                    long left = held(record(helper, PROVIDER));
+                    if (delivered != 64 || left != 36 || carried(helper, wagon) != 0) {
+                        helper.fail("the run with the car out of view left the Depot with " + delivered + " iron and the Mine with "
+                                + left + ", the car holding " + carried(helper, wagon), DEPOT);
+                    }
+                })
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    /** How much iron the car with this id holds in its record. */
+    private static int carried(GameTestHelper helper, UUID car) {
+        return LevelCarRecords.of(helper.getLevel()).of(car).map(record -> record.countItem(Items.IRON_INGOT)).orElse(-1);
     }
 
     private static void brokenRequester(GameTestHelper helper) {

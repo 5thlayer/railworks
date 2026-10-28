@@ -20,6 +20,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github._5thlayer.railworks.network.SpansPacket;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Place;
@@ -51,9 +52,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * A level's Spans and its Trains, saved with it. The rules are {@link Stringing}'s and the storage
  * {@link RailNetwork}'s and {@link Trains}'; this is where they meet a world. It also knows each car's
- * loaded entity, its view, so a Train's tick can read its drivers' keys and its Locomotives' fuel
- * slots and move every car it has in view. Its {@link Logistics}, which runs the automatic Trains'
- * jobs between the level's hatches, ticks with the level and is not saved.
+ * loaded entity, its view, so a Train's tick can read its drivers' keys and move every car it has
+ * in view; its Locomotives' fuel slots are their records in {@link LevelCarRecords}, in view or
+ * not. Its {@link Logistics}, which runs the automatic Trains' jobs between the level's hatches,
+ * ticks with the level and is not saved.
  */
 public final class LevelRails extends SavedData {
 
@@ -155,7 +157,7 @@ public final class LevelRails extends SavedData {
             }
         }
         Predicate<Span> taken = trains.takenFrom(network, train);
-        ToLongFunction<Locomotive> ignite = locomotive -> view(locomotive) instanceof LocomotiveEntity view ? view.ignite() : 0L;
+        ToLongFunction<Locomotive> ignite = locomotive -> ignite(level, locomotive);
         if (train.automatic()) {
             logistics.drive(network, train, goods(level), ignite, taken);
         } else {
@@ -181,6 +183,18 @@ public final class LevelRails extends SavedData {
         }
     }
 
+    /**
+     * Burns a fuel item from {@code locomotive}'s fuel slots, its record's (ADR 0008): through its view,
+     * which drops what a fuel leaves behind where it is, or, out of view, only a fuel that leaves nothing.
+     */
+    private long ignite(ServerLevel level, Locomotive locomotive) {
+        if (view(locomotive) instanceof LocomotiveEntity view) {
+            return view.ignite();
+        }
+        FuelSlots fuel = FuelSlots.of(level, locomotive);
+        return fuel == null ? 0L : fuel.igniteLeavingNothing();
+    }
+
     // ---- logistics ----
 
     /** {@code train}'s status line, as its Locomotive's menu and Jade show it. */
@@ -188,8 +202,9 @@ public final class LevelRails extends SavedData {
         return logistics.status(train, goods(level));
     }
 
-    private LevelGoods goods(ServerLevel level) {
-        return new LevelGoods(level, this);
+    /** The goods of {@code level} as its logistics sees them: what its hatches and its cars' records hold. */
+    public Goods<Item> goods(ServerLevel level) {
+        return new LevelGoods(level);
     }
 
     /** The level ticked: its logistics too, with the hatches that join a Station asked afresh once a plan. */

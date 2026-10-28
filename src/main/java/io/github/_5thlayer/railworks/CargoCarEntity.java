@@ -4,31 +4,30 @@
 package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.rail.CargoCar;
+import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.ContainerUser;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * A Cargo car in the world: the view of its {@link CargoCar}, holding a chest's worth of items,
- * which its menu, vanilla's three-row chest, shows when the car is used. It is no {@link Container}
- * and gives no item capability, so no hopper, feeder or pipe reaches its cargo: with no player
- * there, items go in and out through a Station's hatches (ADR 0008). Nobody rides it; coupling and the rest are
- * {@link CarEntity}'s.
+ * A Cargo car in the world: the view of its {@link CargoCar}, which holds a chest's worth of items
+ * in its record in the level's {@link CarRecords} (ADR 0008), shown by its menu, vanilla's three-row
+ * chest, when the car is used. It is no {@link Container} and gives no item capability, so no
+ * hopper, feeder or pipe reaches its cargo: with no player there, items go in and out through a
+ * Station's hatches (ADR 0008). Nobody rides it; coupling and the rest are {@link CarEntity}'s.
  */
 public final class CargoCarEntity extends CarEntity {
 
@@ -38,22 +37,8 @@ public final class CargoCarEntity extends CarEntity {
     /** How far from the car the player may stand with its menu open, in blocks. */
     private static final double REACH = 8.0;
 
-    private final SimpleContainer cargo = new SimpleContainer(SLOTS) {
-        @Override
-        public boolean stillValid(Player player) {
-            return isAlive() && player.distanceToSqr(CargoCarEntity.this) < REACH * REACH;
-        }
-
-        @Override
-        public void startOpen(ContainerUser user) {
-            opened(user);
-        }
-
-        @Override
-        public void stopOpen(ContainerUser user) {
-            closed(user);
-        }
-    };
+    /** Its menu's window onto its record, the same for every opener. */
+    private final Container cargo = new Cargo();
 
     /** How many have its menu open, on the server: a chest sounds for the first to open it and the last to close it. */
     private int openers;
@@ -67,8 +52,11 @@ public final class CargoCarEntity extends CarEntity {
         return CarKind.CARGO;
     }
 
-    /** What it carries: the server's, for its menu and its station's hatches. */
-    public SimpleContainer cargo() {
+    /**
+     * What it carries, on the server: a window onto its car's record in the level's
+     * {@link CarRecords}, which its menu shows and Jade reads.
+     */
+    public Container cargo() {
         return cargo;
     }
 
@@ -107,29 +95,86 @@ public final class CargoCarEntity extends CarEntity {
     }
 
     @Override
-    protected void dropContents(ServerLevel level) {
-        for (int slot = 0; slot < cargo.getContainerSize(); slot++) {
-            if (!cargo.getItem(slot).isEmpty()) {
-                spawnAtLocation(level, cargo.removeItemNoUpdate(slot));
-            }
-        }
-    }
-
-    @Override
     protected Item getDropItem() {
         return RailworksRegistries.CARGO_CAR.get();
     }
 
     @Override
-    protected void addAdditionalSaveData(ValueOutput output) {
-        super.addAdditionalSaveData(output);
-        // Slot by slot, so what was put where stays there.
-        ContainerHelper.saveAllItems(output.child("cargo"), cargo.getItems());
+    protected int recordSlots() {
+        return SLOTS;
     }
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
         super.readAdditionalSaveData(input);
-        input.child("cargo").ifPresent(saved -> ContainerHelper.loadAllItems(saved, cargo.getItems()));
+        // Cargo named on the entity, saved before the level kept its record or written by a command:
+        // slot by slot, so what was put where stays there.
+        input.child("cargo").ifPresent(saved -> {
+            NonNullList<ItemStack> stacks = NonNullList.withSize(SLOTS, ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(saved, stacks);
+            takeSaved(stacks);
+        });
+    }
+
+    /**
+     * Its record's slots, as its menu sees them: closed to a player too far off or once the car is
+     * gone, and sounding as a chest's lid does.
+     */
+    private final class Cargo implements Container {
+
+        @Override
+        public int getContainerSize() {
+            return record().getContainerSize();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return record().isEmpty();
+        }
+
+        @Override
+        public ItemStack getItem(int slot) {
+            return record().getItem(slot);
+        }
+
+        @Override
+        public ItemStack removeItem(int slot, int count) {
+            return record().removeItem(slot, count);
+        }
+
+        @Override
+        public ItemStack removeItemNoUpdate(int slot) {
+            return record().removeItemNoUpdate(slot);
+        }
+
+        @Override
+        public void setItem(int slot, ItemStack stack) {
+            record().setItem(slot, stack);
+        }
+
+        @Override
+        public void setChanged() {
+            record().setChanged();
+        }
+
+        @Override
+        public void clearContent() {
+            record().clearContent();
+        }
+
+        @Override
+        public boolean stillValid(Player player) {
+            return isAlive() && player.distanceToSqr(CargoCarEntity.this) < REACH * REACH;
+        }
+
+        @Override
+        public void startOpen(ContainerUser user) {
+            opened(user);
+        }
+
+        @Override
+        public void stopOpen(ContainerUser user) {
+            closed(user);
+        }
     }
 }

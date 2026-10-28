@@ -78,6 +78,7 @@ public final class RailworksGameTests {
         StationTests.register(tests);
         CurveTests.register(tests);
         CargoAccessTests.register(tests);
+        CarRecordTests.register(tests);
         CarSoundTests.register(tests);
         StationFacingTests.register(tests);
         HatchTests.register(tests);

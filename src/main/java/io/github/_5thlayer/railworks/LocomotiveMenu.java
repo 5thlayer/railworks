@@ -44,7 +44,7 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     /** The Locomotive's entity id, low half then high half, as the menu's data slots send it. */
     private final ContainerData carId;
 
-    /** The server's menu, over the car's own cab. */
+    /** The server's menu, over the car's fuel slots, its record in the level's {@link CarRecords}. */
     public LocomotiveMenu(int containerId, Inventory inventory, Container cab, LocomotiveEntity car) {
         super(RailworksRegistries.LOCOMOTIVE_MENU.get(), containerId);
         this.cab = cab;

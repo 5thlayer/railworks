@@ -34,6 +34,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
@@ -104,6 +105,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     private final InterpolationHandler interpolation = new InterpolationHandler(this, 3);
     /** The id of its car, which {@link LevelRails} finds its Train by. */
     private @Nullable UUID carId;
+    /** What a view with no car's record holds: on a client, or before it is set as a car's view. Saved nowhere. */
+    private @Nullable SimpleContainer loose;
 
     protected CarEntity(EntityType<? extends CarEntity> type, Level level) {
         super(type, level);
@@ -537,6 +540,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         super.onAddedToLevel();
         if (carId != null && level() instanceof ServerLevel server) {
             LevelRails.of(server).bind(this);
+            // Its record is made with its view, so a car in a Train has one in view or not.
+            record();
         }
     }
 
@@ -553,8 +558,67 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         destroy(level, damageSources().generic());
     }
 
-    /** Drops what the car holds, as it leaves the world. */
-    protected abstract void dropContents(ServerLevel level);
+    /**
+     * Copied into another level, as an entity is through a portal or {@code /tp}: its record goes with
+     * it, so the copy, finding no Train there, breaks dropping what the car held.
+     */
+    @Override
+    public void restoreFrom(Entity oldEntity) {
+        super.restoreFrom(oldEntity);
+        if (carId != null && oldEntity.level() instanceof ServerLevel from && level() instanceof ServerLevel to
+                && from != to) {
+            LevelCarRecords.of(from).remove(carId)
+                    .ifPresent(record -> LevelCarRecords.of(to).handOver(carId, recordSlots(), record.getItems()));
+        }
+    }
+
+    /** Drops what its record held where it is, and takes the record out of the level, as the car leaves the world. */
+    private void dropContents(ServerLevel level) {
+        if (carId != null) {
+            LevelCarRecords.of(level).remove(carId)
+                    .ifPresent(record -> record.removeAllItems().forEach(stack -> spawnAtLocation(level, stack)));
+        }
+    }
+
+    // ---- what it holds ----
+
+    /** How many slots its car's record holds: a Cargo car's cargo, a Locomotive's fuel slots. */
+    protected abstract int recordSlots();
+
+    /**
+     * What its car holds, on the server: the car's record in the level's {@link CarRecords} (ADR 0008),
+     * which this view only shows, made here if the car has none yet. A loose one for a view with no car.
+     */
+    protected SimpleContainer record() {
+        if (carId != null && level() instanceof ServerLevel server) {
+            return LevelCarRecords.of(server).ensure(carId, recordSlots());
+        }
+        if (loose == null) {
+            loose = new SimpleContainer(recordSlots());
+        }
+        return loose;
+    }
+
+    /**
+     * Takes what this entity's data names it holding, slot by slot, into its car's record. From a
+     * world saved before the level kept the record, as its chunk loads, only once, for a car with no
+     * record yet, so one loaded again from an older chunk keeps the record's contents. From a command
+     * writing the data of a car already in the world, {@code /data merge entity}, it is what the car
+     * holds now, its other slots emptied.
+     */
+    protected void takeSaved(List<ItemStack> saved) {
+        if (carId == null || !(level() instanceof ServerLevel server)) {
+            return;
+        }
+        if (!isAddedToLevel()) {
+            LevelCarRecords.of(server).handOver(carId, recordSlots(), saved);
+            return;
+        }
+        SimpleContainer record = record();
+        for (int slot = 0; slot < record.getContainerSize(); slot++) {
+            record.setItem(slot, slot < saved.size() ? saved.get(slot) : ItemStack.EMPTY);
+        }
+    }
 
     @Override
     public ItemStack getPickResult() {
@@ -587,14 +651,20 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         input.read("car_id", Car.ID_CODEC).ifPresent(id -> this.carId = id);
     }
 
-    /** Takes {@code train} into its level's {@link LevelRails} and views its car at {@code index}: a car saved with its own Train. */
-    protected void adoptLegacy(Train train, int index) {
+    /**
+     * Takes {@code train} into its level's {@link LevelRails} and views its car at {@code index}: a car
+     * saved with its own Train, and with what it held on it, {@code saved}, handed to its record first.
+     */
+    protected void adoptLegacy(Train train, int index, List<ItemStack> saved) {
         if (index < 0 || index >= train.cars().size() || !train.cars().get(index).kind().equals(carKind().model())
                 || !(level() instanceof ServerLevel server)) {
             return;
         }
         LevelRails.of(server).add(train);
-        setCar(train, train.cars().get(index));
+        Car car = train.cars().get(index);
+        // Before the view shows it, which would make the car an empty record.
+        LevelCarRecords.of(server).handOver(car.id(), recordSlots(), saved);
+        setCar(train, car);
     }
 
     /** Opens a menu, if {@code player} is on the server. */

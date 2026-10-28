@@ -7,6 +7,7 @@ import java.util.List;
 
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
+import io.github._5thlayer.railworks.LevelCarRecords;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.LocomotiveMenu;
@@ -556,6 +557,8 @@ final class LocomotiveTests {
         var old = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
         oneSlot.storeAsItemList(old.list("cab", ItemStack.OPTIONAL_CODEC));
         tag.put("cab", old.buildResult().get("cab"));
+        // From a world saved before the level kept the car's record: it has none.
+        LevelCarRecords.of(helper.getLevel()).remove(car.carId());
         var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
         reloaded.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
         expectSlots(helper, reloaded, List.of(new ItemStack(Items.COAL, 7), ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY));
@@ -620,6 +623,12 @@ final class LocomotiveTests {
         locomotive.putLong("fuel", car.locomotive().fuel().storedJoules());
         locomotive.putLong("last_lit", car.locomotive().fuel().lastLitJoules());
         tag.put("locomotive", locomotive);
+        // Its cab saved on it too, which its record takes in.
+        var oldCab = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
+        var cabList = oldCab.list("cab", ItemStack.OPTIONAL_CODEC);
+        cabList.add(ItemStack.EMPTY);
+        cabList.add(new ItemStack(Items.CHARCOAL, 9));
+        tag.put("cab", oldCab.buildResult().get("cab"));
         var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
         reloaded.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
         var now = reloaded.train();
@@ -629,6 +638,7 @@ final class LocomotiveTests {
                 || !reloaded.position().equals(car.position()) || !reloaded.holds(span(helper))) {
             helper.fail("a Locomotive saved before Trains had cars came back different: " + now + " at " + reloaded.position(), STAND);
         }
+        expectSlots(helper, reloaded, List.of(ItemStack.EMPTY, new ItemStack(Items.CHARCOAL, 9), ItemStack.EMPTY, ItemStack.EMPTY));
         helper.succeed();
     }
 

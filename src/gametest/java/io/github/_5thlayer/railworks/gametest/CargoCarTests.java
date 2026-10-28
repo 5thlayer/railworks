@@ -467,7 +467,7 @@ final class CargoCarTests {
     }
 
     /** A Cargo car alone on the Span. */
-    private static CargoCarEntity lone(GameTestHelper helper) {
+    static CargoCarEntity lone(GameTestHelper helper) {
         ServerPlayer player = LocomotiveTests.player(helper, -45.0F);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.CARGO_CAR.get()));
         LocomotiveTests.use(helper, player);

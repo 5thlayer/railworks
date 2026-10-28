@@ -23,19 +23,18 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A level's goods as {@link Logistics} asks for them: a hatch's are its record in the level's
- * {@link LevelHatches}, there with its chunk unloaded, and a Cargo car's and a Locomotive's fuel
- * slots their entity's, so a car out of view holds nothing, has no room and is not empty. An item's
- * kind is its {@link Item}, its components ignored: a stack of it moves as it is, components and
- * all.
+ * {@link LevelHatches}, and a Cargo car's and a Locomotive's fuel slots the car's record in its
+ * {@link LevelCarRecords}, all there with their chunks unloaded (ADR 0008). Only a car whose view
+ * has not yet made its record, one of a world saved before the level kept them whose entity has not
+ * loaded since, holds nothing, has no room and is not empty. An item's kind is its {@link Item}, its
+ * components ignored: a stack of it moves as it is, components and all.
  */
 final class LevelGoods implements Goods<Item> {
 
     private final ServerLevel level;
-    private final LevelRails rails;
 
-    LevelGoods(ServerLevel level, LevelRails rails) {
+    LevelGoods(ServerLevel level) {
         this.level = level;
-        this.rails = rails;
     }
 
     @Override
@@ -165,12 +164,13 @@ final class LevelGoods implements Goods<Item> {
     @Override
     public long fuelRoom(Logistics.Hatch<Item> from, Locomotive locomotive, Item item) {
         ItemStacksResourceHandler contents = hatchContents(from);
-        if (contents == null || !(rails.view(locomotive) instanceof LocomotiveEntity view)) {
+        FuelSlots fuel = fuel(locomotive);
+        if (contents == null || fuel == null) {
             return 0;
         }
         for (int slot = 0; slot < contents.size(); slot++) {
             ItemResource resource = contents.getResource(slot);
-            long room = resource.is(item) ? view.fuelRoomFromHatch(resource.toStack(1)) : 0;
+            long room = resource.is(item) ? fuel.roomFromHatch(resource.toStack(1)) : 0;
             if (room > 0) {
                 return room;
             }
@@ -181,7 +181,8 @@ final class LevelGoods implements Goods<Item> {
     @Override
     public long refuel(Logistics.Hatch<Item> from, Locomotive into, Item item, long most) {
         ItemStacksResourceHandler contents = hatchContents(from);
-        if (contents == null || !(rails.view(into) instanceof LocomotiveEntity view)) {
+        FuelSlots fuel = fuel(into);
+        if (contents == null || fuel == null) {
             return 0;
         }
         long moved = 0;
@@ -191,12 +192,12 @@ final class LevelGoods implements Goods<Item> {
                 continue;
             }
             ItemStack stack = resource.toStack(contents.getAmountAsInt(slot));
-            int taking = (int) Math.min(most - moved, Math.min(stack.getCount(), view.fuelRoomFromHatch(stack)));
+            int taking = (int) Math.min(most - moved, Math.min(stack.getCount(), fuel.roomFromHatch(stack)));
             if (taking <= 0) {
                 // Its components match no slot's: the next stack may still fit.
                 continue;
             }
-            int fitted = view.addFuel(stack.copyWithCount(taking));
+            int fitted = fuel.add(stack.copyWithCount(taking));
             if (fitted > 0) {
                 try (var transaction = Transaction.openRoot()) {
                     contents.extract(slot, resource, fitted, transaction);
@@ -213,7 +214,8 @@ final class LevelGoods implements Goods<Item> {
 
     @Override
     public boolean slotsFuelled(Locomotive locomotive) {
-        return rails.view(locomotive) instanceof LocomotiveEntity view && view.hasFuel();
+        FuelSlots fuel = fuel(locomotive);
+        return fuel != null && fuel.hasFuel();
     }
 
     private @Nullable ItemStacksResourceHandler hatchContents(Logistics.Hatch<Item> hatch) {
@@ -223,6 +225,10 @@ final class LevelGoods implements Goods<Item> {
     }
 
     private @Nullable SimpleContainer cargo(CargoCar car) {
-        return rails.view(car) instanceof CargoCarEntity view ? view.cargo() : null;
+        return LevelCarRecords.of(level).of(car.id()).orElse(null);
+    }
+
+    private @Nullable FuelSlots fuel(Locomotive locomotive) {
+        return FuelSlots.of(level, locomotive);
     }
 }
