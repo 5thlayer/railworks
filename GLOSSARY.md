@@ -57,7 +57,7 @@ One of the Locomotives, Cargo cars and Fluid cars a Train is made of, coupled to
 _Avoid_: wagon, carriage, vehicle, rolling stock
 
 **Locomotive**:
-A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside it at a Station; the Electric Locomotive runs on FE.
+A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside it at a Station; the Electric Locomotive runs on a charge of FE, put in only by a Charger beside it at a Station. Each pulls only while it holds fuel or charge.
 _Avoid_: engine (Wireworks' steam engine), loco
 
 **Cargo car**:
@@ -113,6 +113,14 @@ _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 **Fluid hatch**:
 A hatch holding one fluid in a tank, filled and emptied by any mod's pipes, which trades only with a Fluid car, as a hatch of items trades only with a Cargo car. A provider Fluid hatch fuels no Locomotive.
 _Avoid_: tank, fluid port, fluid loader
+
+**Charger**:
+A block beside a Station's platform at a car's floor, joining that Station as a hatch does, which takes FE from any mod's cable and charges the Electric Locomotive standing beside it, of any Train at rest there, manual or automatic. It holds no items and neither offers nor asks. The Creative Charger, for creative play and tests, never runs out and fills a Locomotive at once.
+_Avoid_: charging hatch, charging station, battery
+
+**Burner Generator**:
+A block that burns furnace fuel into FE and gives it to the energy blocks touching it, so a Charger runs in a world with no other energy mod. It powers only what touches it.
+_Avoid_: generator (any mod's), boiler, steam engine (Wireworks')
 
 **Provider**:
 A hatch offering what is put in it to requesters at the same car spot of other Stations, and fuelling the Locomotive of an automatic Train beside it from what no job claims; it never asks.
