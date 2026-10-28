@@ -184,6 +184,16 @@ public final class Logistics<I> {
         boolean stopped() {
             return leg == Leg.AT_PROVIDER || leg == Leg.AT_REQUESTER;
         }
+
+        /** The Station it is stopped at: its provider while loading, its requester while unloading. */
+        Station stoppedAt() {
+            return leg == Leg.AT_PROVIDER ? provider : requester;
+        }
+
+        /** The way its Train ran arriving at the Station it is stopped at. */
+        int wayThere() {
+            return leg == Leg.AT_PROVIDER ? wayAtProvider : wayAtRequester;
+        }
     }
 
     /**
@@ -387,7 +397,7 @@ public final class Logistics<I> {
         boolean moved = false;
         if (++run.sinceStack >= hatchTicksPerStack) {
             run.sinceStack = 0;
-            int way = loading ? job.wayAtProvider : job.wayAtRequester;
+            int way = job.wayThere();
             // Each hatch moves one stack a turn, however many loads it serves.
             List<Hatch<I>> turned = new ArrayList<>();
             for (Load<I> load : job.loads) {
@@ -439,14 +449,15 @@ public final class Logistics<I> {
         }
         run.sinceFuel = 0;
         run.moreFuel = false;
-        Station at = job == null ? null : job.leg == Leg.AT_PROVIDER ? job.provider : job.requester;
         boolean moved = false;
         Map<Station, Integer> standing = new HashMap<>();
         for (Hatch<I> hatch : hatches) {
-            if (!hatch.provider() || at != null && !hatch.station().samePlace(at)) {
+            if (!hatch.provider() || job != null && !hatch.station().samePlace(job.stoppedAt())) {
                 continue;
             }
-            Integer way = standing.computeIfAbsent(hatch.station(), station -> Driver.wayAt(network, train, station));
+            // Stopped on its job, it came the job's way; waiting, the way it stands there, if it does.
+            Integer way = standing.computeIfAbsent(hatch.station(),
+                    station -> job != null ? job.wayThere() : Driver.wayAt(network, train, station));
             if (way == 0 || !(carAt(train, way, hatch.spot()) instanceof Locomotive locomotive)) {
                 continue;
             }

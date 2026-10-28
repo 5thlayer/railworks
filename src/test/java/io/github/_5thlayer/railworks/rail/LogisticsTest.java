@@ -647,6 +647,27 @@ class LogisticsTest {
         runUntil(() -> goods.held(depot, "iron") == 64, "delivered");
     }
 
+    @Test
+    void aTrainOnItsWayHeldAtAnotherStationTakesNoFuelThere() {
+        line();
+        // South of the line, serving Trains heading for C: the leading car at 18.5, a block short of B.
+        Station siding = new Station(19, 6, 1, "Siding");
+        provider(siding, Platform.LEADING, "coal", 64);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = eastbound(5.0, 1);
+        Locomotive locomotive = (Locomotive) train.cars().getFirst();
+        goods.put(cargo(train, 1), "iron", 10);
+        // A Train on the Span from B, so it is held at B on its way to deliver, by the Siding.
+        trains.add(Train.of(onLine(30.0), fuelled()));
+        runUntil(() -> train.atRest() && train.head().toFront() == 1.0, "held at B");
+        runFor(100);
+        assertEquals(Logistics.Kind.TO_UNLOAD, kind(train));
+        assertEquals(0, goods.fuel(locomotive, "coal"), "on its way, not at its job's Station");
+        // Its requester gone, it waits there holding, and is fuelled.
+        hatches.remove(depot);
+        runUntil(() -> goods.fuel(locomotive, "coal") > 0, "fuelled waiting");
+    }
+
     // ---- claims break ----
 
     @Test
