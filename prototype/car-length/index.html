@@ -229,6 +229,16 @@ const box = (group, rgb, x0, y0, z0, x1, y1, z1) => {
   return m;
 };
 
+// A see-through box with its edges drawn, for a place rather than a block.
+function ghost(rgb, x0, y0, z0, x1, y1, z1) {
+  const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(...rgb), transparent: true, opacity: 0.3, depthWrite: false }));
+  const l = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: new THREE.Color(...rgb) }));
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  l.position.copy(m.position);
+  world.add(m, l);
+}
+
 // World: the Rail runs along x on the block-centre line z = 0, its flange's top at y = R.
 // Ground blocks fill y < 0; a block's centre is at whole x and z.
 const R = 4, FRONT = 12.5, SPOTS = 4;
@@ -272,9 +282,17 @@ function build(key) {
         const station = s < 0 && z === off && c === FRONT - 0.5;
         const fuel = v.fuelHatch && s < 0 && c === FRONT - lead / 2 && !station;
         const col = station ? [0.55, 0.3, 0.65] : fuel ? [0.9, 0.45, 0.1] : s < 0 ? [0.6, 0.6, 0.6] : hatchColours[s % 2];
-        box(world, col, c - 0.48, hatchY, z - 0.48, c + 0.48, hatchY + 0.98, z + 0.48);
-        // Supports down to the ground, so the hatches do not float.
-        box(world, [0.5, 0.45, 0.4], c - 0.15, 0, z - 0.15, c + 0.15, hatchY, z + 0.15);
+        if (v.hatchAtChests) {
+          // The hatch's place, a see-through box, and the platform a player stands on two blocks
+          // under it, one colour and solid.
+          ghost(col, c - 0.48, hatchY, z - 0.48, c + 0.48, hatchY + 0.98, z + 0.48);
+          box(world, [0.55, 0.55, 0.58], c - 0.5, hatchY - 2, z - 0.5, c + 0.5, hatchY - 1, z + 0.5);
+          box(world, [0.5, 0.45, 0.4], c - 0.15, 0, z - 0.15, c + 0.15, hatchY - 2, z + 0.15);
+        } else {
+          box(world, col, c - 0.48, hatchY, z - 0.48, c + 0.48, hatchY + 0.98, z + 0.48);
+          // Supports down to the ground, so the hatches do not float.
+          box(world, [0.5, 0.45, 0.4], c - 0.15, 0, z - 0.15, c + 0.15, hatchY, z + 0.15);
+        }
       }
     }
   }
@@ -318,7 +336,7 @@ function build(key) {
   for (const seat of seats) {
     player(FRONT - lead / 2 + seat.z, R + seat.y - (seat.kind === 'cab' ? 0.6 : 0), 0, seat.kind === 'cab');
   }
-  player(FRONT - lead / 2 - 0.5, hatchY + 1, off, false);
+  player(FRONT - lead / 2 - 0.5, v.hatchAtChests ? hatchY - 1 : hatchY + 1, off, false);
   player(FRONT + 2, 0, 2.5, false);
 
   // The info panel.
