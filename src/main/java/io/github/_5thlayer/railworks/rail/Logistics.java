@@ -377,13 +377,13 @@ public final class Logistics<I> {
 
     /** What {@code train}'s Cargo cars and Fluid cars hold between them, kind by kind from its first car. */
     private static <I> List<Cargo<I>> holding(Train train, Goods<I> goods) {
-        Map<I, Long> items = new LinkedHashMap<>();
+        Map<I, Long> held = new LinkedHashMap<>();
         for (Car car : train.cars()) {
             if (car instanceof GoodsCar goodsCar) {
-                goods.contents(goodsCar).forEach((item, count) -> items.merge(item, count, Long::sum));
+                goods.contents(goodsCar).forEach((what, count) -> held.merge(what, count, Long::sum));
             }
         }
-        return counted(items);
+        return counted(held);
     }
 
     /** {@code items}' counts, those above none. */
@@ -595,10 +595,10 @@ public final class Logistics<I> {
 
     /** How much of {@code item} a hatch of {@code kind} moves in one turn: a stack of an item, {@link #FLUID_BUCKETS_PER_STEP} buckets of a fluid. */
     private static <I> long turn(Goods.Kind kind, I item, Goods<I> goods) {
-        return kind == Goods.Kind.FLUID ? FLUID_BUCKETS_PER_STEP * unit(kind, item, goods) : unit(kind, item, goods);
+        return (kind == Goods.Kind.FLUID ? FLUID_BUCKETS_PER_STEP : 1) * unit(kind, item, goods);
     }
 
-    /** What a request of {@code kind} counts {@code item} in: a stack of an item, a bucket of a fluid. */
+    /** What a hatch of {@code kind} counts {@code item} in, its requests and its turns: a stack of an item, a bucket of a fluid. */
     private static <I> long unit(Goods.Kind kind, I item, Goods<I> goods) {
         return kind == Goods.Kind.FLUID ? MILLIBUCKETS_PER_BUCKET : goods.stackSize(item);
     }
