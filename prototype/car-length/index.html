@@ -15,6 +15,7 @@
   :root { --bg: #9cc7e8; --panel: rgba(20,14,12,.82); --ink: #f3ece6; --accent: #e8b04a; }
   html, body { margin: 0; height: 100%; background: var(--bg); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
   #info { position: fixed; top: 12px; left: 12px; max-width: min(420px, calc(100vw - 48px)); background: var(--panel); color: var(--ink); padding: 12px 14px; border-radius: 10px; }
+  #info.hidden { display: none; }
   #info h1 { font-size: 16px; margin: 0 0 6px; color: var(--accent); }
   #info p { margin: 4px 0 8px; }
   #info table { border-collapse: collapse; width: 100%; }
@@ -33,6 +34,7 @@
 <body>
 <div id="info"></div>
 <div id="views">
+  <button id="toggle-info">Hide info (i)</button>
   <button data-view="side">Side</button>
   <button data-view="three">¾</button>
   <button data-view="top">Top</button>
@@ -377,7 +379,12 @@ function view(name) {
   controls.target.copy(t);
   controls.update();
 }
-document.querySelectorAll('#views button').forEach(b => b.onclick = () => view(b.dataset.view));
+document.querySelectorAll('#views button[data-view]').forEach(b => b.onclick = () => view(b.dataset.view));
+function toggleInfo() {
+  const hidden = document.getElementById('info').classList.toggle('hidden');
+  document.getElementById('toggle-info').textContent = hidden ? 'Show info (i)' : 'Hide info (i)';
+}
+document.getElementById('toggle-info').onclick = toggleInfo;
 
 function current() {
   const v = new URLSearchParams(location.search).get('variant');
@@ -396,6 +403,7 @@ addEventListener('keydown', e => {
   if (e.target.closest('input, textarea, [contenteditable]')) return;
   if (e.key === 'ArrowLeft') go(-1);
   if (e.key === 'ArrowRight') go(1);
+  if (e.key === 'i') toggleInfo();
 });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
