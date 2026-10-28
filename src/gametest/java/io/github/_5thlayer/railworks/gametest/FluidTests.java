@@ -126,6 +126,8 @@ final class FluidTests {
                 FluidTests::leftover);
         tests.testOnItsOwn("fluid_a_mixed_train_trades_each_car_only_with_a_hatch_of_its_kind", 1_200, FluidTests::mixed);
         tests.testOnItsOwn("fluid_a_provider_fluid_hatch_fuels_no_locomotive", 200, FluidTests::fuelsNone);
+        // It sets the server config's tank for every Fluid car made meanwhile.
+        tests.testOnItsOwn("fluid_car_tank_holds_the_buckets_the_server_config_sets", 20, FluidTests::configuredTank);
     }
 
     // ---- crafting ----
@@ -359,10 +361,25 @@ final class FluidTests {
         CarRecords records = CarRecords.CODEC.parse(ops, CarRecords.CODEC.encodeStart(ops, LevelCarRecords.of(helper.getLevel()))
                 .getOrThrow()).getOrThrow();
         Tank tank = records.of(fluid.carId()).orElseThrow().tank();
-        if (tank.capacity() != FluidCar.DEFAULT_TANK_BUCKETS * BUCKET) {
+        if (tank.capacity() != 160 * BUCKET) {
             helper.fail("the Fluid car's tank came back holding " + tank.capacity(), LocomotiveTests.STAND);
         }
         expectTank(helper, tank, Fluids.LAVA, 7 * BUCKET, "the car saved and loaded");
+        helper.succeed();
+    }
+
+    private static void configuredTank(GameTestHelper helper) {
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        FluidCarEntity fluid;
+        FluidCarEntity.configure(12);
+        try {
+            fluid = placeBeside(helper, locomotive);
+        } finally {
+            FluidCarEntity.configure(FluidCar.DEFAULT_TANK_BUCKETS);
+        }
+        if (fluid.tank().capacity() != 12 * BUCKET) {
+            helper.fail("a Fluid car made with 12 buckets set holds " + fluid.tank().capacity(), LocomotiveTests.STAND);
+        }
         helper.succeed();
     }
 

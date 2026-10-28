@@ -280,8 +280,8 @@ final class CargoCarTests {
         if (!cargo.cargo().getItem(5).is(Items.IRON_ORE) || cargo.cargo().getItem(5).getCount() != 40) {
             helper.fail("the cargo did not take the ore, slot 5 holds " + cargo.cargo().getItem(5), STAND);
         }
-        if (cargo.cargo().getContainerSize() != CargoCarEntity.SLOTS || menu.getRowCount() != 3) {
-            helper.fail("the cargo is not a chest's three rows", STAND);
+        if (cargo.cargo().getContainerSize() != 54 || menu.getRowCount() != 6) {
+            helper.fail("the cargo is not a double chest's six rows", STAND);
         }
         player.setPos(player.getX() + 20.0, player.getY(), player.getZ());
         if (menu.stillValid(player)) {
