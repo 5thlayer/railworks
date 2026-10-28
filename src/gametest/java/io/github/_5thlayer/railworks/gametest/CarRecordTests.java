@@ -141,7 +141,7 @@ final class CarRecordTests {
             ResourceHandlerUtil.insertStacking(hatch.contents(), ItemResource.of(Items.COAL), 10, transaction);
             transaction.commit();
         }
-        var from = new Logistics.Hatch<Item>(at.getX(), at.getY(), at.getZ(), null, 0, true, Optional.empty());
+        var from = new Logistics.Hatch<Item>(at.getX(), at.getY(), at.getZ(), null, 0, true, Goods.Kind.ITEMS, Optional.empty());
         long loaded = goods.load(from, cargoCar, Items.IRON_ORE, 20);
         long room = goods.fuelRoom(from, locomotiveCar, Items.COAL);
         long fuelled = goods.refuel(from, locomotiveCar, Items.COAL, 10);

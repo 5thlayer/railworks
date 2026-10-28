@@ -44,13 +44,13 @@ public final class Hatches {
     /** A request as it is saved: the item by its id, and the stacks. */
     public static final Codec<HatchRequest<Item>> REQUEST_CODEC = RecordCodecBuilder.create(i -> i.group(
             BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(HatchRequest::item),
-            Codec.intRange(1, Integer.MAX_VALUE).fieldOf("stacks").forGetter(HatchRequest::stacks)
+            Codec.intRange(1, Integer.MAX_VALUE).fieldOf("stacks").forGetter(HatchRequest::count)
     ).apply(i, HatchRequest::new));
 
     /** A request as it is sent to a client. */
     public static final StreamCodec<RegistryFriendlyByteBuf, HatchRequest<Item>> REQUEST_STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.registry(Registries.ITEM), HatchRequest::item,
-            ByteBufCodecs.VAR_INT, HatchRequest::stacks,
+            ByteBufCodecs.VAR_INT, HatchRequest::count,
             HatchRequest::new);
 
     /** Every hatch as it is saved, in the order they were placed. */

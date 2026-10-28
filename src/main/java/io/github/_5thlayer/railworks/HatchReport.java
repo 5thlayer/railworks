@@ -55,7 +55,7 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, 
     /** What a requester asking for {@code request} asks for, in words: the action bar's line and Jade's. */
     public static Component requesting(Optional<HatchRequest<Item>> request) {
         return request.map(asked -> Component.translatable("message.railworks.hatch.requesting",
-                        asked.stacks(), new ItemStack(asked.item()).getItemName()))
+                        asked.count(), new ItemStack(asked.item()).getItemName()))
                 .orElseGet(() -> Component.translatable("message.railworks.hatch.requesting_nothing"));
     }
 

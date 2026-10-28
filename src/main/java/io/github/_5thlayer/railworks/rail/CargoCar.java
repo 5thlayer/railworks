@@ -14,7 +14,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  *
  * <p>Pure: no Minecraft types.
  */
-public final class CargoCar implements Car {
+public final class CargoCar implements GoodsCar {
 
     public static final String KIND = "cargo_car";
 
@@ -57,6 +57,11 @@ public final class CargoCar implements Car {
     @Override
     public double length() {
         return LENGTH;
+    }
+
+    @Override
+    public Goods.Kind holds() {
+        return Goods.Kind.ITEMS;
     }
 
     @Override

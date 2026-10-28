@@ -105,15 +105,23 @@ class LogisticsTest {
     // ---- the hatches ----
 
     private Logistics.Hatch<String> provider(Station station, int spot, String item, long count) {
-        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, true, Optional.empty());
+        return provider(station, spot, Goods.Kind.ITEMS, item, count);
+    }
+
+    private Logistics.Hatch<String> requester(Station station, int spot, String item, int stacks) {
+        return requester(station, spot, Goods.Kind.ITEMS, item, stacks);
+    }
+
+    private Logistics.Hatch<String> provider(Station station, int spot, Goods.Kind kind, String item, long count) {
+        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, true, kind, Optional.empty());
         hatches.add(hatch);
         goods.put(hatch, item, count);
         return hatch;
     }
 
-    private Logistics.Hatch<String> requester(Station station, int spot, String item, int stacks) {
-        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, false,
-                Optional.of(new HatchRequest<>(item, stacks)));
+    private Logistics.Hatch<String> requester(Station station, int spot, Goods.Kind kind, String item, int count) {
+        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, false, kind,
+                Optional.of(new HatchRequest<>(item, count)));
         hatches.add(hatch);
         return hatch;
     }
@@ -942,7 +950,7 @@ class LogisticsTest {
         requester(DEPOT, 0, "iron", 1);
         Train train = shuttle(20.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
-        replace(mine, new Logistics.Hatch<>(mine.x(), mine.y(), mine.z(), MINE, 0, false, Optional.empty()));
+        replace(mine, new Logistics.Hatch<>(mine.x(), mine.y(), mine.z(), MINE, 0, false, Goods.Kind.ITEMS, Optional.empty()));
         step();
         assertEquals(Logistics.Kind.WAITING, kind(train));
     }
@@ -974,7 +982,7 @@ class LogisticsTest {
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
         Train train = shuttle(20.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
-        replace(depot, new Logistics.Hatch<>(depot.x(), depot.y(), depot.z(), DEPOT, 0, true, Optional.empty()));
+        replace(depot, new Logistics.Hatch<>(depot.x(), depot.y(), depot.z(), DEPOT, 0, true, Goods.Kind.ITEMS, Optional.empty()));
         step();
         assertEquals(Logistics.Kind.HOLDING, kind(train));
     }
@@ -1115,6 +1123,169 @@ class LogisticsTest {
         assertEquals(640, goods.held(mine, "iron"));
     }
 
+    // ---- fluid ----
+
+    private static long buckets(long buckets) {
+        return buckets * Logistics.MILLIBUCKETS_PER_BUCKET;
+    }
+
+    /** A Locomotive facing C with {@code cars} behind it, its middle {@code x} blocks from A. */
+    private Train eastbound(double x, Car... cars) {
+        List<Car> all = new ArrayList<>(List.of(fuelled()));
+        all.addAll(List.of(cars));
+        return automatic(Train.of(onLine(x), all));
+    }
+
+    private FluidCar fluidCar(Train train, int index) {
+        return (FluidCar) train.cars().get(index);
+    }
+
+    @Test
+    void anAutomaticTrainCarriesFluidFromAProviderFluidHatchToARequesterOne() {
+        line();
+        Logistics.Hatch<String> quarry = provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(100));
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
+        Train train = eastbound(5.0, FluidCar.create());
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(buckets(16), goods.held(fluidCar(train, 1), "water"));
+        assertEquals(List.of(new Logistics.Cargo<>("water", buckets(16))), logistics.status(train, goods).cargo());
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING, "unloaded");
+        assertEquals(buckets(16), goods.held(depot, "water"));
+        assertEquals(buckets(84), goods.held(quarry, "water"));
+        assertTrue(goods.empty(fluidCar(train, 1)));
+    }
+
+    @Test
+    void aFluidHatchMovesTwoBucketsEveryHatchTicksPerStack() {
+        line();
+        provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(100));
+        requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
+        Train train = eastbound(5.0, FluidCar.create());
+        runUntil(() -> kind(train) == Logistics.Kind.LOADING, "arrived");
+        step();
+        assertEquals(buckets(Logistics.FLUID_BUCKETS_PER_STEP), goods.held(fluidCar(train, 1), "water"));
+        runFor(Logistics.hatchTicksPerStack() - 1);
+        assertEquals(buckets(2), goods.held(fluidCar(train, 1), "water"));
+        step();
+        assertEquals(buckets(4), goods.held(fluidCar(train, 1), "water"));
+    }
+
+    @Test
+    void aFluidCarTakesNoMoreThanItsTank() {
+        line();
+        goods.tank = buckets(10);
+        provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(100));
+        requester(DEPOT, 0, Goods.Kind.FLUID, "water", 64);
+        Train train = eastbound(5.0, FluidCar.create());
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(buckets(10), goods.held(fluidCar(train, 1), "water"));
+    }
+
+    @Test
+    void aFluidCarCarriesOneFluidWhereTwoFluidHatchPairsShareItsSpot() {
+        line();
+        provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(8));
+        provider(QUARRY, 0, Goods.Kind.FLUID, "oil", buckets(8));
+        requester(DEPOT, 0, Goods.Kind.FLUID, "water", 8);
+        Logistics.Hatch<String> oil = requester(DEPOT, 0, Goods.Kind.FLUID, "oil", 8);
+        Train train = eastbound(5.0, FluidCar.create());
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(buckets(8), goods.held(fluidCar(train, 1), "water"));
+        assertEquals(0, goods.held(fluidCar(train, 1), "oil"));
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING, "unloaded");
+        assertEquals(0, goods.held(oil, "oil"));
+    }
+
+    @Test
+    void aFluidLoadOnItsWayCountsAgainstTheRequestSoNoSecondTrainIsSent() {
+        loop();
+        provider(NORTH, 0, Goods.Kind.FLUID, "water", buckets(640));
+        requester(SOUTH, 0, Goods.Kind.FLUID, "water", 16);
+        Train one = automatic(Train.of(new Place(network.get(LOOP[2], LOOP[3]), LOOP[3], 4.0),
+                List.of(fuelled(), FluidCar.create())));
+        Train other = automatic(Train.of(new Place(network.get(LOOP[6], LOOP[7]), LOOP[7], 4.0),
+                List.of(fuelled(), FluidCar.create())));
+        runUntil(() -> kind(one) == Logistics.Kind.TO_UNLOAD, "loaded");
+        for (int i = 0; i < 10 * Logistics.PLAN_TICKS && kind(one) == Logistics.Kind.TO_UNLOAD; i++) {
+            step();
+            assertEquals(Logistics.Kind.WAITING, kind(other));
+        }
+    }
+
+    @Test
+    void aLeftoverInAFluidCarSendsItsTrainOnDeliveryJobsOnly() {
+        line();
+        Logistics.Hatch<String> quarry = provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(64));
+        requester(DEPOT, 0, Goods.Kind.FLUID, "water", 8);
+        Train train = eastbound(5.0, FluidCar.create());
+        goods.put(fluidCar(train, 1), "oil", buckets(5));
+        runFor(200);
+        Logistics.Status<String> status = logistics.status(train, goods);
+        assertEquals(Logistics.Kind.HOLDING, status.kind());
+        assertEquals(List.of(new Logistics.Cargo<>("oil", buckets(5))), status.cargo());
+        assertEquals(buckets(64), goods.held(quarry, "water"));
+
+        Logistics.Hatch<String> oil = requester(DEPOT, 0, Goods.Kind.FLUID, "oil", 8);
+        runUntil(() -> goods.held(oil, "oil") == buckets(5), "delivered the leftover");
+        assertTrue(goods.empty(fluidCar(train, 1)));
+    }
+
+    @Test
+    void aTrainMixingCargoAndFluidCarsLoadsEachAtAHatchOfItsKind() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        provider(QUARRY, 1, Goods.Kind.FLUID, "water", buckets(16));
+        Logistics.Hatch<String> iron = requester(DEPOT, 0, "iron", 1);
+        Logistics.Hatch<String> water = requester(DEPOT, 1, Goods.Kind.FLUID, "water", 16);
+        Train train = eastbound(5.0, CargoCar.create(), FluidCar.create());
+        runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+        assertEquals(buckets(16), goods.held(fluidCar(train, 2), "water"));
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 64), new Logistics.Cargo<>("water", buckets(16))),
+                logistics.status(train, goods).cargo());
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING, "unloaded");
+        assertEquals(64, goods.held(iron, "iron"));
+        assertEquals(buckets(16), goods.held(water, "water"));
+    }
+
+    @Test
+    void noLoadIsPlannedWhereHatchAndCarDifferInKind() {
+        line();
+        // The Fluid hatches at the Cargo car's spot, the hatches of items at the Fluid car's.
+        Logistics.Hatch<String> water = provider(QUARRY, 0, Goods.Kind.FLUID, "water", buckets(16));
+        requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
+        Logistics.Hatch<String> iron = provider(QUARRY, 1, "iron", 64);
+        requester(DEPOT, 1, "iron", 1);
+        Train train = eastbound(5.0, CargoCar.create(), FluidCar.create());
+        runFor(200);
+        assertEquals(Logistics.Kind.WAITING, kind(train));
+        assertEquals(buckets(16), goods.held(water, "water"));
+        assertEquals(64, goods.held(iron, "iron"));
+    }
+
+    @Test
+    void aFluidRequesterIsNeverServedByAProviderOfItems() {
+        line();
+        Logistics.Hatch<String> items = provider(QUARRY, 0, "water", 64);
+        requester(DEPOT, 0, Goods.Kind.FLUID, "water", 16);
+        Train train = eastbound(5.0, FluidCar.create());
+        runFor(200);
+        assertEquals(Logistics.Kind.WAITING, kind(train));
+        assertEquals(64, goods.held(items, "water"));
+    }
+
+    @Test
+    void aProviderFluidHatchFuelsNoLocomotive() {
+        line();
+        // Oil burns, but from a Fluid hatch it goes into no fuel slot.
+        Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, Goods.Kind.FLUID, "oil", buckets(10));
+        Train train = eastbound(8.5, 1);
+        Locomotive locomotive = (Locomotive) train.cars().getFirst();
+        runFor(200);
+        assertEquals(0, goods.fuel(locomotive, "oil"));
+        assertEquals(buckets(10), goods.held(quarry, "oil"));
+    }
+
     private void replace(Logistics.Hatch<String> hatch, Logistics.Hatch<String> with) {
         hatches.set(hatches.indexOf(hatch), with);
     }
@@ -1122,7 +1293,7 @@ class LogisticsTest {
     /** {@code hatch}, a requester, asking for {@code stacks} of {@code item} now, which is the hatch it becomes. */
     private Logistics.Hatch<String> ask(Logistics.Hatch<String> hatch, String item, int stacks) {
         Logistics.Hatch<String> asking = new Logistics.Hatch<>(hatch.x(), hatch.y(), hatch.z(), hatch.station(),
-                hatch.spot(), false, Optional.of(new HatchRequest<>(item, stacks)));
+                hatch.spot(), false, hatch.holds(), Optional.of(new HatchRequest<>(item, stacks)));
         replace(hatch, asking);
         return asking;
     }
@@ -1135,7 +1306,10 @@ class LogisticsTest {
 
     // ---- the fake ----
 
-    /** What hatches and cars hold, by item kind; a car has {@link #slots} slots, and a hatch takes up to {@link #hatchRoom} items. */
+    /**
+     * What hatches and cars hold, by item kind or fluid; a Cargo car has {@link #slots} slots, a Fluid
+     * car a {@link #tank} of one fluid, and a hatch takes up to {@link #hatchRoom} items or millibuckets.
+     */
     private static final class FakeGoods implements Goods<String> {
 
         private final Map<Integer, Map<String, Long>> inHatches = new HashMap<>();
@@ -1145,13 +1319,14 @@ class LogisticsTest {
         final Map<UUID, Long> charges = new HashMap<>();
         final Map<Integer, Long> buffers = new HashMap<>();
         int slots = 27;
+        long tank = 64 * Logistics.MILLIBUCKETS_PER_BUCKET;
         long hatchRoom = Long.MAX_VALUE / 4;
 
         void put(Logistics.Hatch<String> hatch, String item, long count) {
             inHatches.computeIfAbsent(hatch.x(), x -> new HashMap<>()).put(item, count);
         }
 
-        void put(CargoCar car, String item, long count) {
+        void put(GoodsCar car, String item, long count) {
             inCars.computeIfAbsent(car.id(), id -> new HashMap<>()).put(item, count);
         }
 
@@ -1166,12 +1341,12 @@ class LogisticsTest {
         }
 
         @Override
-        public long held(CargoCar car, String item) {
+        public long held(GoodsCar car, String item) {
             return inCars.getOrDefault(car.id(), Map.of()).getOrDefault(item, 0L);
         }
 
         @Override
-        public Map<String, Long> contents(CargoCar car) {
+        public Map<String, Long> contents(GoodsCar car) {
             Map<String, Long> contents = new LinkedHashMap<>();
             inCars.getOrDefault(car.id(), Map.of()).forEach((item, count) -> {
                 if (count > 0) {
@@ -1182,7 +1357,7 @@ class LogisticsTest {
         }
 
         @Override
-        public boolean empty(CargoCar car) {
+        public boolean empty(GoodsCar car) {
             return inCars.getOrDefault(car.id(), Map.of()).values().stream().allMatch(count -> count == 0L);
         }
 
@@ -1192,8 +1367,21 @@ class LogisticsTest {
         }
 
         @Override
-        public long load(Logistics.Hatch<String> from, CargoCar into, String item, long most) {
+        public long tank(FluidCar car) {
+            return tank;
+        }
+
+        @Override
+        public long load(Logistics.Hatch<String> from, GoodsCar into, String item, long most) {
             Map<String, Long> car = inCars.computeIfAbsent(into.id(), id -> new HashMap<>());
+            if (into instanceof FluidCar) {
+                long holds = car.values().stream().mapToLong(Long::longValue).sum();
+                boolean other = car.entrySet().stream().anyMatch(held -> held.getValue() > 0 && !held.getKey().equals(item));
+                long moved = other ? 0 : Math.min(most, Math.min(held(from, item), tank - holds));
+                put(from, item, held(from, item) - moved);
+                car.merge(item, moved, Long::sum);
+                return moved;
+            }
             long used = 0;
             for (var held : car.entrySet()) {
                 used += (held.getValue() + stackSize(held.getKey()) - 1) / stackSize(held.getKey());
@@ -1208,7 +1396,7 @@ class LogisticsTest {
         }
 
         @Override
-        public long unload(CargoCar from, Logistics.Hatch<String> into, String item, long most) {
+        public long unload(GoodsCar from, Logistics.Hatch<String> into, String item, long most) {
             long holds = inHatches.getOrDefault(into.x(), Map.of()).values().stream().mapToLong(Long::longValue).sum();
             long moved = Math.min(most, Math.min(held(from, item), hatchRoom - holds));
             inCars.computeIfAbsent(from.id(), id -> new HashMap<>()).merge(item, -moved, Long::sum);
@@ -1232,10 +1420,10 @@ class LogisticsTest {
             return inLocomotives.getOrDefault(locomotive.id(), Map.of()).getOrDefault(item, 0L);
         }
 
-        /** Coal and wood burn and leave nothing; a lava bucket leaves its bucket, and iron does not burn. */
+        /** Coal, wood and oil burn and leave nothing; a lava bucket leaves its bucket, and iron does not burn. */
         @Override
         public long fuelRoom(Logistics.Hatch<String> from, Locomotive locomotive, String item) {
-            if (!item.equals("coal") && !item.equals("wood")) {
+            if (!item.equals("coal") && !item.equals("wood") && !item.equals("oil")) {
                 return 0;
             }
             Map<String, Long> slots = inLocomotives.getOrDefault(locomotive.id(), Map.of());

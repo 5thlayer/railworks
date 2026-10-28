@@ -6,40 +6,53 @@ package io.github._5thlayer.railworks.rail;
 import java.util.Map;
 
 /**
- * What only Minecraft knows of the goods {@link Logistics} moves: what hatches and Cargo cars hold,
- * and moving it between them, what a Locomotive's fuel slots hold and take, and the FE of an
- * Electric Locomotive's charge and a Charger's buffer. Counts are items, of one kind each, its
- * components ignored, or FE.
+ * What only Minecraft knows of the goods {@link Logistics} moves: what hatches, Cargo cars and Fluid
+ * cars hold, and moving it between them, what a Locomotive's fuel slots hold and take, and the FE of
+ * an Electric Locomotive's charge and a Charger's buffer. Goods are of two {@link Kind kinds}: items,
+ * counted one by one, of one kind each, their components ignored; and fluid, counted in millibuckets
+ * ({@link Logistics#MILLIBUCKETS_PER_BUCKET} to a bucket). A hatch of items and a Cargo car hold
+ * items, a Fluid hatch and a Fluid car fluid. Charge is counted in FE.
  *
- * <p>Pure: no Minecraft types. {@code I} is the item's kind, the game's {@code Item}.
+ * <p>Pure: no Minecraft types. {@code I} is the goods' kind, the game's {@code Item} or {@code Fluid}.
  */
 public interface Goods<I> {
+
+    /** The two kinds of goods, each moved only between a hatch and a car of its own kind. */
+    enum Kind {
+        /** Items, held by a hatch of items and a Cargo car. */
+        ITEMS,
+        /** Fluid, held by a Fluid hatch and a Fluid car. */
+        FLUID
+    }
 
     /** How many of {@code item} make a stack. */
     int stackSize(I item);
 
-    /** How many of {@code item} {@code hatch} holds. */
+    /** How much of {@code item} {@code hatch} holds. */
     long held(Logistics.Hatch<I> hatch, I item);
 
-    /** How many of {@code item} {@code car} holds. */
-    long held(CargoCar car, I item);
+    /** How much of {@code item} {@code car} holds. */
+    long held(GoodsCar car, I item);
 
-    /** What {@code car} holds, item by item in the order of its slots; nothing for a car whose goods are not known. */
-    Map<I, Long> contents(CargoCar car);
+    /** What {@code car} holds, item by item in the order of its slots or its one fluid; nothing for a car whose goods are not known. */
+    Map<I, Long> contents(GoodsCar car);
 
     /** Whether {@code car} holds nothing at all. */
-    boolean empty(CargoCar car);
+    boolean empty(GoodsCar car);
 
     /** How many slots {@code car} has, each a stack of one kind. */
     int slots(CargoCar car);
 
-    /** Moves up to {@code most} of {@code item} from {@code from} into {@code into}, as far as it holds them and the car has room; how many moved. */
-    long load(Logistics.Hatch<I> from, CargoCar into, I item, long most);
+    /** How many millibuckets of one fluid {@code car}'s tank holds when full. */
+    long tank(FluidCar car);
 
-    /** Moves up to {@code most} of {@code item} from {@code from} into {@code into}, as far as it holds them and the hatch has room; how many moved. */
-    long unload(CargoCar from, Logistics.Hatch<I> into, I item, long most);
+    /** Moves up to {@code most} of {@code item} from {@code from} into {@code into}, as far as it holds them and the car has room; how much moved. */
+    long load(Logistics.Hatch<I> from, GoodsCar into, I item, long most);
 
-    /** What {@code hatch} holds, item by item in the order of its slots. */
+    /** Moves up to {@code most} of {@code item} from {@code from} into {@code into}, as far as it holds them and the hatch has room; how much moved. */
+    long unload(GoodsCar from, Logistics.Hatch<I> into, I item, long most);
+
+    /** What {@code hatch} holds, item by item in the order of its slots or its one fluid. */
     Map<I, Long> contents(Logistics.Hatch<I> hatch);
 
     /**

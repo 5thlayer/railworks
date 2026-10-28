@@ -198,7 +198,7 @@ public final class RailworksCommands {
         hatch.clearRequest();
         int asked = 0;
         for (int stack = 0; stack < stacks; stack++) {
-            asked = hatch.ask(item).stacks();
+            asked = hatch.ask(item).count();
         }
         return asked;
     }
