@@ -506,13 +506,11 @@ final class LocomotiveTests {
         ServerPlayer driver = board(helper, car);
         press(driver, true, false);
         run(car, 20);
-        var output = TagValueOutput.createWithoutContext(
-                ProblemReporter.DISCARDING);
+        var output = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
-        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
-                EntitySpawnReason.LOAD);
-        reloaded.load(TagValueInput.create(
-                ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(),
+                output.buildResult()));
         var was = car.train();
         var now = reloaded.train();
         if (now == null || reloaded.locomotive() == null || !now.head().equals(was.head()) || now.speed() != was.speed()
@@ -530,13 +528,11 @@ final class LocomotiveTests {
         putInSlot(opened, 1, new ItemStack(Items.COAL, 10));
         putInSlot(opened, 2, new ItemStack(Items.CHARCOAL, 5));
         putInSlot(opened, 3, new ItemStack(Items.COAL, 20));
-        var output = TagValueOutput.createWithoutContext(
-                ProblemReporter.DISCARDING);
+        var output = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
-        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
-                EntitySpawnReason.LOAD);
-        reloaded.load(TagValueInput.create(
-                ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(),
+                output.buildResult()));
         expectSlots(helper, reloaded, List.of(ItemStack.EMPTY, new ItemStack(Items.COAL, 10),
                 new ItemStack(Items.CHARCOAL, 5), new ItemStack(Items.COAL, 20)));
         helper.succeed();
@@ -598,8 +594,7 @@ final class LocomotiveTests {
         ServerPlayer driver = board(helper, car);
         press(driver, true, false);
         run(car, 20);
-        var output = TagValueOutput.createWithoutContext(
-                ProblemReporter.DISCARDING);
+        var output = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
         car.saveWithoutId(output);
         // The entity as a world saved before Trains had cars holds it: the Locomotive was the Train,
         // saved with the entity and not with the level.
@@ -618,10 +613,8 @@ final class LocomotiveTests {
         locomotive.putLong("fuel", car.locomotive().fuel().storedJoules());
         locomotive.putLong("last_lit", car.locomotive().fuel().lastLitJoules());
         tag.put("locomotive", locomotive);
-        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
-                EntitySpawnReason.LOAD);
-        reloaded.load(TagValueInput.create(
-                ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
+        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
+        reloaded.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), tag));
         var now = reloaded.train();
         if (now == null || reloaded.locomotive() == null || now.cars().size() != 1
                 || !now.head().equals(car.train().head()) || now.speed() != car.train().speed()

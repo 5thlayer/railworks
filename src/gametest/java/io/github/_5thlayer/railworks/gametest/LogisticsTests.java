@@ -30,6 +30,7 @@ import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
@@ -42,6 +43,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.transfer.ResourceHandlerUtil;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
@@ -54,7 +56,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * requester broken on the way is held until a requester asks for it again (#38). How jobs are
  * planned, stacks moved, claims broken and fuel moved is {@code LogisticsTest}'s. These tests share
  * the {@code logistics_} prefix, but for a provider beside the leading car's place filling an
- * automatic Train's Locomotive with fuel that leaves nothing behind (#53), whose share
+ * automatic Train's Locomotive with fuel that leaves nothing behind (#53), whose names share
  * {@code refuel_}.
  */
 final class LogisticsTests {
@@ -88,6 +90,7 @@ final class LogisticsTests {
         tests.testOnItsOwn("refuel_a_provider_by_the_leading_car_fills_the_locomotive_with_clean_fuel", 400,
                 LogisticsTests::refuels);
         tests.testOnItsOwn("refuel_a_manual_train_is_left_alone", 200, LogisticsTests::refuelsNoManualTrain);
+        tests.testOnItsOwn("refuel_a_stack_the_fuel_slots_cannot_take_is_passed_over", 400, LogisticsTests::refuelsPastAStack);
     }
 
     // ---- the mode ----
@@ -262,12 +265,16 @@ final class LogisticsTests {
      * fuel slots. The Locomotive.
      */
     private static LocomotiveEntity atTheDepot(GameTestHelper helper) {
+        return atTheDepot(helper, List.of(new ItemStack(Items.LAVA_BUCKET), new ItemStack(Items.COAL, 300)));
+    }
+
+    /** {@link #atTheDepot}, its provider holding {@code fuel}, in that order. */
+    private static LocomotiveEntity atTheDepot(GameTestHelper helper, List<ItemStack> fuel) {
         Span last = line(helper);
         station(helper, DEPOT);
-        BlockPos fuel = besideTheLeadingCar(helper, DEPOT);
-        helper.setBlock(fuel, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
-        insert(record(helper, fuel), new ItemStack(Items.LAVA_BUCKET));
-        insert(record(helper, fuel), new ItemStack(Items.COAL, 300));
+        BlockPos hatch = besideTheLeadingCar(helper, DEPOT);
+        helper.setBlock(hatch, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        fuel.forEach(stack -> insert(record(helper, hatch), stack));
         Locomotive east = Locomotive.burner();
         CargoCar wagon = CargoCar.create();
         // Its middle half a block short of the line's end, where the Depot's leading car stands.
@@ -301,6 +308,25 @@ final class LogisticsTests {
                 .thenIdle(100)
                 .thenExecute(() -> LocomotiveTests.expectSlots(helper, locomotive,
                         List.of(ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY)))
+                .thenExecute(() -> forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    private static void refuelsPastAStack(GameTestHelper helper) {
+        // Named coal first, which no slot takes once all four hold other fuels; plain coal after it.
+        ItemStack named = new ItemStack(Items.COAL, 64);
+        named.set(DataComponents.CUSTOM_NAME, Component.literal("Anthracite"));
+        LocomotiveEntity locomotive = atTheDepot(helper, List.of(named, new ItemStack(Items.COAL, 64)));
+        ServerPlayer player = near(helper);
+        for (ItemStack fuel : List.of(new ItemStack(Items.COAL, 10), new ItemStack(Items.CHARCOAL, 10),
+                new ItemStack(Items.OAK_PLANKS, 10), new ItemStack(Items.BLAZE_ROD, 10))) {
+            player.setItemInHand(InteractionHand.MAIN_HAND, fuel);
+            locomotive.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        }
+        locomotive.train().setAutomatic(true);
+        helper.startSequence()
+                .thenWaitUntil(() -> LocomotiveTests.expectSlots(helper, locomotive, List.of(new ItemStack(Items.COAL, 64),
+                        new ItemStack(Items.CHARCOAL, 10), new ItemStack(Items.OAK_PLANKS, 10), new ItemStack(Items.BLAZE_ROD, 10))))
                 .thenExecute(() -> forceLoad(helper, false))
                 .thenSucceed();
     }
