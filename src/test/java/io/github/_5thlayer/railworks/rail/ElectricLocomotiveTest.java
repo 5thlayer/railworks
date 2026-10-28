@@ -135,8 +135,8 @@ class ElectricLocomotiveTest {
     void itPullsAWayOnlyWhileALocomotiveFacingThatWayHoldsFuelOrCharge() {
         Locomotive east = electric(0L);
         Locomotive west = electric(300L);
-        // Midway along the first Span, room behind it for the car coupled there.
-        Train train = Train.of(new Place(network.get(A, B), B, 10.0), List.of(east, CargoCar.create()));
+        // Five blocks short of B, room behind it for the car coupled there.
+        Train train = Train.of(new Place(network.get(A, B), B, 5.0), List.of(east, CargoCar.create()));
         train = train.coupled(network, Train.End.BACK, west, true);
         assertFalse(train.pulls(1, Locomotive.waiting(goods)), "the one facing its heading is empty");
         assertTrue(train.pulls(-1, Locomotive.waiting(goods)), "the one facing back holds a tick");

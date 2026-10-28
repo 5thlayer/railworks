@@ -17,13 +17,17 @@ import io.github._5thlayer.railworks.HatchReport;
 import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.PlatformsNear;
+import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.Ware;
+import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.HatchRequest;
 import io.github._5thlayer.railworks.rail.Platform;
+import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.SpanRules;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
@@ -45,7 +49,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.HopperBlock;
@@ -61,29 +64,33 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
- * Hatches join a Station's platform (#36, ADR 0008): a Station north of {@link LocomotiveTests}'
- * Span, which runs east from x 1 to x 9 along z 3, at x 2 serves Trains heading west, so its platform
- * runs back east from it: the leading car's place beside x 2, 3 and 4, its first car spot beside x 5
- * and 6 and its second beside x 7 and 8, either side of the Rail at a car's floor, y 2. A hatch places beside a car spot or the
- * leading car's place (#53) and nowhere else, keeps its mode, request and
+ * Hatches join a Station's platform (#36, ADR 0008): a Span runs south along x 5 from z -3, out
+ * past the structure's north edge, to z 12, past its south edge, the plot's length, and a Station
+ * east of its north end serves Trains heading north, so its platform runs back south from it: the
+ * leading car's place beside z -3 to 1, its first five-block car spot beside z 2 to 6 and its second
+ * beside z 7 to 11 (#70), either side of the Rail at a car's floor, y 2. A hatch places beside any
+ * block of a car spot or the leading car's place (#53) and nowhere else, keeps its mode, request and
  * contents in the level's {@link LevelHatches}, is reached by hoppers through its block, and joins
  * the Station as long as its platform covers it. Which block is beside which spot is
  * {@code PlatformTest}'s. All share the {@code logistics_hatch_} prefix.
  */
 final class HatchTests {
 
-    /** Where the Station stands, beside the Rail a block below a car's floor, north of it. */
-    private static final BlockPos STATION = new BlockPos(2, 1, 2);
-    /** Beside the leading car's place, which has no car spot but takes a hatch as one does. */
-    private static final BlockPos LEADER = new BlockPos(4, 2, 2);
-    /** Beside the first car spot at a car's floor, over the block behind the Station. */
+    /** The Rail's ends, a Pylon each: the Span runs south from the first, at the line's end. */
+    private static final BlockPos NORTH_END = new BlockPos(5, 1, -3);
+    private static final BlockPos SOUTH_END = new BlockPos(5, 1, 12);
+    /** Where the Station stands, beside the Rail a block below a car's floor, east of its north end. */
+    private static final BlockPos STATION = new BlockPos(6, 1, -3);
+    /** Beside the leading car's place, which has no car spot but takes a hatch as one does: its third block. */
+    private static final BlockPos LEADER = new BlockPos(6, 2, -1);
+    /** Beside the first car spot at a car's floor: its first block, nearest the Station. */
     private static final BlockPos FIRST = new BlockPos(6, 2, 2);
-    /** Beside the first car spot across the Rail. */
-    private static final BlockPos ACROSS = new BlockPos(5, 2, 4);
-    /** Beside the second car spot. */
-    private static final BlockPos SECOND = new BlockPos(7, 2, 2);
+    /** Beside the first car spot across the Rail: its middle block. */
+    private static final BlockPos ACROSS = new BlockPos(4, 2, 4);
+    /** Beside the second car spot: its last block, the platform's last. */
+    private static final BlockPos SECOND = new BlockPos(6, 2, 11);
     /** Ahead of the Station, beside no car spot. */
-    private static final BlockPos AHEAD = new BlockPos(1, 2, 2);
+    private static final BlockPos AHEAD = new BlockPos(6, 2, -4);
     /** What {@link #expectJoined} expects of a hatch that joins no Station. */
     private static final int JOINS_NOTHING = Integer.MIN_VALUE;
 
@@ -171,11 +178,11 @@ final class HatchTests {
     private static void freeSpots(GameTestHelper helper) {
         ServerPlayer player = withStation(helper);
         BlockPos first = helper.absolutePos(FIRST);
-        // Drawn spot by spot: the leading car's three-block place and two spots, each a box on either
-        // side of the Rail, a car gap short of its ends.
+        // Drawn spot by spot: the leading car's five-block place and two five-block spots, each a box on
+        // either side of the Rail, a car gap short of its ends.
         List<AABB> spots = ownSpots(helper);
-        if (spots.size() != 6 || !ownFreeSpots(helper).stream().allMatch(spot -> spot.box().getZsize() == 1.0
-                        && Math.abs(spot.box().getXsize() - (spot.leading() ? 2.8 : 1.8)) < 1e-6)
+        if (spots.size() != 6 || !ownFreeSpots(helper).stream().allMatch(spot -> spot.box().getXsize() == 1.0
+                        && Math.abs(spot.box().getZsize() - ((spot.leading() ? Platform.LEAD : Platform.SPOT) - CarBody.GAP)) < 1e-6)
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(first).deflate(0.01)))
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(helper.absolutePos(LEADER)).deflate(0.01)))
                 || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {
@@ -185,14 +192,16 @@ final class HatchTests {
         List<AABB> leading = ownFreeSpots(helper).stream()
                 .filter(PlatformsNear.FreeSpot::leading).map(PlatformsNear.FreeSpot::box).toList();
         AABB leader = new AABB(helper.absolutePos(LEADER)).deflate(0.01);
-        AABB across = new AABB(helper.absolutePos(LEADER).south(2)).deflate(0.01);
+        AABB across = new AABB(helper.absolutePos(LEADER).west(2)).deflate(0.01);
         if (leading.size() != 2 || leading.stream().noneMatch(box -> box.intersects(leader))
                 || leading.stream().noneMatch(box -> box.intersects(across))) {
             helper.fail("the free blocks beside the leading car's place are drawn as " + leading, LEADER);
         }
+        // A hatch at the first spot's first block leaves its other four on that side drawn one by one,
+        // the last half a car gap short of the spot's end.
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
         List<AABB> left = ownSpots(helper);
-        if (left.size() != 6 || left.stream().filter(box -> Math.abs(box.getXsize() - 0.9) < 1e-6).count() != 1
+        if (left.size() != 9 || left.stream().filter(box -> Math.abs(box.getZsize() - 0.9) < 1e-6).count() != 1
                 || left.stream().anyMatch(box -> box.intersects(new AABB(first).deflate(0.01)))) {
             helper.fail("with a hatch beside the first spot, the free car spots are drawn as " + left, FIRST);
         }
@@ -204,11 +213,16 @@ final class HatchTests {
         return ownFreeSpots(helper).stream().map(PlatformsNear.FreeSpot::box).toList();
     }
 
-    /** The free car spots drawn in this test's own plot: a server asks every Station of the level. */
+    /**
+     * The free car spots drawn in this test's own plot, beside its Rail between its ends: a server asks
+     * every Station of the level.
+     */
     private static List<PlatformsNear.FreeSpot> ownFreeSpots(GameTestHelper helper) {
-        Vec3 station = Vec3.atCenterOf(helper.absolutePos(STATION));
+        Vec3 north = Vec3.atCenterOf(helper.absolutePos(NORTH_END));
+        Vec3 south = Vec3.atCenterOf(helper.absolutePos(SOUTH_END));
         return PlatformsNear.freeSpots(helper.getLevel(), helper.absolutePos(STATION)).stream()
-                .filter(spot -> spot.box().getCenter().distanceTo(station) < 7.0)
+                .filter(spot -> Math.abs(spot.box().getCenter().x - north.x) < 1.5
+                        && spot.box().getCenter().z > north.z - 1.0 && spot.box().getCenter().z < south.z)
                 .toList();
     }
 
@@ -353,7 +367,7 @@ final class HatchTests {
         expectJoined(helper, FIRST, 0);
         // Cutting the Span takes the platform away, and the hatch is a plain container still holding its coal.
         var network = LevelRails.of(helper.getLevel()).network();
-        var span = LocomotiveTests.span(helper);
+        var span = span(helper);
         network.remove(span.a(), span.b());
         expectJoined(helper, FIRST, JOINS_NOTHING);
         if (count(record(helper, FIRST).contents()) != 4) {
@@ -663,15 +677,27 @@ final class HatchTests {
 
     // ---- setup ----
 
-    /** {@link LocomotiveTests}' Span with a Station north of it, and a survival player beside it. */
+    /** The Span with a Station east of its north end, and a survival player beside it. */
     private static ServerPlayer withStation(GameTestHelper helper) {
-        ServerPlayer player = LocomotiveTests.player(helper, -45.0F);
-        player.setGameMode(GameType.SURVIVAL);
+        for (BlockPos end : List.of(NORTH_END, SOUTH_END)) {
+            helper.setBlock(end, RailworksRegistries.PYLON.get().defaultBlockState());
+        }
+        LevelRails.of(helper.getLevel()).network().add(span(helper));
+        // Past the structure's floor there is nothing to click on.
+        helper.setBlock(STATION.below(), Blocks.STONE);
+        ServerPlayer player = LogisticsTests.near(helper, new BlockPos(7, 1, 1));
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.STATION_ITEM.get()));
         if (!StationTests.place(helper, player, STATION).consumesAction()) {
             throw helper.assertionException(STATION, Component.literal("the Station was refused"));
         }
         return player;
+    }
+
+    /** The Span between the Rail's ends. */
+    private static Span span(GameTestHelper helper) {
+        var one = PylonColumn.arm(helper.absolutePos(NORTH_END));
+        var other = PylonColumn.arm(helper.absolutePos(SOUTH_END));
+        return Span.of(one, other, SpanRules.cost(one, other));
     }
 
     /** A hatch of {@code mode} placed by {@code player} at {@code pos}, which must go. */

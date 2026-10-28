@@ -6,6 +6,8 @@ package io.github._5thlayer.railworks.gametest;
 import static io.github._5thlayer.railworks.gametest.LocomotiveTests.STAND;
 
 import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.rail.CarBody;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -18,6 +20,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -29,10 +32,16 @@ import net.minecraft.world.phys.Vec3;
  */
 final class LocomotiveSeatTests {
 
-    /** The cab's seat, 0.8 forward of the car's middle, a seated player's feet 0.6 over the floor's underside. */
-    private static final Vec3 CAB = new Vec3(0.0, 0.6, 0.8);
-    /** Standing in the bay, 0.9 behind the car's middle, on the floor's top 0.7 over its underside. */
-    private static final Vec3 BAY = new Vec3(0.0, 0.7, -0.9);
+    /**
+     * The cab's seat, {@link CarBody#CAB_SEAT}: in the car's front block, 1.8 forward of its middle,
+     * a seated player's feet 0.6 below it, 0.6 over the floor's underside.
+     */
+    private static final Vec3 CAB = new Vec3(CarBody.CAB_SEAT.x(), CarBody.CAB_SEAT.y() - 0.6, CarBody.CAB_SEAT.z());
+    /**
+     * Standing in the bay, {@link CarBody#BAY_SPOT}: behind the Engine room, 1.45 behind the car's
+     * middle, on the floor's top 0.7 over its underside.
+     */
+    private static final Vec3 BAY = new Vec3(CarBody.BAY_SPOT.x(), CarBody.BAY_SPOT.y(), CarBody.BAY_SPOT.z());
 
     private LocomotiveSeatTests() {
     }
@@ -185,14 +194,20 @@ final class LocomotiveSeatTests {
         ServerPlayer driver = LocomotiveTests.board(helper, car);
         ServerPlayer rider = LocomotiveTests.board(helper, car);
         double floor = helper.absolutePos(STAND).getY();
+        // The cab stands past the platform's east edge, at x 9: floor beside it on both sides.
+        for (int x = 9; x <= 10; x++) {
+            for (int z = 1; z <= 5; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
         // Looking south, a little ahead of square to the car.
         driver.setYRot(-10.0F);
         getOff(driver);
-        expectBeside(helper, driver, car, car.getX() + 0.8, 1, floor, "the driver");
+        expectBeside(helper, driver, car, car.getX() + CAB.z, 1, floor, "the driver");
         // Looking north, a little behind.
         rider.setYRot(-170.0F);
         getOff(rider);
-        expectBeside(helper, rider, car, car.getX() - 0.9, -1, floor, "the rider");
+        expectBeside(helper, rider, car, car.getX() + BAY.z, -1, floor, "the rider");
         helper.succeed();
     }
 

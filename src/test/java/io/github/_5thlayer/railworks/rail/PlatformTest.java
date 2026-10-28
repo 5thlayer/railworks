@@ -21,7 +21,7 @@ class PlatformTest {
 
     /** A level line along x, its Arms' tops at y 5, long enough for any platform here. */
     private static final Arm A = new Arm(0, 5, 0);
-    private static final Arm B = new Arm(40, 5, 0);
+    private static final Arm B = new Arm(60, 5, 0);
 
     private final RailNetwork network = new RailNetwork();
 
@@ -32,7 +32,7 @@ class PlatformTest {
     }
 
     private void line() {
-        network.add(Span.of(A, B, 40));
+        network.add(Span.of(A, B, 60));
     }
 
     /** On the south side at the car's floor: on the right of a Train heading for B. */
@@ -60,13 +60,15 @@ class PlatformTest {
     }
 
     @Test
-    void itRunsBackFourCarSpotsTwoBlocksApartBehindTheThreeBlockLeadingCar() {
+    void itRunsBackFourCarSpotsFiveBlocksApartBehindTheFiveBlockLeadingCar() {
         line();
-        // Serving Trains heading for B: its front edge at 11.5, the leading Locomotive's middle at 10,
-        // and the spots back toward A behind its three blocks.
-        Platform platform = platform(south(11));
-        assertEquals(10.0, along(platform.leadMark()), 1e-9);
-        assertEquals(List.of(7.5, 5.5, 3.5, 1.5), middles(platform));
+        // Serving Trains heading for B: its front edge at 30.5, the leading Locomotive's middle at 28,
+        // and the spots back toward A behind its five blocks, the platform 25 blocks to 5.5.
+        assertEquals(5.0, Platform.SPOT);
+        assertEquals(5.0, Platform.LEAD);
+        Platform platform = platform(south(30));
+        assertEquals(28.0, along(platform.leadMark()), 1e-9);
+        assertEquals(List.of(23.0, 18.0, 13.0, 8.0), middles(platform));
         assertEquals(List.of(0, 1, 2, 3), platform.spots().stream().map(Platform.CarSpot::index).toList());
         assertEquals(B, platform.front().front());
     }
@@ -74,36 +76,36 @@ class PlatformTest {
     @Test
     void onTheOtherSideItRunsBackTheOtherWay() {
         line();
-        assertEquals(List.of(13.5, 15.5, 17.5, 19.5), middles(platform(north(10))));
+        assertEquals(List.of(36.0, 41.0, 46.0, 51.0), middles(platform(north(29))));
     }
 
     @Test
     void itHasAsManySpotsAsTheServerSetsCappedAtFour() {
         line();
         Platform.configure(2);
-        assertEquals(List.of(7.5, 5.5), middles(platform(south(11))));
+        assertEquals(List.of(23.0, 18.0), middles(platform(south(30))));
         Platform.configure(9);
         assertEquals(Platform.MAX_CARS, Platform.cars());
-        assertEquals(4, platform(south(11)).spots().size());
+        assertEquals(4, platform(south(30)).spots().size());
     }
 
     @Test
     void itEndsWhereTheLineEnds() {
         line();
-        // From 5.5 back: the leading car's three blocks, and one whole spot before A, at 0, ends the line.
-        assertEquals(List.of(1.5), middles(platform(south(5))));
-        assertEquals(List.of(), middles(platform(south(4))), "no room for a spot behind the leading car");
+        // From 10.5 back: the leading car's five blocks, and one whole spot before A, at 0, ends the line.
+        assertEquals(List.of(3.0), middles(platform(south(10))));
+        assertEquals(List.of(), middles(platform(south(9))), "no room for a spot behind the leading car");
     }
 
     @Test
     void itEndsWhereTheStraightLegEndsAtABend() {
         Arm q = new Arm(0, 5, 0);
-        Arm r = new Arm(6, 5, 0);
+        Arm r = new Arm(10, 5, 0);
         network.add(Span.of(new Arm(-6, 5, 4), q, 8));
-        network.add(Span.of(q, r, 6));
-        network.add(Span.of(r, B, 34));
-        // The Rail bends through q, so q to r is no Straight leg: the third spot, over r, would be on it.
-        assertEquals(List.of(9.5, 7.5), middles(platform(south(13))));
+        network.add(Span.of(q, r, 10));
+        network.add(Span.of(r, B, 50));
+        // The Rail bends through q, so q to r is no Straight leg: the third spot, from 5.5 to 10.5, would be on it.
+        assertEquals(List.of(18.0, 13.0), middles(platform(south(25))));
     }
 
     @Test
@@ -111,14 +113,14 @@ class PlatformTest {
         line();
         // A car runs on until its middle meets the line's end, so the leading car stands at the Station
         // with its front half a block past the end Arm, and the spots run back from there as anywhere.
-        Platform platform = platform(south(40));
-        assertEquals(39.0, along(platform.leadMark()), 1e-9);
-        assertEquals(List.of(36.5, 34.5, 32.5, 30.5), middles(platform));
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(40, 6, -1), "the leading car's");
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(38, 6, 1), "the leading car's third block");
-        assertEquals(OptionalInt.of(0), platform.spotBeside(37, 6, 1));
-        assertEquals(OptionalInt.of(0), platform.spotBeside(36, 6, -1));
-        assertEquals(OptionalInt.of(1), platform.spotBeside(35, 6, 1));
+        Platform platform = platform(south(60));
+        assertEquals(58.0, along(platform.leadMark()), 1e-9);
+        assertEquals(List.of(53.0, 48.0, 43.0, 38.0), middles(platform));
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(60, 6, -1), "the leading car's");
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(56, 6, 1), "the leading car's fifth block");
+        assertEquals(OptionalInt.of(0), platform.spotBeside(55, 6, 1));
+        assertEquals(OptionalInt.of(0), platform.spotBeside(51, 6, -1));
+        assertEquals(OptionalInt.of(1), platform.spotBeside(50, 6, 1));
     }
 
     /** A Station by an Arm the Rail bends through, its platform running back over the bend. */
@@ -144,53 +146,53 @@ class PlatformTest {
     @Test
     void aBlockBesideTheRailAtACarsFloorIsBesideTheSpotItIsIn() {
         line();
-        Platform platform = platform(south(11));
-        // Either side of the Rail, the two blocks behind the leading car's the first spot's.
-        assertEquals(OptionalInt.of(0), platform.spotBeside(8, 6, -1));
-        assertEquals(OptionalInt.of(0), platform.spotBeside(7, 6, 1));
-        assertEquals(OptionalInt.of(1), platform.spotBeside(6, 6, -1));
-        assertEquals(OptionalInt.of(1), platform.spotBeside(5, 6, 1));
-        assertEquals(OptionalInt.of(3), platform.spotBeside(1, 6, 1));
+        Platform platform = platform(south(30));
+        // Either side of the Rail, the five blocks behind the leading car's the first spot's.
+        assertEquals(OptionalInt.of(0), platform.spotBeside(25, 6, -1));
+        assertEquals(OptionalInt.of(0), platform.spotBeside(21, 6, 1));
+        assertEquals(OptionalInt.of(1), platform.spotBeside(20, 6, -1));
+        assertEquals(OptionalInt.of(1), platform.spotBeside(16, 6, 1));
+        assertEquals(OptionalInt.of(3), platform.spotBeside(6, 6, 1));
     }
 
     @Test
     void aBlockBesideTheLeadingCarsPlaceIsBesideItAsBesideACarSpot() {
         line();
-        Platform platform = platform(south(11));
-        // The leading Locomotive stands from 8.5 to 11.5: the Station's own block is one of the six
-        // beside it, three each side, the one beside its back among them.
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(11, 6, -1));
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(10, 6, -1));
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(9, 6, -1), "beside its third block");
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(9, 6, 1), "beside its third block");
-        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(11, 6, 1), "the Station's own block");
-        assertEquals(Optional.of(new Platform.Joined(south(11), Platform.LEADING)),
-                Platform.joined(network, List.of(south(11)), 9, 6, -1));
-        assertEquals(6, platform.besideBlocks(network).stream().filter(b -> b.spot() == Platform.LEADING).count());
+        Platform platform = platform(south(30));
+        // The leading Locomotive stands from 25.5 to 30.5: the Station's own block is one of the ten
+        // beside it, five each side, the one beside its back among them.
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(30, 6, -1));
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(28, 6, -1));
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(26, 6, -1), "beside its fifth block");
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(26, 6, 1), "beside its fifth block");
+        assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(30, 6, 1), "the Station's own block");
+        assertEquals(Optional.of(new Platform.Joined(south(30), Platform.LEADING)),
+                Platform.joined(network, List.of(south(30)), 26, 6, -1));
+        assertEquals(10, platform.besideBlocks(network).stream().filter(b -> b.spot() == Platform.LEADING).count());
     }
 
     @Test
     void aBlockOffThePlatformIsBesideNoSpot() {
         line();
-        Platform platform = platform(south(11));
-        assertEquals(OptionalInt.empty(), platform.spotBeside(12, 6, 1), "ahead of the Station");
-        assertEquals(OptionalInt.empty(), platform.spotBeside(0, 6, 1), "behind the last spot");
-        assertEquals(OptionalInt.empty(), platform.spotBeside(7, 5, 1), "a block below the car's floor");
-        assertEquals(OptionalInt.empty(), platform.spotBeside(7, 7, 1), "a block above it");
-        assertEquals(OptionalInt.empty(), platform.spotBeside(7, 6, 2), "two blocks off the Rail");
-        assertEquals(OptionalInt.empty(), platform.spotBeside(7, 6, 0), "in the Rail's own row");
+        Platform platform = platform(south(30));
+        assertEquals(OptionalInt.empty(), platform.spotBeside(31, 6, 1), "ahead of the Station");
+        assertEquals(OptionalInt.empty(), platform.spotBeside(5, 6, 1), "behind the last spot");
+        assertEquals(OptionalInt.empty(), platform.spotBeside(22, 5, 1), "a block below the car's floor");
+        assertEquals(OptionalInt.empty(), platform.spotBeside(22, 7, 1), "a block above it");
+        assertEquals(OptionalInt.empty(), platform.spotBeside(22, 6, 2), "two blocks off the Rail");
+        assertEquals(OptionalInt.empty(), platform.spotBeside(22, 6, 0), "in the Rail's own row");
     }
 
     @Test
     void platformsSharingAnyOfTheLineOverlap() {
         line();
-        Platform mine = platform(south(11));
-        assertTrue(mine.overlaps(platform(south(5))), "behind it, on its spots");
-        assertTrue(mine.overlaps(platform(north(11))), "across the Rail, serving the other way");
-        assertTrue(platform(north(11)).overlaps(mine));
-        assertTrue(mine.overlaps(platform(south(21))), "its last spot over this one's leading car");
-        assertFalse(mine.overlaps(platform(south(22))), "its last spot ends where this one's front is");
-        assertFalse(mine.overlaps(platform(south(32))));
+        Platform mine = platform(south(30));
+        assertTrue(mine.overlaps(platform(south(20))), "behind it, on its spots");
+        assertTrue(mine.overlaps(platform(north(30))), "across the Rail, serving the other way");
+        assertTrue(platform(north(30)).overlaps(mine));
+        assertTrue(mine.overlaps(platform(south(54))), "its last spot over this one's leading car");
+        assertFalse(mine.overlaps(platform(south(55))), "its last spot ends where this one's front is");
+        assertFalse(mine.overlaps(platform(south(58))));
     }
 
     @Test
@@ -203,54 +205,54 @@ class PlatformTest {
     @Test
     void aStationAtTheLinesEndOverlapsOnlyWhatItsSpotsCover() {
         line();
-        Platform end = platform(south(40));
-        assertTrue(end.overlaps(platform(north(40))));
-        assertFalse(end.overlaps(platform(south(29))), "its front at 29.5, where the end Station's last spot ends");
-        assertTrue(end.overlaps(platform(south(31))));
+        Platform end = platform(south(60));
+        assertTrue(end.overlaps(platform(north(60))));
+        assertFalse(end.overlaps(platform(south(35))), "its front at 35.5, where the end Station's last spot ends");
+        assertTrue(end.overlaps(platform(south(36))));
     }
 
     @Test
     void theOverlappingStationIsNamedAndItsOwnBlockIsNotCounted() {
         line();
-        Station mine = south(11);
-        Station smelter = north(8);
-        assertEquals(Optional.of(smelter), Platform.overlapping(network, mine, List.of(mine, south(30), smelter)));
-        assertEquals(Optional.empty(), Platform.overlapping(network, mine, List.of(mine, south(30))));
+        Station mine = south(30);
+        Station smelter = north(27);
+        assertEquals(Optional.of(smelter), Platform.overlapping(network, mine, List.of(mine, south(58), smelter)));
+        assertEquals(Optional.empty(), Platform.overlapping(network, mine, List.of(mine, south(58))));
     }
 
     @Test
     void theStopIsReachedOnlyArrivingTheServingWay() {
         line();
-        Platform platform = platform(south(11));
-        Place eastbound = new Place(network.get(A, B), B, 40.0 - 2.0);
+        Platform platform = platform(south(30));
+        Place eastbound = new Place(network.get(A, B), B, 60.0 - 2.0);
         Place westbound = new Place(network.get(A, B), A, 2.0);
-        assertEquals(8.0, platform.toLeadMark(network, eastbound, Station.STRETCH), 1e-9);
+        assertEquals(26.0, platform.toLeadMark(network, eastbound, Station.STRETCH), 1e-9);
         assertTrue(Double.isNaN(platform.toLeadMark(network, westbound, Station.STRETCH)));
         // Just past it, within the stretch.
-        assertEquals(-0.5, platform.toLeadMark(network, new Place(network.get(A, B), B, 29.5), Station.STRETCH), 1e-9);
+        assertEquals(-0.5, platform.toLeadMark(network, new Place(network.get(A, B), B, 31.5), Station.STRETCH), 1e-9);
     }
 
     @Test
     void drivingOnTheLeftAStationServesAndRunsBackTheOtherWay() {
         line();
         DriveSide.configure(DriveSide.LEFT);
-        assertEquals(List.of(13.5, 15.5, 17.5, 19.5), middles(platform(south(10))));
+        assertEquals(List.of(36.0, 41.0, 46.0, 51.0), middles(platform(south(29))));
     }
 
     @Test
     void aBlockBesideACarSpotJoinsThatStationAtThatSpot() {
         line();
-        Station mine = south(11);
-        Station smelter = north(30);
+        Station mine = south(25);
+        Station smelter = north(31);
         List<Station> stations = List.of(smelter, mine);
-        assertEquals(Optional.of(new Platform.Joined(mine, 1)), Platform.joined(network, stations, 6, 6, -1));
-        assertEquals(Optional.of(new Platform.Joined(smelter, 0)), Platform.joined(network, stations, 33, 6, 1));
-        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING)), Platform.joined(network, stations, 32, 6, 1),
-                "beside the smelter's leading car's third block");
-        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING)), Platform.joined(network, stations, 30, 6, 1),
+        assertEquals(Optional.of(new Platform.Joined(mine, 1)), Platform.joined(network, stations, 15, 6, -1));
+        assertEquals(Optional.of(new Platform.Joined(smelter, 0)), Platform.joined(network, stations, 38, 6, 1));
+        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING)), Platform.joined(network, stations, 35, 6, 1),
+                "beside the smelter's leading car's fifth block");
+        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING)), Platform.joined(network, stations, 31, 6, 1),
                 "beside the smelter's leading car");
-        assertEquals(Optional.empty(), Platform.joined(network, stations, 20, 6, 1), "between the two platforms");
-        assertEquals(Optional.empty(), Platform.joined(network, List.of(), 8, 6, -1), "with no Station");
+        assertEquals(Optional.empty(), Platform.joined(network, stations, 28, 6, 1), "between the two platforms");
+        assertEquals(Optional.empty(), Platform.joined(network, List.of(), 20, 6, -1), "with no Station");
     }
 
     @Test
@@ -260,15 +262,22 @@ class PlatformTest {
     }
 
     @Test
-    void eachCarSpotHasFourBlocksBesideItTwoEachSideOfTheRailAndTheLeadingCarsPlaceSix() {
+    void eachCarSpotAndTheLeadingCarsPlaceHaveTenBlocksBesideThemFiveEachSideOfTheRail() {
         line();
-        Platform platform = platform(south(11));
+        Platform platform = platform(south(30));
         List<Platform.Beside> beside = platform.besideBlocks(network);
-        // Four spots and the leading car's place.
-        assertEquals(22, beside.size());
+        // Four spots and the leading car's place, 25 blocks along each side.
+        assertEquals(50, beside.size());
+        assertEquals(6, beside.stream().mapToInt(Platform.Beside::x).min().orElseThrow());
+        assertEquals(30, beside.stream().mapToInt(Platform.Beside::x).max().orElseThrow());
         Set<List<Integer>> first = beside.stream().filter(b -> b.spot() == 0)
                 .map(b -> List.of(b.x(), b.y(), b.z())).collect(Collectors.toSet());
-        assertEquals(Set.of(List.of(8, 6, -1), List.of(7, 6, -1), List.of(8, 6, 1), List.of(7, 6, 1)), first);
+        Set<List<Integer>> expected = new java.util.HashSet<>();
+        for (int x = 21; x <= 25; x++) {
+            expected.add(List.of(x, 6, -1));
+            expected.add(List.of(x, 6, 1));
+        }
+        assertEquals(expected, first);
         for (Platform.Beside b : beside) {
             assertEquals(OptionalInt.of(b.spot()), platform.spotBeside(b.x(), b.y(), b.z()));
         }
@@ -277,25 +286,25 @@ class PlatformTest {
     @Test
     void aShortPlatformHasBlocksOnlyBesideItsLeadingCarAndItsSpots() {
         line();
-        assertEquals(10, platform(south(5)).besideBlocks(network).size());
+        assertEquals(20, platform(south(10)).besideBlocks(network).size());
     }
 
     @Test
     void eachCarSpotHasASideEachSideOfTheRailRunningAlongTheLine() {
         line();
-        List<Platform.Side> sides = platform(south(11)).sides(network);
+        List<Platform.Side> sides = platform(south(30)).sides(network);
         assertEquals(10, sides.size());
         assertTrue(sides.stream().allMatch(Platform.Side::alongX));
-        assertTrue(sides.stream().allMatch(side -> side.blocks().size() == (side.spot() == Platform.LEADING ? 3 : 2)),
-                "three blocks beside the leading car's place, two beside a spot");
+        assertTrue(sides.stream().allMatch(side -> side.blocks().size() == 5),
+                "five blocks beside the leading car's place and beside a spot");
         assertEquals(Platform.LEADING, sides.getFirst().spot());
-        assertEquals(Set.of(List.of(8, 6, -1), List.of(7, 6, -1)), sides.stream().filter(side -> side.spot() == 0)
+        assertEquals(Set.of(List.of(25, 6, -1), List.of(24, 6, -1), List.of(23, 6, -1), List.of(22, 6, -1), List.of(21, 6, -1)), sides.stream().filter(side -> side.spot() == 0)
                 .findFirst().orElseThrow().blocks().stream()
                 .map(b -> List.of(b.x(), b.y(), b.z())).collect(Collectors.toSet()));
         // A line along z: its sides run along z.
         RailNetwork alongZ = new RailNetwork();
-        alongZ.add(Span.of(new Arm(0, 5, 0), new Arm(0, 5, 40), 40));
-        Platform byZ = Platform.of(alongZ, new Station(1, 6, 11, "Z")).orElseThrow();
+        alongZ.add(Span.of(new Arm(0, 5, 0), new Arm(0, 5, 60), 60));
+        Platform byZ = Platform.of(alongZ, new Station(1, 6, 30, "Z")).orElseThrow();
         assertTrue(byZ.sides(alongZ).stream().noneMatch(Platform.Side::alongX));
         assertEquals(10, byZ.sides(alongZ).size());
     }

@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks.gametest;
 
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 import io.github._5thlayer.libworks.gallery.GalleryPack;
 import io.github._5thlayer.libworks.testkit.GalleryCheck;
@@ -22,8 +23,11 @@ import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Train;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.GameTestSequence;
+import net.minecraft.gametest.framework.StructureUtils;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -50,41 +54,55 @@ import net.minecraft.world.phys.Vec3;
  */
 final class GalleryTests {
 
-    /** Three scenes a row, each row 16 blocks north of the last, as {@code gallery/build} lays them. */
-    private static final Layout ROWS = new Layout(3, 16);
+    /**
+     * One scene a row, each row 16 blocks north of the last, as {@code gallery/build} lays them: a
+     * Layout lays a row's plots {@link GalleryCheck#PLOT_WIDTH} apart, too close for plots of
+     * {@link #PLOT_WIDTH}.
+     */
+    private static final Layout ROWS = new Layout(1, 16);
+    /** A scene's plot, along its row from {@link GalleryCheck#FIRST_PLOT_EAST} east of where it is run, as {@code gallery/clear} clears it. */
+    private static final int PLOT_WIDTH = 40;
+    /** A scene's plot, from its sign's row at the origin's z to 14 blocks north. */
+    private static final int PLOT_DEPTH = 15;
 
     /** Where the gallery is run from: the platform's south-west corner, the plots spilling north and east of it. */
     private static final BlockPos ORIGIN = new BlockPos(0, 1, 8);
     /** Where a scene's sign stands, from where the scene is run. */
-    private static final BlockPos SIGN = new BlockPos(14, 0, 0);
+    private static final BlockPos SIGN = new BlockPos(21, 0, 0);
     /** The Stations scene's two Stations, from where it is run, and what it names them. */
     private static final BlockPos QUARRY = new BlockPos(4, 2, -7);
-    private static final BlockPos SMELTER = new BlockPos(25, 2, -5);
+    private static final BlockPos SMELTER = new BlockPos(41, 2, -8);
 
-    /** The logistics scenes' first provider hatch, and the chests under the requesters beside their first and second car spots, from where each is run. */
-    private static final BlockPos PROVIDER = new BlockPos(7, 2, -5);
-    private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(22, 0, -7);
-    private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
+    /**
+     * The logistics scenes' first provider hatch, beside the first car spot of the Station on the
+     * shuttle line's south leg, and the chests under the requesters beside the first and second car
+     * spots of the one on its north leg, from where each is run.
+     */
+    private static final BlockPos PROVIDER = new BlockPos(11, 2, -1);
+    private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(11, 0, -12);
+    private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(16, 0, -12);
     /** The Fluid car scene's requester Fluid hatch beside Smelter's first car spot, from where it is run. */
-    private static final BlockPos FLUID_REQUESTER = new BlockPos(22, 2, -7);
+    private static final BlockPos FLUID_REQUESTER = new BlockPos(11, 2, -12);
     /** The buckets of lava the Fluid car scene's requester asks for, half what its provider holds once built. */
     private static final int FLUID_BUCKETS = 16;
     private static final int BUCKET = (int) Logistics.MILLIBUCKETS_PER_BUCKET;
     /** The refuel scene's provider of coal beside Mine's leading car's place, from where it is run. */
-    private static final BlockPos LEADING_FUEL = new BlockPos(5, 2, -5);
+    private static final BlockPos LEADING_FUEL = new BlockPos(6, 2, -1);
     /** The charge scene's Creative Charger beside Mine's leading car's place, and the Charger by Smelter fed by its Burner Generator, from where it is run. */
-    private static final BlockPos CREATIVE_CHARGER = new BlockPos(5, 2, -5);
-    private static final BlockPos SMELTER_CHARGER = new BlockPos(23, 2, -7);
-    /** The far-away scene's Mine, at its line's far end, and the chest under Smelter's requester by its plot, from where it is run. */
+    private static final BlockPos CREATIVE_CHARGER = new BlockPos(6, 2, -1);
+    private static final BlockPos SMELTER_CHARGER = new BlockPos(6, 2, -12);
+    /** The far-away scene's Mine, at its line's far end, and Smelter's requester by its plot and the chest under it, from where it is run. */
     private static final BlockPos FAR_MINE = new BlockPos(260, 2, -5);
-    private static final BlockPos NEAR_CHEST = new BlockPos(7, 0, -5);
+    private static final BlockPos NEAR_REQUESTER = new BlockPos(11, 2, -5);
+    private static final BlockPos NEAR_CHEST = new BlockPos(11, 0, -5);
     /** The ends of the strip its line runs along, out past its plot, from where it is run. */
     private static final BlockPos FAR_WEST = new BlockPos(22, 0, -8);
     private static final BlockPos FAR_EAST = new BlockPos(262, 0, -4);
     /** The flyover's Arms, from where it is run: the low line's, west to east, and the high line's, south to north. */
     private static final List<BlockPos> LOW_LINE = List.of(
-            new BlockPos(3, 1, -6), new BlockPos(11, 1, -6), new BlockPos(19, 1, -6), new BlockPos(25, 1, -6));
-    private static final List<BlockPos> HIGH_LINE = List.of(new BlockPos(15, 6, -1), new BlockPos(15, 6, -12));
+            new BlockPos(3, 1, -6), new BlockPos(11, 1, -6), new BlockPos(19, 1, -6), new BlockPos(27, 1, -6),
+            new BlockPos(35, 1, -6), new BlockPos(41, 1, -6));
+    private static final List<BlockPos> HIGH_LINE = List.of(new BlockPos(23, 6, -1), new BlockPos(23, 6, -14));
 
     /** The stacks the logistics scene's provider holds once built. */
     private static final int PROVIDED_STACKS = 8;
@@ -95,22 +113,25 @@ final class GalleryTests {
     private GalleryTests() {
     }
 
-    /** The scenes in the order {@code build} lays them, each with a key block and where its function places it. */
+    /**
+     * The scenes in the order {@code build} lays them, each with a key block and where its function
+     * places it, inside libworks' narrower plot, which {@link GalleryCheck#assertKeyBlocks} asks of it.
+     */
     private static List<Scene> scenes() {
         var pylon = RailworksRegistries.PYLON.get();
         return List.of(
-                new Scene("pylons", new BlockPos(23, 3, -6), pylon),
-                new Scene("limits", new BlockPos(14, 3, -2), pylon),
-                new Scene("curves", new BlockPos(14, 1, -4), pylon),
+                new Scene("pylons", new BlockPos(24, 2, -6), pylon),
+                new Scene("limits", new BlockPos(21, 3, -2), pylon),
+                new Scene("curves", new BlockPos(21, 1, -3), pylon),
                 new Scene("locomotive", new BlockPos(11, 1, -6), pylon),
-                new Scene("coupling", new BlockPos(10, 0, -2), Blocks.CHEST),
+                new Scene("coupling", new BlockPos(16, 0, -2), Blocks.CHEST),
                 new Scene("stations", QUARRY, RailworksRegistries.STATION.get()),
                 new Scene("logistics", PROVIDER, RailworksRegistries.HATCH.get()),
                 new Scene("two_loads", PROVIDER, RailworksRegistries.HATCH.get()),
-                new Scene("flyover", HIGH_LINE.getLast(), pylon),
+                new Scene("flyover", HIGH_LINE.getFirst(), pylon),
                 new Scene("refuel", LEADING_FUEL, RailworksRegistries.HATCH.get()),
                 new Scene("charge", CREATIVE_CHARGER, RailworksRegistries.CREATIVE_CHARGER.get()),
-                new Scene("far_away", PROVIDER, RailworksRegistries.HATCH.get()),
+                new Scene("far_away", NEAR_REQUESTER, RailworksRegistries.HATCH.get()),
                 new Scene("fluid", PROVIDER, RailworksRegistries.FLUID_HATCH.get()));
     }
 
@@ -143,7 +164,7 @@ final class GalleryTests {
         var functions = helper.getLevel().getServer().getFunctions();
         var stations = ROWS.sceneOrigin(at, indexOf(scenes, "stations"));
         var flyover = ROWS.sceneOrigin(at, indexOf(scenes, "flyover"));
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, scenes.size(), (source, steps) -> steps
+        withPack(helper, scenes.size(), (source, steps) -> steps
                 .thenExecute(() -> {
                     GalleryCheck.assertLoads(helper, source, Railworks.MOD_ID);
                     for (var scene : scenes) {
@@ -175,8 +196,8 @@ final class GalleryTests {
     private static void signReplays(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
         var sign = at.offset(SIGN);
-        var plot = GalleryCheck.plot(at);
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps.thenExecute(() -> {
+        var plot = plot(at);
+        withPack(helper, ONE_SCENE, (source, steps) -> steps.thenExecute(() -> {
             GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "coupling"));
             helper.assertTrue(helper.getLevel().getBlockEntity(sign) instanceof SignBlockEntity entity
                             && entity.executeClickCommandsIfPresent(helper.getLevel(), source.getPlayer(), sign, true),
@@ -197,7 +218,7 @@ final class GalleryTests {
     private static void logisticsDeliver(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
         var second = ROWS.sceneOrigin(at, 1);
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, 2, (source, steps) -> steps
+        withPack(helper, 2, (source, steps) -> steps
                 .thenExecute(() -> {
                     GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "logistics"));
                     GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "logistics"));
@@ -221,7 +242,7 @@ final class GalleryTests {
     /** The refuel scene: its Train, set down dry, is fuelled at Mine and carries the ore to the Smelter's chest. */
     private static void refuelDelivers(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+        withPack(helper, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "refuel")))
                 .thenWaitUntil(() -> holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE))).thenSucceed();
     }
@@ -229,7 +250,7 @@ final class GalleryTests {
     /** The Fluid car scene: its Train carries the 16 buckets of lava Smelter's requester asks for from Mine's 32. */
     private static void fluidDelivers(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+        withPack(helper, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "fluid")))
                 .thenWaitUntil(() -> {
                     var requester = LevelHatches.of(helper.getLevel()).at(at.offset(FLUID_REQUESTER)).orElseThrow();
@@ -258,7 +279,7 @@ final class GalleryTests {
                 most[0] = Math.max(most[0], now);
             });
         });
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+        withPack(helper, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "charge")))
                 .thenWaitUntil(() -> {
                     holds(helper, at.offset(FIRST_SPOT_CHEST), Items.IRON_ORE);
@@ -275,7 +296,7 @@ final class GalleryTests {
      */
     private static void farAwayDelivers(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
-        var plot = GalleryCheck.plot(at);
+        var plot = plot(at);
         // Generated now, as a world played in would have them: the runner ticks faster than chunks
         // generate off the server thread, and the scene would wait on them for longer than it runs.
         var west = at.offset(FAR_WEST);
@@ -295,7 +316,7 @@ final class GalleryTests {
             }
         });
         List<Train> first = new java.util.ArrayList<>();
-        GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
+        withPack(helper, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> {
                     GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "far_away"));
                     first.addAll(trainsIn(helper, plot));
@@ -324,6 +345,35 @@ final class GalleryTests {
                             net.minecraft.world.phys.AABB.encapsulatingFullBlocks(at.offset(FAR_WEST), at.offset(FAR_EAST).above(8)));
                     helper.assertTrue(loose.isEmpty(), "building again left items along the line: " + loose.stream().map(ItemEntity::getItem).toList());
                 })).thenSucceed();
+    }
+
+    /**
+     * libworks' {@link GalleryCheck#withPack} over the first {@code plots} plots, as {@code build} lays
+     * them, with the parts of each plot its own narrower plot leaves out loaded before and cleared
+     * after: it force-loads, and sets to air, only the {@link GalleryCheck#PLOT_WIDTH} by
+     * {@link GalleryCheck#PLOT_DEPTH} of each plot by the scene's origin. The runner lets the chunks
+     * go once the batch ends.
+     */
+    private static GameTestSequence withPack(GameTestHelper helper, int plots, BiConsumer<CommandSourceStack, GameTestSequence> steps) {
+        var at = helper.absolutePos(ORIGIN);
+        var level = helper.getLevel();
+        for (int index = 0; index < plots; index++) {
+            plot(ROWS.sceneOrigin(at, index)).intersectingChunks().forEach(chunk -> {
+                level.getChunk(chunk.x(), chunk.z());
+                level.setChunkForced(chunk.x(), chunk.z(), true);
+            });
+        }
+        return GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, plots, steps).thenExecute(() -> {
+            for (int index = 0; index < plots; index++) {
+                StructureUtils.clearSpaceForStructure(plot(ROWS.sceneOrigin(at, index)), level);
+            }
+        });
+    }
+
+    /** The plot of a scene run from {@code at}, absolute, its floor included, as {@code gallery/clear} clears it. */
+    private static BoundingBox plot(BlockPos at) {
+        return new BoundingBox(at.getX() + GalleryCheck.FIRST_PLOT_EAST, at.getY() - 1, at.getZ() - PLOT_DEPTH + 1,
+                at.getX() + GalleryCheck.FIRST_PLOT_EAST + PLOT_WIDTH - 1, at.getY() + GalleryCheck.PLOT_HEIGHT - 1, at.getZ());
     }
 
     /** The Arms at {@code line}, from {@code origin}. */

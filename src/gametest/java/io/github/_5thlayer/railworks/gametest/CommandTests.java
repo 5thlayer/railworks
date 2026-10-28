@@ -22,13 +22,22 @@ import net.minecraft.world.level.block.Blocks;
  */
 final class CommandTests {
 
-    /** Two one-segment columns, eight blocks apart along x. */
-    private static final BlockPos WEST = new BlockPos(1, 1, 3);
-    private static final BlockPos EAST = new BlockPos(9, 1, 3);
-    /** A column three segments high, three blocks past {@link #EAST}: a Span to it climbs 2 in 3. */
-    private static final BlockPos STEEP = new BlockPos(12, 1, 3);
-    /** The block a car riding the Span between the Arms stands in, a car's length from either. */
-    private static final BlockPos ON_RAIL = new BlockPos(5, 2, 3);
+    /**
+     * Two one-segment columns, eleven blocks apart along x: room for two five-block cars coupled,
+     * the one at {@link #ON_RAIL} and one behind it.
+     */
+    private static final BlockPos WEST = new BlockPos(-1, 1, 3);
+    private static final BlockPos EAST = new BlockPos(10, 1, 3);
+    /**
+     * A column three segments high, three blocks back along x from {@link #EAST}: a Span to it climbs
+     * 2 in 3. Back, not on past it, which would stand in the next test's plot.
+     */
+    private static final BlockPos STEEP = EAST.west(3);
+    /**
+     * The block a car riding the Span between the Arms stands in, its front half a block short of
+     * {@link #EAST}'s end, a car's length and more from {@link #WEST}.
+     */
+    private static final BlockPos ON_RAIL = new BlockPos(7, 2, 3);
 
     /** Facing east, as a command's yaw: Minecraft's yaw turns from south through west. */
     private static final float EAST_YAW = -90.0F;
@@ -113,11 +122,14 @@ final class CommandTests {
     private static void carCouples(GameTestHelper helper) {
         strung(helper);
         run(helper, "railworks car locomotive %s " + EAST_YAW, ON_RAIL);
-        run(helper, "railworks car cargo_car %s " + EAST_YAW, ON_RAIL.west(2));
-        var trains = helper.getLevel().getEntitiesOfClass(CarEntity.class, helper.getBounds()).stream()
-                .map(CarEntity::train).distinct().toList();
+        // A car's length behind it, where a Cargo car's middle stands coupled.
+        run(helper, "railworks car cargo_car %s " + EAST_YAW, ON_RAIL.west(5));
+        var cars = helper.getLevel().getEntitiesOfClass(CarEntity.class, helper.getBounds());
+        var trains = cars.stream().map(CarEntity::train).distinct().toList();
         helper.assertTrue(trains.size() == 1 && trains.getFirst() != null && trains.getFirst().cars().size() == 2,
                 "the Cargo car did not couple into the Locomotive's Train: " + trains);
+        double apart = Math.abs(cars.get(0).getX() - cars.get(1).getX());
+        helper.assertTrue(Math.abs(apart - 5.0) < 1e-6, "the coupled cars stand " + apart + " apart, not five");
         helper.succeed();
     }
 
@@ -136,7 +148,7 @@ final class CommandTests {
         helper.setBlock(WEST, RailworksRegistries.PYLON.get().defaultBlockState());
         helper.setBlock(EAST, RailworksRegistries.PYLON.get().defaultBlockState());
         // The structure's roof is a barrier layer; a car rides up into it, so clear it over the Span.
-        for (int x = 0; x <= 12; x++) {
+        for (int x = -2; x <= 11; x++) {
             for (int z = 2; z <= 4; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
             }

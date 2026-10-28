@@ -4,14 +4,14 @@
 # unstrung Pylon the line would turn 56 degrees to. The chest holds Rail to try both.
 function railworks:gallery/clear
 function railworks:gallery/sign {scene:"limits"}
-function railworks:gallery/column {x:3,z:-2,top:0}
-function railworks:gallery/column {x:11,z:-2,top:2}
-function railworks:gallery/column {x:14,z:-2,top:3}
-railworks span ~3 ~ ~-2 ~11 ~ ~-2
-function railworks:gallery/column {x:3,z:-10,top:0}
-function railworks:gallery/column {x:11,z:-10,top:0}
-function railworks:gallery/column {x:16,z:-5,top:0}
-function railworks:gallery/column {x:21,z:-6,top:0}
-railworks span ~3 ~ ~-10 ~11 ~ ~-10
-railworks span ~11 ~ ~-10 ~16 ~ ~-5
-setblock ~22 ~ ~-2 minecraft:chest[facing=south]{Items:[{Slot:0b,id:"railworks:rail",count:64}]}
+function railworks:gallery/column {x:10,z:-2,top:0}
+function railworks:gallery/column {x:18,z:-2,top:2}
+function railworks:gallery/column {x:21,z:-2,top:3}
+railworks span ~10 ~ ~-2 ~18 ~ ~-2
+function railworks:gallery/column {x:10,z:-11,top:0}
+function railworks:gallery/column {x:18,z:-11,top:0}
+function railworks:gallery/column {x:23,z:-6,top:0}
+function railworks:gallery/column {x:28,z:-7,top:0}
+railworks span ~10 ~ ~-11 ~18 ~ ~-11
+railworks span ~18 ~ ~-11 ~23 ~ ~-6
+setblock ~29 ~ ~-2 minecraft:chest[facing=south]{Items:[{Slot:0b,id:"railworks:rail",count:64}]}
