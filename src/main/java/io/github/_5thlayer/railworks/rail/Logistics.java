@@ -52,7 +52,7 @@ import java.util.function.ToLongFunction;
  * what that car holds, planned before any job from a provider. With none, it waits where it is,
  * holding.
  *
- * <p>Fuel goes in at a Station too (ADR 0008, amended in #53): an automatic Train at rest at one, on a
+ * <p>Fuel goes in at a Station too (ADR 0008): an automatic Train at rest at one, on a
  * job or waiting, has each Locomotive standing beside a provider there topped up from it, a stack a
  * turn, of fuel no load claims, as far as its fuel slots take it; a Train on a job waits while there
  * is more. A hatch beside the leading car's place, {@link Platform#LEADING}, serves the car standing
@@ -279,7 +279,7 @@ public final class Logistics<I> {
             train.tick(network, hold(train), false, ignite, taken);
             return;
         }
-        if (job.driver.tick(network, train, goods::slotFuelled, ignite, taken)) {
+        if (job.driver.tick(network, train, goods::slotsFuelled, ignite, taken)) {
             job.leg = job.leg == Leg.TO_PROVIDER ? Leg.AT_PROVIDER : Leg.AT_REQUESTER;
             // The first stack moves on the first tick at the Station.
             run.sinceStack = hatchTicksPerStack;
@@ -420,10 +420,11 @@ public final class Logistics<I> {
     // ---- fuel ----
 
     /**
-     * One tick of fuelling {@code train} (ADR 0008, amended in #53): at rest at a Station, on a job or
+     * One tick of fuelling {@code train} (ADR 0008): at rest at a Station, on a job or
      * waiting, each provider there beside one of its Locomotives moves a stack of fuel into it every
      * {@link #hatchTicksPerStack()} ticks, the first on the first tick at rest, of what no load
-     * claims, as far as its fuel slots take it. Its Train waits on its job while there is more to move.
+     * claims, as far as its fuel slots take it. Its Train waits on its job while there is more to
+     * move.
      */
     private void fuel(RailNetwork network, Train train, Run<I> run, List<Hatch<I>> hatches, Goods<I> goods) {
         run.fuelMoved = false;
@@ -447,12 +448,11 @@ public final class Logistics<I> {
                 continue;
             }
             for (I item : goods.contents(hatch).keySet()) {
-                long most = Math.min(goods.stackSize(item), Math.min(unclaimed(hatch, item, goods), goods.fuelRoom(locomotive, item)));
-                if (most <= 0) {
-                    continue;
+                long most = Math.min(goods.stackSize(item), fuelToMove(hatch, locomotive, item, goods));
+                if (most > 0) {
+                    run.fuelMoved |= goods.refuel(hatch, locomotive, item, most) > 0;
+                    break;
                 }
-                run.fuelMoved |= goods.refuel(hatch, locomotive, item, most) > 0;
-                break;
             }
             run.fuelling |= fuelLeft(hatch, locomotive, goods);
         }
@@ -460,27 +460,18 @@ public final class Logistics<I> {
 
     /** Whether {@code provider} has fuel no load claims that {@code locomotive} still takes. */
     private boolean fuelLeft(Hatch<I> provider, Locomotive locomotive, Goods<I> goods) {
-        for (I item : goods.contents(provider).keySet()) {
-            if (Math.min(unclaimed(provider, item, goods), goods.fuelRoom(locomotive, item)) > 0) {
-                return true;
-            }
-        }
-        return false;
+        return goods.contents(provider).keySet().stream().anyMatch(item -> fuelToMove(provider, locomotive, item, goods) > 0);
     }
 
-    /**
-     * The way {@code train}, at rest, runs to stand at {@code station}, its leading car within
-     * {@link Driver#ARRIVE} of the lead mark or past it by no more than the stretch, as a Train
-     * driven there stops; 0 where it does not stand there.
-     */
+    /** How much of {@code item} {@code provider} has to give {@code locomotive}: what no load claims, as far as its fuel slots take it. */
+    private long fuelToMove(Hatch<I> provider, Locomotive locomotive, I item, Goods<I> goods) {
+        return Math.min(unclaimed(provider, item, goods), goods.fuelRoom(provider, locomotive, item));
+    }
+
+    /** The way {@code train}, at rest, runs to stand at {@code station}, as {@link Driver#standsAt} says; 0 where it does not stand there. */
     private static int wayAt(RailNetwork network, Train train, Station station) {
-        Optional<Platform> platform = Platform.of(network, station);
-        if (platform.isEmpty()) {
-            return 0;
-        }
         for (int way : new int[] {1, -1}) {
-            // NaN, out of reach, compares false.
-            if (platform.get().toLeadMark(network, train.lead(network, way), Station.STRETCH) <= Driver.ARRIVE) {
+            if (Driver.standsAt(network, train, way, station)) {
                 return way;
             }
         }
@@ -693,7 +684,7 @@ public final class Logistics<I> {
 
     /** How far {@code train}, running {@code way}, is from {@code platform}'s lead mark, as {@link Platform#toLeadMark}; NaN where it cannot pull that way. */
     private static <I> double toLeadMark(RailNetwork network, Train train, int way, Platform platform, Goods<I> goods) {
-        return train.pulls(way, goods::slotFuelled)
+        return train.pulls(way, goods::slotsFuelled)
                 ? platform.toLeadMark(network, train.lead(network, way), Station.STRETCH) : Double.NaN;
     }
 
@@ -732,7 +723,7 @@ public final class Logistics<I> {
             Place lead = provider.leadMark();
             Place otherEnd = train.length() == 0.0 ? lead.turned() : lead.move(network, -train.length()).place().turned();
             for (int atRequester : new int[] {1, -1}) {
-                if (!train.pulls(atRequester, goods::slotFuelled)) {
+                if (!train.pulls(atRequester, goods::slotsFuelled)) {
                     continue;
                 }
                 double toRequester = requester.toLeadMark(network, atRequester == atProvider ? lead : otherEnd, 0.0);

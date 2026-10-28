@@ -27,6 +27,8 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
     private static final Identifier BACKGROUND = Identifier.withDefaultNamespace("textures/gui/container/generic_54.png");
     /** The panel's own grey, to paint the chest row's unused slots out. */
     private static final int PANEL = 0xFFC6C6C6;
+    /** How many slots the chest row has. */
+    private static final int ROW = 9;
     /** The chest row's columns the fuel slots take, from the first. */
     private static final int FUEL_COLUMNS = Locomotive.FUEL_SLOTS;
     /** The status line's grey, a label's. */
@@ -44,7 +46,7 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
         super.init();
         // Over the painted-out slots right of the fuel slots, a column clear of them.
         automatic = addRenderableWidget(Button.builder(label(), button -> toggle())
-                .bounds(leftPos + 7 + (FUEL_COLUMNS + 1) * 18 + 2, topPos + 17, (8 - FUEL_COLUMNS) * 18 - 4, 18).build());
+                .bounds(leftPos + 7 + (FUEL_COLUMNS + 1) * 18 + 2, topPos + 17, (ROW - 1 - FUEL_COLUMNS) * 18 - 4, 18).build());
     }
 
     /** The Locomotive, as this client sees it; null once it is out of sight. */
@@ -89,7 +91,7 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
         // A strip of the panel's own grey under the row, for the status line.
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, left, top + 18 + 17, 0.0F, 4.0F, this.imageWidth, 12, 256, 256);
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, left, top + 18 + 17 + 12, 0.0F, 126.0F, this.imageWidth, 96, 256, 256);
-        for (int column = 0; column < 9; column++) {
+        for (int column = 0; column < ROW; column++) {
             if (column >= FUEL_COLUMNS) {
                 graphics.fill(left + 7 + column * 18, top + 17, left + 7 + (column + 1) * 18, top + 17 + 18, PANEL);
             }

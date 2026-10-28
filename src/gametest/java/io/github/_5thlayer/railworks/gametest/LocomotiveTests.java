@@ -74,6 +74,8 @@ final class LocomotiveTests {
         tests.test("locomotive_comes_off_the_rail_when_its_span_is_cut", 20, LocomotiveTests::derails);
         tests.test("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
         tests.test("locomotive_is_saved_with_its_place_speed_and_fuel", 20, LocomotiveTests::saves);
+        tests.test("locomotive_fuel_slots_keep_their_order_across_a_save", 20, LocomotiveTests::savesSlotOrder);
+        tests.test("locomotive_menu_fills_any_fuel_slot_and_the_first_holding_fuel_burns_first", 20, LocomotiveTests::burnsInOrder);
         tests.test("locomotive_saved_before_trains_had_cars_loads_in_place", 20, LocomotiveTests::loadsLegacySave);
         tests.test("locomotive_cab_seats_its_rider_forward_facing_east", 20, helper -> seatsForward(helper, -45.0F, 1));
         tests.test("locomotive_cab_seats_its_rider_forward_facing_west", 20, helper -> seatsForward(helper, 45.0F, -1));
@@ -509,6 +511,59 @@ final class LocomotiveTests {
             helper.fail("a saved and reloaded car came back different: " + now, STAND);
         }
         helper.succeed();
+    }
+
+    private static void savesSlotOrder(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        Opened opened = menu(helper, car);
+        // The first slot left empty, and coal either side of the charcoal, as a menu can lay them.
+        putInSlot(opened, 1, new ItemStack(Items.COAL, 10));
+        putInSlot(opened, 2, new ItemStack(Items.CHARCOAL, 5));
+        putInSlot(opened, 3, new ItemStack(Items.COAL, 20));
+        var output = net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(
+                net.minecraft.util.ProblemReporter.DISCARDING);
+        car.saveWithoutId(output);
+        var reloaded = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(),
+                net.minecraft.world.entity.EntitySpawnReason.LOAD);
+        reloaded.load(net.minecraft.world.level.storage.TagValueInput.create(
+                net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+        expectSlots(helper, reloaded, List.of(ItemStack.EMPTY, new ItemStack(Items.COAL, 10),
+                new ItemStack(Items.CHARCOAL, 5), new ItemStack(Items.COAL, 20)));
+        helper.succeed();
+    }
+
+    private static void burnsInOrder(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        Opened opened = menu(helper, car);
+        // A stick is a sliver of a run; the coal after it is not touched until it is gone.
+        putInSlot(opened, 2, new ItemStack(Items.STICK, 1));
+        putInSlot(opened, 3, new ItemStack(Items.COAL, 3));
+        ServerPlayer driver = board(helper, car);
+        expectSlots(helper, car, List.of(ItemStack.EMPTY, ItemStack.EMPTY, new ItemStack(Items.STICK, 1),
+                new ItemStack(Items.COAL, 3)));
+        press(driver, true, false);
+        run(car, 3);
+        expectSlots(helper, car, List.of(ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, new ItemStack(Items.COAL, 3)));
+        helper.succeed();
+    }
+
+    /** A survival player's view of {@code car}'s menu, opened by sneaking at it. */
+    private record Opened(ServerPlayer player, LocomotiveMenu menu) {
+    }
+
+    private static Opened menu(GameTestHelper helper, LocomotiveEntity car) {
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        player.setGameMode(GameType.SURVIVAL);
+        player.setShiftKeyDown(true);
+        car.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        player.setShiftKeyDown(false);
+        return new Opened(player, (LocomotiveMenu) player.containerMenu);
+    }
+
+    /** Puts {@code stack} in fuel slot {@code slot} through the opened menu, as a click with it carried does. */
+    private static void putInSlot(Opened opened, int slot, ItemStack stack) {
+        opened.menu().setCarried(stack);
+        opened.menu().clicked(LocomotiveMenu.FUEL + slot, 0, ContainerInput.PICKUP, opened.player());
     }
 
     private static void loadsLegacySave(GameTestHelper helper) {
