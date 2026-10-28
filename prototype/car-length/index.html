@@ -188,8 +188,8 @@ const VARIANTS = {
        build: () => [widen(locoHood(5), 2), widen(cargo(5, [-1.5, 0, 1.5]), 2)],
        note: "D's cars two blocks wide. Centred on the Rail, a car's sides fall halfway across the blocks beside it, so the hatches stand two blocks off the Rail with half a block of air before the car." },
   H: { name: 'G with a 2-block Rider bay', loco: 5, car: 5, width: 2,
-       build: () => [widen(locoHood(5, 2.0), 2), widen(cargo(5, [-1.5, 0, 1.5]), 2)],
-       note: "G's Locomotive with its Rider's bay two blocks long at the back and the engine room cut to one: cab 1.8, engine room 1.0, bay 2.0." },
+       build: () => [widen(locoHood(5, 2.0), 2), widen(cargo(5, [-1, 0, 1]), 2)],
+       note: "G's Locomotive with its Rider's bay two blocks long at the back and the engine room cut to one: cab 1.8, engine room 1.0, bay 2.0. The Cargo car's chests sit over its three inner blocks." },
   E: { name: '5: a cab at each end', loco: 5, car: 5, build: () => [locoDoubleCab(5), cargo(5, [-1.2, 1.2])],
        note: 'Double-ended: a cab facing out at each end and the bay between. One Locomotive drives both ways; Cargo with two chests a side.' },
 };
