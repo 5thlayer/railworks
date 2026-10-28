@@ -24,6 +24,7 @@ class CarBodyTest {
         check(CarBody.LOCOMOTIVE, CarBody.LENGTH);
         check(CarBody.ELECTRIC, CarBody.LENGTH);
         check(CarBody.CARGO, CarBody.LENGTH);
+        check(CarBody.FLUID, CarBody.LENGTH);
     }
 
     @Test
@@ -43,7 +44,7 @@ class CarBodyTest {
 
     @Test
     void noTwoFacesOfABodyShareAPlane() {
-        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.CARGO)) {
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.CARGO, CarBody.FLUID)) {
             List<CarBody.Box> boxes = boxes(body);
             for (int i = 0; i < boxes.size(); i++) {
                 for (int j = i + 1; j < boxes.size(); j++) {

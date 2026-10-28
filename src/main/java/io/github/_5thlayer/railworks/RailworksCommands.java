@@ -10,6 +10,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import io.github._5thlayer.groundworks.Refusal;
+import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Stringing;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -34,15 +35,15 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  *   <li>{@code /railworks span <from> <to>} strings a Span between the Arms of the Pylon columns
  *       standing at {@code from} and {@code to}, for no Rail, under the length, grade and bend
  *       limits a player strings by.</li>
- *   <li>{@code /railworks car (locomotive|electric_locomotive|cargo_car) <pos> <yaw>} sets a car on the Rail where one
- *       riding it would stand in the block {@code pos}, facing {@code yaw} along it, as the car in
+ *   <li>{@code /railworks car (locomotive|electric_locomotive|cargo_car|fluid_car) <pos> <yaw>} sets a car
+ *       on the Rail where one riding it would stand in the block {@code pos}, facing {@code yaw} along it, as the car in
  *       a player's hand would: coupled into a Train at rest when that is where it lands beside one
  *       of the Train's ends, and refused where the item would be.</li>
  *   <li>{@code /railworks hatch <pos> provider <item> <stacks>} puts {@code stacks} full stacks of
  *       {@code item} in the provider hatch at {@code pos}, refused without room for them all; with
  *       {@code requester}, has the requester hatch there ask for that many, a stack at a time as a
  *       player's uses of the item do, refused past its slots. A hatch set by a command a moment
- *       before counts.</li>
+ *       before counts; a Fluid hatch is refused as the other kind.</li>
  *   <li>{@code /railworks automatic <locomotive>} switches the Locomotive's Train to automatic, as
  *       its menu's toggle does, so it takes jobs between hatches (ADR 0008).</li>
  * </ul>
@@ -161,7 +162,7 @@ public final class RailworksCommands {
             throw NOT_A_HATCH.create(pos.toShortString());
         }
         Hatches.Hatch hatch = entity.hatch().orElseThrow(() -> NOT_A_HATCH.create(pos.toShortString()));
-        if (hatch.mode() != mode) {
+        if (hatch.mode() != mode || hatch.holds() != Goods.Kind.ITEMS) {
             throw WRONG_MODE.create(pos.toShortString());
         }
         ItemResource resource = ItemResource.of(ItemArgument.getItem(context, "item").item());

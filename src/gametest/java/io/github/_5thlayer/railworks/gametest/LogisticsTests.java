@@ -566,7 +566,7 @@ final class LogisticsTests {
      * Fails unless the Locomotive's status line, as a client reads it, shows {@code icons} after its
      * words, "64 minecraft:iron_ingot" for each, comma-separated, and names no items beyond them.
      */
-    private static void expectIcons(GameTestHelper helper, LocomotiveEntity locomotive, String icons) {
+    static void expectIcons(GameTestHelper helper, LocomotiveEntity locomotive, String icons) {
         String shown = locomotive.statusIconsSeen().stream()
                 .map(icon -> icon.getCount() + " " + BuiltInRegistries.ITEM.getKey(icon.getItem()))
                 .collect(Collectors.joining(", "));
@@ -577,7 +577,7 @@ final class LogisticsTests {
     }
 
     /** Fails unless the Locomotive's status line, as a client reads it, is the line {@code key} says. */
-    private static void expectStatus(GameTestHelper helper, LocomotiveEntity locomotive, String key) {
+    static void expectStatus(GameTestHelper helper, LocomotiveEntity locomotive, String key) {
         Component status = locomotive.statusSeen();
         String said = status.getContents() instanceof TranslatableContents contents ? contents.getKey() : status.getString();
         if (!said.equals(key)) {

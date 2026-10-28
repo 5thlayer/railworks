@@ -265,7 +265,7 @@ public final class Logistics<I> {
         Logistics.stallSeconds = stallSeconds;
     }
 
-    /** How many ticks a hatch takes for each stack it moves. */
+    /** How many ticks a hatch takes for each stack it moves, and a Fluid hatch for its {@link #FLUID_BUCKETS_PER_STEP} buckets. */
     public static int hatchTicksPerStack() {
         return hatchTicksPerStack;
     }

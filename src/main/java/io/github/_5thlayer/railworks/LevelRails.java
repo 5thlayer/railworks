@@ -40,7 +40,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -98,9 +97,9 @@ public final class LevelRails extends SavedData {
     private final List<CarEntity> stale = new ArrayList<>();
     /** Where each car of a Train stood in the world after the level's last tick. */
     private Map<UUID, Vec3> standing = Map.of();
-    private final Logistics<Item> logistics = new Logistics<>();
+    private final Logistics<Ware> logistics = new Logistics<>();
     /** The hatches that join a Station as logistics last asked, in the order they were placed; asked afresh once a plan. */
-    private List<Logistics.Hatch<Item>> joined = List.of();
+    private List<Logistics.Hatch<Ware>> joined = List.of();
     /** The Chargers that join a Station, asked afresh with the hatches. */
     private List<Logistics.Charger> joinedChargers = List.of();
     private int ticks;
@@ -362,12 +361,12 @@ public final class LevelRails extends SavedData {
     // ---- logistics ----
 
     /** {@code train}'s status line, as its Locomotive's menu and Jade show it. */
-    public Logistics.Status<Item> status(ServerLevel level, Train train) {
+    public Logistics.Status<Ware> status(ServerLevel level, Train train) {
         return logistics.status(train, goods(level));
     }
 
     /** The goods of {@code level} as its logistics sees them: what its hatches and its cars' records hold. */
-    public Goods<Item> goods(ServerLevel level) {
+    public Goods<Ware> goods(ServerLevel level) {
         return new LevelGoods(level);
     }
 
@@ -413,12 +412,12 @@ public final class LevelRails extends SavedData {
     }
 
     /** Every hatch of the level that joins a Station, as logistics sees it, in the order they were placed. */
-    private List<Logistics.Hatch<Item>> joinedHatches(ServerLevel level) {
-        List<Logistics.Hatch<Item>> joined = new ArrayList<>();
+    private List<Logistics.Hatch<Ware>> joinedHatches(ServerLevel level) {
+        List<Logistics.Hatch<Ware>> joined = new ArrayList<>();
         for (Hatches.Hatch hatch : LevelHatches.of(level).all()) {
             BlockPos pos = hatch.pos();
             PlatformsNear.joined(level, pos).ifPresent(at -> joined.add(new Logistics.Hatch<>(pos.getX(), pos.getY(),
-                    pos.getZ(), at.station(), at.spot(), hatch.mode() == HatchMode.PROVIDER, Goods.Kind.ITEMS, hatch.request())));
+                    pos.getZ(), at.station(), at.spot(), hatch.mode() == HatchMode.PROVIDER, hatch.holds(), hatch.request())));
         }
         return List.copyOf(joined);
     }

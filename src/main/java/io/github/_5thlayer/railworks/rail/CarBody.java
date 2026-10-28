@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * The boxes a car is drawn from: a boxy car straddling the Rail, its shell riding on top with
- * skirts down both sides of the web, and the chests set into a Cargo car's sides. Coordinates are
+ * skirts down both sides of the web, the chests set into a Cargo car's sides, and a Fluid car's tank. Coordinates are
  * the car's own: x across, y up from the floor's underside on the flange's top, z along the car with
  * +z the end it faces. Placeholder art, so {@code CarRenderer} only paints these and nothing else
  * decides their sizes. It also holds the car's size and where the Locomotive's rider sits in it, so
@@ -47,7 +47,9 @@ public record CarBody(List<Part> parts, List<Box> chests) {
         /** A headlight. */
         LAMP(0.95F, 0.90F, 0.62F),
         /** The Electric Locomotive's nose band, copper. */
-        COPPER(0.78F, 0.45F, 0.28F);
+        COPPER(0.78F, 0.45F, 0.28F),
+        /** A Fluid car's tank, a paler rust than the shell. */
+        TANK(0.72F, 0.42F, 0.33F);
 
         public final float red;
         public final float green;
@@ -124,18 +126,25 @@ public record CarBody(List<Part> parts, List<Box> chests) {
     public static final CarBody LOCOMOTIVE = locomotive();
     public static final CarBody ELECTRIC = electric();
     public static final CarBody CARGO = cargo();
+    public static final CarBody FLUID = fluid();
 
     /** Where the Locomotive's rider's eye is. */
     public static Point eye() {
         return new Point(0.0, SEAT_Y + EYE_ABOVE_SEAT, SEAT_Z);
     }
 
-    /** What both cars share: the skirts, the floor and the roof. */
+    /** What the closed cars share: the skirts, the floor and the roof. */
     private static List<Part> shell() {
+        List<Part> parts = underframe();
+        parts.add(new Part(Paint.SHELL, -0.5, 2.6, -0.9, 0.5, 2.75, 0.9));
+        return parts;
+    }
+
+    /** What every car shares: the skirts and the floor. */
+    private static List<Part> underframe() {
         List<Part> parts = new ArrayList<>();
         sides(parts, new Part(Paint.DARK_RUST, 0.17, 0.0, -0.89, 0.49, 0.62, 0.89));
         parts.add(new Part(Paint.SHELL, -0.5, 0.55, -0.9, 0.5, 0.7, 0.9));
-        parts.add(new Part(Paint.SHELL, -0.5, 2.6, -0.9, 0.5, 2.75, 0.9));
         return parts;
     }
 
@@ -195,6 +204,20 @@ public record CarBody(List<Part> parts, List<Box> chests) {
         // The chest fills a cube in the recess, its lock just behind the facing.
         Box chest = new Box(0.05, 1.075, -0.195, 0.44, 1.465, 0.195);
         return new CarBody(List.copyOf(parts), List.of(chest, chest.mirrored()));
+    }
+
+    /**
+     * The Fluid car: an open floor carrying a tank along it, rounded by a wide box crossing a tall one,
+     * on a saddle at each end, a band round it near each end and a dome on top.
+     */
+    private static CarBody fluid() {
+        List<Part> parts = underframe();
+        parts.add(new Part(Paint.TANK, -0.46, 0.95, -0.83, 0.46, 2.05, 0.83));
+        parts.add(new Part(Paint.TANK, -0.33, 0.72, -0.84, 0.33, 2.33, 0.84));
+        parts.add(new Part(Paint.TANK, -0.12, 2.32, -0.15, 0.12, 2.5, 0.15));
+        ends(parts, new Part(Paint.TRIM, -0.47, 0.94, 0.4, 0.47, 2.06, 0.46));
+        ends(parts, new Part(Paint.DARK_RUST, -0.4, 0.69, 0.55, 0.4, 0.8, 0.7));
+        return new CarBody(List.copyOf(parts), List.of());
     }
 
     /** The part and its mirror across the car. */

@@ -18,6 +18,7 @@ import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.RailworksRegistries;
+import io.github._5thlayer.railworks.Ware;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Locomotive;
@@ -125,9 +126,9 @@ final class CarRecordTests {
         Locomotive locomotiveCar = locomotive.locomotive();
         cargo.remove(Entity.RemovalReason.UNLOADED_TO_CHUNK);
         locomotive.remove(Entity.RemovalReason.UNLOADED_TO_CHUNK);
-        Goods<Item> goods = LevelRails.of(helper.getLevel()).goods(helper.getLevel());
-        if (goods.held(cargoCar, Items.IRON_ORE) != 12 || goods.empty(cargoCar)
-                || !goods.contents(cargoCar).equals(java.util.Map.of(Items.IRON_ORE, 12L))) {
+        Goods<Ware> goods = LevelRails.of(helper.getLevel()).goods(helper.getLevel());
+        if (goods.held(cargoCar, Ware.of(Items.IRON_ORE)) != 12 || goods.empty(cargoCar)
+                || !goods.contents(cargoCar).equals(java.util.Map.of(Ware.of(Items.IRON_ORE), 12L))) {
             helper.fail("a Cargo car out of view holds " + goods.contents(cargoCar) + ", empty " + goods.empty(cargoCar), STAND);
         }
         if (!goods.slotsFuelled(locomotiveCar)) {
@@ -135,17 +136,17 @@ final class CarRecordTests {
         }
         // A provider's record beside them, loading the car and fuelling the Locomotive with no view.
         BlockPos at = helper.absolutePos(STAND.west(3));
-        var hatch = LevelHatches.of(helper.getLevel()).put(at, HatchMode.PROVIDER);
+        var hatch = LevelHatches.of(helper.getLevel()).put(at, Goods.Kind.ITEMS, HatchMode.PROVIDER);
         try (var transaction = Transaction.openRoot()) {
             ResourceHandlerUtil.insertStacking(hatch.contents(), ItemResource.of(Items.IRON_ORE), 20, transaction);
             ResourceHandlerUtil.insertStacking(hatch.contents(), ItemResource.of(Items.COAL), 10, transaction);
             transaction.commit();
         }
-        var from = new Logistics.Hatch<Item>(at.getX(), at.getY(), at.getZ(), null, 0, true, Goods.Kind.ITEMS, Optional.empty());
-        long loaded = goods.load(from, cargoCar, Items.IRON_ORE, 20);
-        long room = goods.fuelRoom(from, locomotiveCar, Items.COAL);
-        long fuelled = goods.refuel(from, locomotiveCar, Items.COAL, 10);
-        if (loaded != 20 || goods.held(cargoCar, Items.IRON_ORE) != 32) {
+        var from = new Logistics.Hatch<Ware>(at.getX(), at.getY(), at.getZ(), null, 0, true, Goods.Kind.ITEMS, Optional.empty());
+        long loaded = goods.load(from, cargoCar, Ware.of(Items.IRON_ORE), 20);
+        long room = goods.fuelRoom(from, locomotiveCar, Ware.of(Items.COAL));
+        long fuelled = goods.refuel(from, locomotiveCar, Ware.of(Items.COAL), 10);
+        if (loaded != 20 || goods.held(cargoCar, Ware.of(Items.IRON_ORE)) != 32) {
             helper.fail("a provider loaded " + loaded + " into a Cargo car out of view", STAND);
         }
         if (room <= 0 || fuelled != 10) {

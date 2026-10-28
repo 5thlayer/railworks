@@ -9,15 +9,14 @@ import java.util.Locale;
 
 import io.github._5thlayer.railworks.rail.Logistics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 /**
  * A Train's status line as a player reads it, under the Locomotive menu's Automatic toggle and in
  * Jade: "Manual", "Waiting for a job", "To X to load", "Loading at X", "To X to unload", "Unloading
  * at X", "Cannot reach X" or "Nowhere to deliver". Heading to unload or with nowhere to deliver, the
- * items it carries follow the words as icons with their counts, the first {@link #ICONS} of them and
- * then "+M" for the rest.
+ * items it carries follow the words as icons with their counts, a fluid as its filled bucket with its
+ * count in buckets, the first {@link #ICONS} of them and then "+M" for the rest.
  */
 public final class StatusLine {
 
@@ -28,22 +27,25 @@ public final class StatusLine {
     }
 
     /** The line's words. */
-    public static Component of(Logistics.Status<Item> status) {
+    public static Component of(Logistics.Status<Ware> status) {
         String key = "status.railworks.train." + status.kind().name().toLowerCase(Locale.ROOT);
         return status.station().isEmpty() ? Component.translatable(key) : Component.translatable(key, status.station());
     }
 
-    /** The first {@link #ICONS} items the line names, each a stack of its count, however many stacks that is. */
-    public static List<ItemStack> icons(Logistics.Status<Item> status) {
+    /**
+     * The first {@link #ICONS} items and fluids the line names: an item as a stack of its count, however
+     * many stacks that is, and a fluid as its filled bucket, so many as its buckets.
+     */
+    public static List<ItemStack> icons(Logistics.Status<Ware> status) {
         List<ItemStack> icons = new ArrayList<>();
-        for (Logistics.Cargo<Item> load : status.cargo().subList(0, Math.min(ICONS, status.cargo().size()))) {
-            icons.add(new ItemStack(load.item(), (int) Math.min(Integer.MAX_VALUE, load.count())));
+        for (Logistics.Cargo<Ware> load : status.cargo().subList(0, Math.min(ICONS, status.cargo().size()))) {
+            icons.add(load.item().icon(load.count()));
         }
         return icons;
     }
 
     /** How many items the line names beyond its icons. */
-    public static int beyondIcons(Logistics.Status<Item> status) {
+    public static int beyondIcons(Logistics.Status<Ware> status) {
         return Math.max(0, status.cargo().size() - ICONS);
     }
 

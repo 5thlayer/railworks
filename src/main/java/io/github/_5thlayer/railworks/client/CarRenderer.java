@@ -25,9 +25,9 @@ import org.joml.Matrix4f;
 
 /**
  * A car, drawn from its {@link CarBody} as placeholder boxes: a boxy car straddling the Rail, in the
- * Rail's rust red, and on a Cargo car a vanilla chest set into each side. Every face is its own
- * triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its tube, so the strips
- * the pipeline joins in one buffer leave no triangles between them.
+ * Rail's rust red, on a Cargo car a vanilla chest set into each side, and on a Fluid car a tank. Every
+ * face is its own triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its tube,
+ * so the strips the pipeline joins in one buffer leave no triangles between them.
  */
 public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, CarRenderer.State> {
 
@@ -61,6 +61,10 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
 
     public static <T extends CarEntity> CarRenderer<T> cargo(EntityRendererProvider.Context context) {
         return new CarRenderer<>(context, CarBody.CARGO);
+    }
+
+    public static <T extends CarEntity> CarRenderer<T> fluid(EntityRendererProvider.Context context) {
+        return new CarRenderer<>(context, CarBody.FLUID);
     }
 
     @Override

@@ -7,15 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.HatchRequest;
+import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 
 /**
  * What a hatch shows a player looking at it, beside what it holds: whether it is a provider or a
@@ -27,7 +27,7 @@ import net.minecraft.world.item.ItemStack;
  * @param request what a requester asks for; empty for one asking for nothing, and for a provider
  * @param joined  the Station it joins and the car spot it stands beside; empty for none
  */
-public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, Optional<StationSpot> joined) {
+public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, Optional<StationSpot> joined) {
 
     /** The Station a hatch joins, by name, and its car spot's index, 0 the one behind the leading car's. */
     public record StationSpot(String station, int spot) {
@@ -52,11 +52,31 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Item>> request, 
         return new HatchReport(hatch.mode(), hatch.request(), joined);
     }
 
-    /** What a requester asking for {@code request} asks for, in words: the action bar's line and Jade's. */
-    public static Component requesting(Optional<HatchRequest<Item>> request) {
-        return request.map(asked -> Component.translatable("message.railworks.hatch.requesting",
-                        asked.count(), new ItemStack(asked.item()).getItemName()))
+    /**
+     * What a requester asking for {@code request} asks for, in words, stacks of an item or buckets of a
+     * fluid: the action bar's line and Jade's.
+     */
+    public static Component requesting(Optional<HatchRequest<Ware>> request) {
+        return request.map(asked -> Component.translatable(asked.item().kind() == Goods.Kind.FLUID
+                        ? "message.railworks.hatch.requesting_fluid" : "message.railworks.hatch.requesting",
+                        asked.count(), asked.item().name()))
                 .orElseGet(() -> Component.translatable("message.railworks.hatch.requesting_nothing"));
+    }
+
+    /** What a Fluid hatch's {@code tank} holds, in buckets, in words: the action bar's line. */
+    public static Component holding(Tank tank) {
+        if (tank.amount() == 0) {
+            return Component.translatable("message.railworks.fluid_hatch.holds_nothing");
+        }
+        return Component.translatable("message.railworks.fluid_hatch.holds", buckets(tank.amount()),
+                Ware.of(tank.fluid().getFluid()).name());
+    }
+
+    /** {@code millibuckets} in buckets, to one place where it is not a whole number: "3", "2.5". */
+    static String buckets(long millibuckets) {
+        long whole = millibuckets / Logistics.MILLIBUCKETS_PER_BUCKET;
+        long tenths = millibuckets % Logistics.MILLIBUCKETS_PER_BUCKET / (Logistics.MILLIBUCKETS_PER_BUCKET / 10);
+        return tenths == 0 ? Long.toString(whole) : whole + "." + tenths;
     }
 
     /** Its lines in Jade: provider or requester, a requester's request, and the Station it joins or that it joins none. */

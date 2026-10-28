@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.ChargeSpec;
@@ -26,15 +27,17 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A level's goods as {@link Logistics} asks for them: a hatch's are its record in the level's
- * {@link LevelHatches}, and a Cargo car's and a Locomotive's fuel slots the car's record in its
- * {@link LevelCarRecords}, all there with their chunks unloaded (ADR 0008), as are an Electric
+ * {@link LevelHatches}, and a Cargo car's, a Fluid car's tank and a Locomotive's fuel slots the car's
+ * record in its {@link LevelCarRecords}, all there with their chunks unloaded (ADR 0008, the Fluid
+ * car's and Fluid hatch's tanks as the Cargo car's cargo and the hatch's slots), as are an Electric
  * Locomotive's charge, its car's record too, and a Charger's buffer, its record in the level's
- * {@link LevelChargers} (ADR 0005, amended in #9). Only a car whose view
- * has not yet made its record, one of a world saved before the level kept them whose entity has not
- * loaded since, holds nothing, has no room and is not empty. An item's kind is its {@link Item}, its
- * components ignored: a stack of it moves as it is, components and all.
+ * {@link LevelChargers} (ADR 0005, amended in #9). Only a car whose view has not yet made its record,
+ * one of a world saved before the level kept them whose entity has not loaded since, holds nothing,
+ * has no room and is not empty. A ware is an item's kind, its components ignored, a stack of it
+ * moving as it is, components and all; or a fluid, counted in millibuckets, moving between a Fluid
+ * hatch's tank and a Fluid car's.
  */
-final class LevelGoods implements Goods<Item> {
+final class LevelGoods implements Goods<Ware> {
 
     private final ServerLevel level;
 
@@ -43,45 +46,51 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public int stackSize(Item item) {
-        return item.getDefaultMaxStackSize();
+    public int stackSize(Ware ware) {
+        return ware instanceof Ware.OfItem item ? item.item().getDefaultMaxStackSize() : 1;
     }
 
     @Override
-    public long held(Logistics.Hatch<Item> hatch, Item item) {
-        ItemStacksResourceHandler contents = hatchContents(hatch);
-        long held = 0;
-        for (int slot = 0; contents != null && slot < contents.size(); slot++) {
-            if (contents.getResource(slot).is(item)) {
-                held += contents.getAmountAsLong(slot);
-            }
+    public long held(Logistics.Hatch<Ware> hatch, Ware ware) {
+        return switch (ware) {
+            case Ware.OfItem item -> held(hatchContents(hatch), item.item());
+            case Ware.OfFluid fluid -> held(hatchTank(hatch), fluid);
+        };
+    }
+
+    @Override
+    public long held(GoodsCar car, Ware ware) {
+        CarRecords.Contents record = record(car);
+        if (record == null) {
+            return 0;
         }
-        return held;
+        return switch (ware) {
+            case Ware.OfItem item -> record.countItem(item.item());
+            case Ware.OfFluid fluid -> held(record.tank(), fluid);
+        };
     }
 
     @Override
-    public long held(GoodsCar car, Item item) {
-        SimpleContainer cargo = cargo(car);
-        return cargo == null ? 0 : cargo.countItem(item);
-    }
-
-    @Override
-    public Map<Item, Long> contents(GoodsCar car) {
-        SimpleContainer cargo = cargo(car);
-        Map<Item, Long> contents = new LinkedHashMap<>();
-        for (int slot = 0; cargo != null && slot < cargo.getContainerSize(); slot++) {
-            ItemStack stack = cargo.getItem(slot);
+    public Map<Ware, Long> contents(GoodsCar car) {
+        CarRecords.Contents record = record(car);
+        Map<Ware, Long> contents = new LinkedHashMap<>();
+        if (record == null) {
+            return contents;
+        }
+        for (int slot = 0; slot < record.getContainerSize(); slot++) {
+            ItemStack stack = record.getItem(slot);
             if (!stack.isEmpty()) {
-                contents.merge(stack.getItem(), (long) stack.getCount(), Long::sum);
+                contents.merge(Ware.of(stack.getItem()), (long) stack.getCount(), Long::sum);
             }
         }
+        tankContents(record.tank(), contents);
         return contents;
     }
 
     @Override
     public boolean empty(GoodsCar car) {
-        SimpleContainer cargo = cargo(car);
-        return cargo != null && cargo.isEmpty();
+        CarRecords.Contents record = record(car);
+        return record != null && record.isEmpty();
     }
 
     @Override
@@ -89,16 +98,27 @@ final class LevelGoods implements Goods<Item> {
         return CargoCarEntity.SLOTS;
     }
 
+    /** Its record's tank's, made with the size the server config gave a Fluid car then; a car with no record yet, the size it gives now. */
     @Override
     public long tank(FluidCar car) {
-        return 0;
+        CarRecords.Contents record = record(car);
+        return record != null ? record.tank().capacity() : FluidCarEntity.tankCapacity();
     }
 
     @Override
-    public long load(Logistics.Hatch<Item> from, GoodsCar into, Item item, long most) {
-        ItemStacksResourceHandler contents = hatchContents(from);
-        SimpleContainer cargo = cargo(into);
-        if (contents == null || cargo == null) {
+    public long load(Logistics.Hatch<Ware> from, GoodsCar into, Ware ware, long most) {
+        CarRecords.Contents record = record(into);
+        if (record == null) {
+            return 0;
+        }
+        return switch (ware) {
+            case Ware.OfItem item -> loadItems(hatchContents(from), record, item.item(), most);
+            case Ware.OfFluid fluid -> move(hatchTank(from), record.tank(), fluid, most);
+        };
+    }
+
+    private static long loadItems(@Nullable ItemStacksResourceHandler contents, SimpleContainer cargo, Item item, long most) {
+        if (contents == null) {
             return 0;
         }
         long moved = 0;
@@ -125,10 +145,19 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public long unload(GoodsCar from, Logistics.Hatch<Item> into, Item item, long most) {
-        ItemStacksResourceHandler contents = hatchContents(into);
-        SimpleContainer cargo = cargo(from);
-        if (contents == null || cargo == null) {
+    public long unload(GoodsCar from, Logistics.Hatch<Ware> into, Ware ware, long most) {
+        CarRecords.Contents record = record(from);
+        if (record == null) {
+            return 0;
+        }
+        return switch (ware) {
+            case Ware.OfItem item -> unloadItems(record, hatchContents(into), item.item(), most);
+            case Ware.OfFluid fluid -> move(record.tank(), hatchTank(into), fluid, most);
+        };
+    }
+
+    private static long unloadItems(SimpleContainer cargo, @Nullable ItemStacksResourceHandler contents, Item item, long most) {
+        if (contents == null) {
             return 0;
         }
         long moved = 0;
@@ -154,33 +183,53 @@ final class LevelGoods implements Goods<Item> {
         return moved;
     }
 
+    /**
+     * Moves up to {@code most} millibuckets of {@code fluid} from one tank to the other, as far as the
+     * one holds it and the other has room; how many moved.
+     */
+    private static long move(@Nullable Tank from, @Nullable Tank into, Ware.OfFluid fluid, long most) {
+        if (from == null || into == null) {
+            return 0;
+        }
+        try (var transaction = Transaction.openRoot()) {
+            int moved = ResourceHandlerUtil.move(from, into, resource -> resource.is(fluid.fluid()),
+                    (int) Math.min(Integer.MAX_VALUE, most), transaction);
+            transaction.commit();
+            return moved;
+        }
+    }
+
     @Override
-    public Map<Item, Long> contents(Logistics.Hatch<Item> hatch) {
+    public Map<Ware, Long> contents(Logistics.Hatch<Ware> hatch) {
+        Map<Ware, Long> held = new LinkedHashMap<>();
         ItemStacksResourceHandler contents = hatchContents(hatch);
-        Map<Item, Long> held = new LinkedHashMap<>();
         for (int slot = 0; contents != null && slot < contents.size(); slot++) {
             ItemResource resource = contents.getResource(slot);
             if (!resource.isEmpty()) {
-                held.merge(resource.getItem(), contents.getAmountAsLong(slot), Long::sum);
+                held.merge(Ware.of(resource.getItem()), contents.getAmountAsLong(slot), Long::sum);
             }
+        }
+        Tank tank = hatchTank(hatch);
+        if (tank != null) {
+            tankContents(tank, held);
         }
         return held;
     }
 
     /**
-     * The room for the first stack of {@code item} that {@code from} holds that the fuel slots take
-     * any of, components and all, which {@link #refuel} moves first.
+     * The room for the first stack of {@code ware} that {@code from} holds that the fuel slots take
+     * any of, components and all, which {@link #refuel} moves first; none for a fluid.
      */
     @Override
-    public long fuelRoom(Logistics.Hatch<Item> from, Locomotive locomotive, Item item) {
+    public long fuelRoom(Logistics.Hatch<Ware> from, Locomotive locomotive, Ware ware) {
         ItemStacksResourceHandler contents = hatchContents(from);
         FuelSlots fuel = fuel(locomotive);
-        if (contents == null || fuel == null) {
+        if (!(ware instanceof Ware.OfItem item) || contents == null || fuel == null) {
             return 0;
         }
         for (int slot = 0; slot < contents.size(); slot++) {
             ItemResource resource = contents.getResource(slot);
-            long room = resource.is(item) ? fuel.roomFromHatch(resource.toStack(1)) : 0;
+            long room = resource.is(item.item()) ? fuel.roomFromHatch(resource.toStack(1)) : 0;
             if (room > 0) {
                 return room;
             }
@@ -189,16 +238,16 @@ final class LevelGoods implements Goods<Item> {
     }
 
     @Override
-    public long refuel(Logistics.Hatch<Item> from, Locomotive into, Item item, long most) {
+    public long refuel(Logistics.Hatch<Ware> from, Locomotive into, Ware ware, long most) {
         ItemStacksResourceHandler contents = hatchContents(from);
         FuelSlots fuel = fuel(into);
-        if (contents == null || fuel == null) {
+        if (!(ware instanceof Ware.OfItem item) || contents == null || fuel == null) {
             return 0;
         }
         long moved = 0;
         for (int slot = 0; slot < contents.size() && moved < most; slot++) {
             ItemResource resource = contents.getResource(slot);
-            if (!resource.is(item)) {
+            if (!resource.is(item.item())) {
                 continue;
             }
             ItemStack stack = resource.toStack(contents.getAmountAsInt(slot));
@@ -264,13 +313,40 @@ final class LevelGoods implements Goods<Item> {
         return locomotive.isElectric() ? LevelCarRecords.of(level).of(locomotive.id()).orElse(null) : null;
     }
 
-    private @Nullable ItemStacksResourceHandler hatchContents(Logistics.Hatch<Item> hatch) {
-        return LevelHatches.of(level).at(new BlockPos(hatch.x(), hatch.y(), hatch.z()))
-                .map(Hatches.Hatch::contents)
-                .orElse(null);
+    private static long held(@Nullable ItemStacksResourceHandler contents, Item item) {
+        long held = 0;
+        for (int slot = 0; contents != null && slot < contents.size(); slot++) {
+            if (contents.getResource(slot).is(item)) {
+                held += contents.getAmountAsLong(slot);
+            }
+        }
+        return held;
     }
 
-    private @Nullable SimpleContainer cargo(GoodsCar car) {
+    private static long held(@Nullable Tank tank, Ware.OfFluid fluid) {
+        return tank != null && tank.fluid().is(fluid.fluid()) ? tank.amount() : 0;
+    }
+
+    /** Adds what {@code tank} holds to {@code contents}. */
+    private static void tankContents(Tank tank, Map<Ware, Long> contents) {
+        if (tank.amount() > 0) {
+            contents.merge(Ware.of(tank.fluid().getFluid()), (long) tank.amount(), Long::sum);
+        }
+    }
+
+    private Optional<Hatches.Hatch> hatch(Logistics.Hatch<Ware> hatch) {
+        return LevelHatches.of(level).at(new BlockPos(hatch.x(), hatch.y(), hatch.z()));
+    }
+
+    private @Nullable ItemStacksResourceHandler hatchContents(Logistics.Hatch<Ware> hatch) {
+        return hatch(hatch).map(Hatches.Hatch::contents).orElse(null);
+    }
+
+    private @Nullable Tank hatchTank(Logistics.Hatch<Ware> hatch) {
+        return hatch(hatch).map(Hatches.Hatch::tank).orElse(null);
+    }
+
+    private CarRecords.@Nullable Contents record(GoodsCar car) {
         return LevelCarRecords.of(level).of(car.id()).orElse(null);
     }
 

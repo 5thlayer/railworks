@@ -1,0 +1,646 @@
+// SPDX-FileCopyrightText: 2026 5thlayer
+// SPDX-License-Identifier: MIT
+
+package io.github._5thlayer.railworks.gametest;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import com.mojang.serialization.DynamicOps;
+import io.github._5thlayer.railworks.CarEntity;
+import io.github._5thlayer.railworks.CarRecords;
+import io.github._5thlayer.railworks.CargoCarEntity;
+import io.github._5thlayer.railworks.FluidCarEntity;
+import io.github._5thlayer.railworks.HatchBlock;
+import io.github._5thlayer.railworks.HatchBlockEntity;
+import io.github._5thlayer.railworks.HatchMode;
+import io.github._5thlayer.railworks.Hatches;
+import io.github._5thlayer.railworks.LevelCarRecords;
+import io.github._5thlayer.railworks.LevelHatches;
+import io.github._5thlayer.railworks.LevelRails;
+import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.PlatformsNear;
+import io.github._5thlayer.railworks.PylonColumn;
+import io.github._5thlayer.railworks.RailworksRegistries;
+import io.github._5thlayer.railworks.Tank;
+import io.github._5thlayer.railworks.Ware;
+import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.FluidCar;
+import io.github._5thlayer.railworks.rail.HatchRequest;
+import io.github._5thlayer.railworks.rail.Locomotive;
+import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.Logistics;
+import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.Platform;
+import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.SpanRules;
+import io.github._5thlayer.railworks.rail.Train;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
+
+/**
+ * The Fluid car and the Fluid hatch in a real level (#10): their recipes, the car placed and coupled
+ * into a Train and weighing a Cargo car's 1000 kg, buckets by hand on the car and on both kinds of
+ * Fluid hatch, a pipe through the hatch's fluid capability, the bucket on its sides, the tanks kept
+ * through a save, and automatic Trains carrying fluid between Fluid hatches: a job, a leftover in a
+ * Fluid car, a Train mixing a Cargo car and a Fluid car, and a provider Fluid hatch beside a
+ * Locomotive that fuels none. How fluid is planned, claimed and moved is {@code LogisticsTest}'s; a
+ * Train carrying fluid out of view is {@code FarAwayTests}'. These tests share the {@code fluid_}
+ * prefix.
+ */
+final class FluidTests {
+
+    /**
+     * A straight line along z 3, Span by Span from x -11 to 29, its Pylons out past the structure, so
+     * a Train of three cars stands behind a Station's four car spots.
+     */
+    private static final int[] PYLONS = {-11, -1, 9, 19, 29};
+    private static final int Z = 3;
+    /** South of the line, serving Trains heading east: its leading car's place beside x 9 and 10, its car spots back west from 7 and 8. */
+    private static final BlockPos QUARRY = new BlockPos(10, 1, 4);
+    /** South of the line, serving Trains heading east: its leading car's place beside x 25 and 26, its car spots back west from 23 and 24. */
+    private static final BlockPos DEPOT = new BlockPos(26, 1, 4);
+    /** The two blocks beside each of a Station's first two car spots, at a car's floor. */
+    private static final BlockPos QUARRY_0 = new BlockPos(7, 2, 4);
+    private static final BlockPos QUARRY_0_OTHER = new BlockPos(8, 2, 4);
+    private static final BlockPos QUARRY_1 = new BlockPos(5, 2, 4);
+    private static final BlockPos QUARRY_1_OTHER = new BlockPos(6, 2, 4);
+    private static final BlockPos QUARRY_LEADING = new BlockPos(9, 2, 4);
+    private static final BlockPos DEPOT_0 = new BlockPos(23, 2, 4);
+    private static final BlockPos DEPOT_0_OTHER = new BlockPos(24, 2, 4);
+    private static final BlockPos DEPOT_1 = new BlockPos(21, 2, 4);
+    private static final BlockPos DEPOT_1_OTHER = new BlockPos(22, 2, 4);
+    /** A hatch inside the structure, joining no Station: only a tank. */
+    private static final BlockPos LONE = new BlockPos(4, 2, 6);
+
+    private static final int BUCKET = (int) Logistics.MILLIBUCKETS_PER_BUCKET;
+
+    private FluidTests() {
+    }
+
+    static void register(RailworksGameTests.Registrar tests) {
+        tests.test("fluid_car_crafts_from_iron_round_a_bucket", 1, FluidTests::carCrafts);
+        tests.test("fluid_hatch_crafts_from_iron_round_a_bucket_and_a_hopper", 1, FluidTests::hatchCrafts);
+        tests.test("fluid_car_couples_behind_a_locomotive_and_weighs_a_cargo_cars_1000_kg", 20, FluidTests::couples);
+        tests.test("fluid_car_buckets_by_hand_fill_and_empty_it_and_it_opens_no_menu", 20, FluidTests::carByHand);
+        tests.test("fluid_hatch_a_filled_bucket_sets_a_requesters_request_and_stays_full", 20, FluidTests::requesterByHand);
+        tests.test("fluid_hatch_buckets_by_hand_fill_and_empty_a_provider", 20, FluidTests::providerByHand);
+        tests.test("fluid_hatch_a_pipe_fills_and_empties_it_through_its_fluid_capability", 20, FluidTests::pipe);
+        tests.test("fluid_hatch_shows_its_fluid_as_a_filled_bucket", 40, FluidTests::shows);
+        tests.test("fluid_tanks_are_kept_through_a_save", 20, FluidTests::saved);
+        // Each runs its line out past the structure.
+        tests.testOnItsOwn("fluid_a_job_carries_fluid_from_a_provider_fluid_hatch_to_a_requester_one", 1_200, FluidTests::job);
+        tests.testOnItsOwn("fluid_a_leftover_poured_in_by_hand_is_delivered_once_a_requester_asks_for_it", 1_200,
+                FluidTests::leftover);
+        tests.testOnItsOwn("fluid_a_mixed_train_trades_each_car_only_with_a_hatch_of_its_kind", 1_200, FluidTests::mixed);
+        tests.testOnItsOwn("fluid_a_provider_fluid_hatch_fuels_no_locomotive", 200, FluidTests::fuelsNone);
+    }
+
+    // ---- crafting ----
+
+    private static void carCrafts(GameTestHelper helper) {
+        ItemStack iron = new ItemStack(Items.IRON_INGOT);
+        expectCrafts(helper, "fluid_car", RailworksRegistries.FLUID_CAR.get().getDefaultInstance(),
+                List.of(iron, ItemStack.EMPTY, iron, iron, new ItemStack(Items.BUCKET), iron, iron, iron, iron));
+    }
+
+    private static void hatchCrafts(GameTestHelper helper) {
+        ItemStack iron = new ItemStack(Items.IRON_INGOT);
+        expectCrafts(helper, "fluid_hatch", RailworksRegistries.FLUID_HATCH_ITEM.get().getDefaultInstance(),
+                List.of(iron, iron, iron, iron, new ItemStack(Items.BUCKET), iron, iron, new ItemStack(Items.HOPPER), iron));
+    }
+
+    private static void expectCrafts(GameTestHelper helper, String name, ItemStack result, List<ItemStack> grid) {
+        var input = CraftingInput.of(3, 3, grid);
+        var recipe = helper.getLevel().recipeAccess().getRecipeFor(RecipeType.CRAFTING, input, helper.getLevel());
+        var key = ResourceKey.create(Registries.RECIPE, Identifier.fromNamespaceAndPath("railworks", name));
+        if (recipe.isEmpty() || !recipe.get().id().equals(key) || !recipe.get().value().assemble(input).is(result.getItem())) {
+            helper.fail("the grid crafted " + recipe.map(r -> r.id().toString()).orElse("nothing") + ", not " + name);
+        }
+        helper.succeed();
+    }
+
+    // ---- the car ----
+
+    private static void couples(GameTestHelper helper) {
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        FluidCarEntity fluid = placeBeside(helper, locomotive);
+        Train train = locomotive.train();
+        if (train == null || train != fluid.train() || train.cars().size() != 2 || !(train.cars().getLast() instanceof FluidCar)) {
+            helper.fail("the Fluid car did not couple behind the Locomotive: " + train + " and " + fluid.train(), LocomotiveTests.STAND);
+            return;
+        }
+        double empty = train.mass();
+        fill(fluid.tank(), Fluids.WATER, 10 * BUCKET);
+        if (Math.abs(empty - (LocomotiveSpec.MASS_KG + 1_000.0)) > 1e-6 || train.mass() != empty) {
+            helper.fail("the Train weighs " + empty + " empty and " + train.mass() + " full, not the Locomotive and 1000 kg",
+                    LocomotiveTests.STAND);
+        }
+        helper.succeed();
+    }
+
+    private static void carByHand(GameTestHelper helper) {
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        FluidCarEntity fluid = placeBeside(helper, locomotive);
+        ServerPlayer player = LogisticsTests.near(helper, LocomotiveTests.STAND);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+        fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        expectTank(helper, fluid.tank(), Fluids.WATER, BUCKET, "a water bucket poured in");
+        expectHand(helper, player, Items.BUCKET);
+        if (player.containerMenu != player.inventoryMenu || !(player.containerMenu instanceof InventoryMenu)) {
+            helper.fail("using the Fluid car opened " + player.containerMenu, LocomotiveTests.STAND);
+        }
+        // Another fluid does not mix with the one it holds.
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LAVA_BUCKET));
+        fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        expectTank(helper, fluid.tank(), Fluids.WATER, BUCKET, "a lava bucket used");
+        expectHand(helper, player, Items.LAVA_BUCKET);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.BUCKET));
+        fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        expectTank(helper, fluid.tank(), Fluids.EMPTY, 0, "an empty bucket filled");
+        expectHand(helper, player, Items.WATER_BUCKET);
+        helper.succeed();
+    }
+
+    /** A Fluid car placed by a survival player behind {@code car}, as a Cargo car is. */
+    private static FluidCarEntity placeBeside(GameTestHelper helper, LocomotiveEntity car) {
+        ServerPlayer player = CargoCarTests.cargoPlayer(helper, car, -1);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.FLUID_CAR.get()));
+        LocomotiveTests.use(helper, player);
+        List<FluidCarEntity> cars = helper.getLevel().getEntitiesOfClass(FluidCarEntity.class, LocomotiveTests.searchBox(helper),
+                view -> !view.isRemoved());
+        if (cars.size() != 1 || !player.getMainHandItem().isEmpty()) {
+            throw helper.assertionException(LocomotiveTests.STAND, Component.literal("placing a Fluid car left " + cars.size()
+                    + " of them, and " + player.getMainHandItem() + " in hand"));
+        }
+        return cars.getFirst();
+    }
+
+    // ---- the hatch by hand ----
+
+    private static void requesterByHand(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.REQUESTER));
+        ServerPlayer player = LogisticsTests.near(helper, LONE.north());
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+        use(helper, player, LONE);
+        expectRequest(helper, new HatchRequest<>(Ware.of(Fluids.WATER), 8));
+        use(helper, player, LONE);
+        expectRequest(helper, new HatchRequest<>(Ware.of(Fluids.WATER), 16));
+        expectHand(helper, player, Items.WATER_BUCKET);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LAVA_BUCKET));
+        use(helper, player, LONE);
+        expectRequest(helper, new HatchRequest<>(Ware.of(Fluids.LAVA), 8));
+        // Up to its tank.
+        for (int i = 0; i < 20; i++) {
+            use(helper, player, LONE);
+        }
+        expectRequest(helper, new HatchRequest<>(Ware.of(Fluids.LAVA), Hatches.tankBuckets()));
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        use(helper, player, LONE);
+        if (record(helper, LONE).request().isPresent()) {
+            helper.fail("an empty hand left the request " + record(helper, LONE).request(), LONE);
+        }
+        // Sneaking switches it, keeping its tank.
+        fill(record(helper, LONE).tank(), Fluids.WATER, 3 * BUCKET);
+        player.setShiftKeyDown(true);
+        use(helper, player, LONE);
+        if (record(helper, LONE).mode() != HatchMode.PROVIDER || helper.getBlockState(LONE).getValue(HatchBlock.MODE) != HatchMode.PROVIDER) {
+            helper.fail("a sneaking empty hand did not make the Fluid hatch a provider", LONE);
+        }
+        expectTank(helper, record(helper, LONE).tank(), Fluids.WATER, 3 * BUCKET, "switched to a provider");
+        helper.succeed();
+    }
+
+    private static void providerByHand(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.PROVIDER));
+        ServerPlayer player = LogisticsTests.near(helper, LONE.north());
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+        use(helper, player, LONE);
+        expectTank(helper, record(helper, LONE).tank(), Fluids.WATER, BUCKET, "a water bucket poured in");
+        expectHand(helper, player, Items.BUCKET);
+        use(helper, player, LONE);
+        expectTank(helper, record(helper, LONE).tank(), Fluids.EMPTY, 0, "an empty bucket filled");
+        expectHand(helper, player, Items.WATER_BUCKET);
+        if (record(helper, LONE).request().isPresent()) {
+            helper.fail("a provider asks for " + record(helper, LONE).request(), LONE);
+        }
+        helper.succeed();
+    }
+
+    // ---- the hatch's capability and sides ----
+
+    private static void pipe(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.PROVIDER));
+        helper.setBlock(LONE.east(2), RailworksRegistries.HATCH.get().defaultBlockState());
+        BlockPos at = helper.absolutePos(LONE);
+        var handler = helper.getLevel().getCapability(Capabilities.Fluid.BLOCK, at, Direction.WEST);
+        if (handler == null || helper.getLevel().getCapability(Capabilities.Item.BLOCK, at, Direction.WEST) != null) {
+            helper.fail("the Fluid hatch gives a fluid handler " + handler + " and an item handler, or not as it should", LONE);
+            return;
+        }
+        if (helper.getLevel().getCapability(Capabilities.Fluid.BLOCK, helper.absolutePos(LONE.east(2)), Direction.WEST) != null) {
+            helper.fail("a hatch of items gives a fluid handler", LONE.east(2));
+        }
+        int in;
+        int out;
+        try (var transaction = Transaction.openRoot()) {
+            in = handler.insert(FluidResource.of(Fluids.WATER), 5 * BUCKET, transaction);
+            out = handler.extract(FluidResource.of(Fluids.WATER), 2 * BUCKET, transaction);
+            transaction.commit();
+        }
+        if (in != 5 * BUCKET || out != 2 * BUCKET) {
+            helper.fail("a pipe put in " + in + " and took out " + out, LONE);
+        }
+        expectTank(helper, record(helper, LONE).tank(), Fluids.WATER, 3 * BUCKET, "a pipe filled and emptied it");
+        int lava;
+        try (var transaction = Transaction.openRoot()) {
+            lava = handler.insert(FluidResource.of(Fluids.LAVA), BUCKET, transaction);
+            transaction.commit();
+        }
+        if (lava != 0) {
+            helper.fail("a Fluid hatch holding water took " + lava + " of lava", LONE);
+        }
+        helper.succeed();
+    }
+
+    private static void shows(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.REQUESTER));
+        record(helper, LONE).ask(Fluids.WATER);
+        helper.setBlock(LONE.east(2), fluidHatch(HatchMode.PROVIDER));
+        fill(record(helper, LONE.east(2)).tank(), Fluids.LAVA, BUCKET);
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    ItemStack asked = helper.getBlockEntity(LONE, HatchBlockEntity.class).shown();
+                    ItemStack held = helper.getBlockEntity(LONE.east(2), HatchBlockEntity.class).shown();
+                    helper.assertTrue(asked.is(Items.WATER_BUCKET) && held.is(Items.LAVA_BUCKET),
+                            "the requester shows " + asked + " and the provider " + held + ", not their fluids' buckets");
+                })
+                .thenSucceed();
+    }
+
+    // ---- saving ----
+
+    private static void saved(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.REQUESTER));
+        record(helper, LONE).ask(Fluids.WATER);
+        fill(record(helper, LONE).tank(), Fluids.WATER, 3 * BUCKET);
+        DynamicOps<Tag> ops = helper.getLevel().registryAccess().createSerializationContext(NbtOps.INSTANCE);
+        Hatches hatches = Hatches.CODEC.parse(ops, Hatches.CODEC.encodeStart(ops, LevelHatches.of(helper.getLevel()))
+                .getOrThrow()).getOrThrow();
+        Hatches.Hatch back = hatches.at(helper.absolutePos(LONE)).orElseThrow();
+        if (back.holds() != record(helper, LONE).holds() || !back.request().equals(record(helper, LONE).request())
+                || back.tank().capacity() != Hatches.tankBuckets() * BUCKET) {
+            helper.fail("the Fluid hatch came back as " + back.holds() + " asking for " + back.request()
+                    + " with a tank of " + back.tank().capacity(), LONE);
+        }
+        expectTank(helper, back.tank(), Fluids.WATER, 3 * BUCKET, "the hatch saved and loaded");
+
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        FluidCarEntity fluid = placeBeside(helper, locomotive);
+        fill(fluid.tank(), Fluids.LAVA, 7 * BUCKET);
+        CarRecords records = CarRecords.CODEC.parse(ops, CarRecords.CODEC.encodeStart(ops, LevelCarRecords.of(helper.getLevel()))
+                .getOrThrow()).getOrThrow();
+        Tank tank = records.of(fluid.carId()).orElseThrow().tank();
+        if (tank.capacity() != FluidCar.DEFAULT_TANK_BUCKETS * BUCKET) {
+            helper.fail("the Fluid car's tank came back holding " + tank.capacity(), LocomotiveTests.STAND);
+        }
+        expectTank(helper, tank, Fluids.LAVA, 7 * BUCKET, "the car saved and loaded");
+        helper.succeed();
+    }
+
+    // ---- automatic Trains ----
+
+    private static void job(GameTestHelper helper) {
+        line(helper);
+        fluidHatch(helper, QUARRY_0, HatchMode.PROVIDER, Fluids.WATER, 20);
+        fluidHatch(helper, DEPOT_0, HatchMode.REQUESTER, null, 0);
+        record(helper, DEPOT_0).ask(Fluids.WATER);
+        Running running = running(helper, FluidCar.create());
+        FluidCarEntity fluid = (FluidCarEntity) running.views().get(1);
+        helper.startSequence()
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.to_unload"))
+                .thenExecute(() -> {
+                    expectTank(helper, fluid.tank(), Fluids.WATER, 8 * BUCKET, "the Fluid car left the Quarry");
+                    LogisticsTests.expectIcons(helper, running.locomotive(), "8 minecraft:water_bucket");
+                })
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.waiting"))
+                .thenExecute(() -> {
+                    expectTank(helper, record(helper, DEPOT_0).tank(), Fluids.WATER, 8 * BUCKET, "the requester was delivered to");
+                    expectTank(helper, record(helper, QUARRY_0).tank(), Fluids.WATER, 12 * BUCKET, "the provider gave");
+                    expectTank(helper, fluid.tank(), Fluids.EMPTY, 0, "the Fluid car unloaded");
+                    LogisticsTests.expectIcons(helper, running.locomotive(), "");
+                    clearAway(helper, running.train());
+                })
+                .thenSucceed();
+    }
+
+    private static void leftover(GameTestHelper helper) {
+        line(helper);
+        fluidHatch(helper, QUARRY_0, HatchMode.PROVIDER, Fluids.WATER, 20);
+        Running running = running(helper, FluidCar.create());
+        FluidCarEntity fluid = (FluidCarEntity) running.views().get(1);
+        ServerPlayer player = LogisticsTests.near(helper, new BlockPos(-7, 2, 1));
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LAVA_BUCKET));
+        fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        expectTank(helper, fluid.tank(), Fluids.LAVA, BUCKET, "a lava bucket poured in by hand");
+        helper.startSequence()
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.holding"))
+                .thenExecute(() -> LogisticsTests.expectIcons(helper, running.locomotive(), "1 minecraft:lava_bucket"))
+                // Holding, it takes no job from the Quarry.
+                .thenIdle(3 * 20)
+                .thenExecute(() -> {
+                    LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.holding");
+                    expectTank(helper, record(helper, QUARRY_0).tank(), Fluids.WATER, 20 * BUCKET, "the Train held a leftover");
+                    fluidHatch(helper, DEPOT_0, HatchMode.REQUESTER, null, 0);
+                    record(helper, DEPOT_0).ask(Fluids.LAVA);
+                })
+                .thenWaitUntil(() -> expectTank(helper, record(helper, DEPOT_0).tank(), Fluids.LAVA, BUCKET, "the leftover delivered"))
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.waiting"))
+                .thenExecute(() -> {
+                    expectTank(helper, fluid.tank(), Fluids.EMPTY, 0, "the leftover delivered");
+                    expectTank(helper, record(helper, QUARRY_0).tank(), Fluids.WATER, 20 * BUCKET, "the leftover delivered");
+                    clearAway(helper, running.train());
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A Locomotive, a Cargo car at the first car spot and a Fluid car at the second, each spot with a
+     * hatch of items and a Fluid hatch beside it at both Stations: the Cargo car carries the iron
+     * between the hatches of items beside it and the Fluid car the water between the Fluid hatches
+     * beside it, and the hatches of the other kind are left as they were.
+     */
+    private static void mixed(GameTestHelper helper) {
+        line(helper);
+        itemHatch(helper, QUARRY_0, HatchMode.PROVIDER, 64);
+        fluidHatch(helper, QUARRY_0_OTHER, HatchMode.PROVIDER, Fluids.WATER, 16);
+        fluidHatch(helper, QUARRY_1, HatchMode.PROVIDER, Fluids.WATER, 16);
+        itemHatch(helper, QUARRY_1_OTHER, HatchMode.PROVIDER, 64);
+        itemHatch(helper, DEPOT_0, HatchMode.REQUESTER, 0);
+        fluidHatch(helper, DEPOT_0_OTHER, HatchMode.REQUESTER, null, 0);
+        fluidHatch(helper, DEPOT_1, HatchMode.REQUESTER, null, 0);
+        itemHatch(helper, DEPOT_1_OTHER, HatchMode.REQUESTER, 0);
+        record(helper, DEPOT_0).ask(Items.IRON_INGOT);
+        record(helper, DEPOT_0_OTHER).ask(Fluids.WATER);
+        record(helper, DEPOT_1).ask(Fluids.WATER);
+        record(helper, DEPOT_1_OTHER).ask(Items.IRON_INGOT);
+        Running running = running(helper, CargoCar.create(), FluidCar.create());
+        CargoCarEntity cargo = (CargoCarEntity) running.views().get(1);
+        FluidCarEntity fluid = (FluidCarEntity) running.views().get(2);
+        helper.startSequence()
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.to_unload"))
+                .thenExecute(() -> {
+                    helper.assertTrue(cargo.cargo().countItem(Items.IRON_INGOT) == 64,
+                            "the Cargo car left the Quarry with " + cargo.cargo().countItem(Items.IRON_INGOT) + " iron");
+                    expectTank(helper, fluid.tank(), Fluids.WATER, 8 * BUCKET, "the Fluid car left the Quarry");
+                    LogisticsTests.expectIcons(helper, running.locomotive(), "64 minecraft:iron_ingot, 8 minecraft:water_bucket");
+                })
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.waiting"))
+                .thenExecute(() -> {
+                    helper.assertTrue(LogisticsTests.held(record(helper, DEPOT_0)) == 64
+                                    && LogisticsTests.held(record(helper, DEPOT_1_OTHER)) == 0
+                                    && LogisticsTests.held(record(helper, QUARRY_0)) == 0
+                                    && LogisticsTests.held(record(helper, QUARRY_1_OTHER)) == 64,
+                            "the iron went from " + LogisticsTests.held(record(helper, QUARRY_0)) + " and "
+                                    + LogisticsTests.held(record(helper, QUARRY_1_OTHER)) + " to "
+                                    + LogisticsTests.held(record(helper, DEPOT_0)) + " and " + LogisticsTests.held(record(helper, DEPOT_1_OTHER)));
+                    expectTank(helper, record(helper, DEPOT_1).tank(), Fluids.WATER, 8 * BUCKET, "the Fluid car's requester");
+                    expectTank(helper, record(helper, DEPOT_0_OTHER).tank(), Fluids.EMPTY, 0, "the Cargo car's Fluid requester");
+                    expectTank(helper, record(helper, QUARRY_1).tank(), Fluids.WATER, 8 * BUCKET, "the Fluid car's provider");
+                    expectTank(helper, record(helper, QUARRY_0_OTHER).tank(), Fluids.WATER, 16 * BUCKET, "the Cargo car's Fluid provider");
+                    clearAway(helper, running.train());
+                })
+                .thenSucceed();
+    }
+
+    /** A Locomotive at rest at the Quarry, automatic, a provider Fluid hatch of lava beside it: its fuel slots stay empty. */
+    private static void fuelsNone(GameTestHelper helper) {
+        line(helper);
+        fluidHatch(helper, QUARRY_LEADING, HatchMode.PROVIDER, Fluids.LAVA, 10);
+        Locomotive east = Locomotive.burner();
+        Span span = span(helper, 9);
+        // Its middle half a block short of the Quarry's own x, where its leading car stands.
+        Train train = Train.of(new Place(span, span.b(), 19 - (QUARRY.getX() - 0.5)), List.of(east));
+        LocomotiveEntity locomotive = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
+        train.setAutomatic(true);
+        helper.startSequence()
+                .thenIdle(3 * 20)
+                .thenExecute(() -> {
+                    helper.assertTrue(locomotive.fuelItem().isEmpty(), "a provider Fluid hatch fuelled the Locomotive with "
+                            + locomotive.fuelItem());
+                    expectTank(helper, record(helper, QUARRY_LEADING).tank(), Fluids.LAVA, 10 * BUCKET, "beside the Locomotive");
+                    clearAway(helper, train);
+                })
+                .thenSucceed();
+    }
+
+    /** The views of a Train {@link #running} sets going: its Locomotive first, then its cars. */
+    private record Running(Train train, LocomotiveEntity locomotive, List<CarEntity> views) {
+    }
+
+    /**
+     * Both Stations on the {@link #line}, and west of the Quarry, heading east, a fuelled automatic
+     * Train of a Locomotive and {@code cars} behind it, the first car spot's car first.
+     */
+    private static Running running(GameTestHelper helper, Car... cars) {
+        Locomotive east = Locomotive.burner();
+        List<Car> all = new ArrayList<>(List.of(east));
+        all.addAll(List.of(cars));
+        Span first = span(helper, -11);
+        Train train = Train.of(new Place(first, first.b(), 2.0), all);
+        List<CarEntity> views = new ArrayList<>();
+        LocomotiveEntity locomotive = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
+        views.add(locomotive);
+        for (var car : cars) {
+            views.add(switch (car) {
+                case CargoCar cargo -> LogisticsTests.spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, cargo);
+                case FluidCar fluid -> LogisticsTests.spawn(helper, RailworksRegistries.FLUID_CAR_ENTITY.get(), train, fluid);
+                default -> throw new IllegalArgumentException("no view for " + car);
+            });
+        }
+        LocomotiveTests.fill(helper, locomotive, new ItemStack(Items.COAL, 8));
+        train.setAutomatic(true);
+        return new Running(train, locomotive, views);
+    }
+
+    // ---- setup ----
+
+    /** The line, the structure's roof cleared over it, its chunks loaded, and both its Stations, named. */
+    private static void line(GameTestHelper helper) {
+        forceLoad(helper, true);
+        for (int x = PYLONS[0]; x <= PYLONS[PYLONS.length - 1]; x++) {
+            for (int z = 2; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
+            }
+        }
+        for (int x : PYLONS) {
+            helper.setBlock(new BlockPos(x, 1, Z), RailworksRegistries.PYLON.get().defaultBlockState());
+        }
+        for (int i = 0; i + 1 < PYLONS.length; i++) {
+            var one = arm(helper, PYLONS[i]);
+            var other = arm(helper, PYLONS[i + 1]);
+            LevelRails.of(helper.getLevel()).network().add(Span.of(one, other, SpanRules.cost(one, other)));
+        }
+        LogisticsTests.station(helper, QUARRY);
+        LogisticsTests.station(helper, DEPOT);
+    }
+
+    private static Arm arm(GameTestHelper helper, int x) {
+        return PylonColumn.arm(helper.absolutePos(new BlockPos(x, 1, Z)));
+    }
+
+    /** The line's Span from the Pylon at {@code x}. */
+    private static Span span(GameTestHelper helper, int x) {
+        for (int i = 0; i + 1 < PYLONS.length; i++) {
+            if (PYLONS[i] == x) {
+                return LevelRails.of(helper.getLevel()).network().get(arm(helper, x), arm(helper, PYLONS[i + 1]));
+            }
+        }
+        throw new IllegalArgumentException("no Pylon at " + x);
+    }
+
+    /**
+     * Takes {@code train} and what its cars held out of the level, and the line's Spans, Pylons,
+     * Stations and hatches and what they dropped, and lets its chunks go: each batch's structure
+     * stands beside the last one's, so the next test's line runs over this one's plot.
+     */
+    private static void clearAway(GameTestHelper helper, Train train) {
+        LevelRails rails = LevelRails.of(helper.getLevel());
+        rails.trains().remove(train);
+        // Its views, no Train holding their cars, go at the level's next tick.
+        train.cars().forEach(car -> LevelCarRecords.of(helper.getLevel()).remove(car.id()));
+        for (int i = 0; i + 1 < PYLONS.length; i++) {
+            rails.network().remove(arm(helper, PYLONS[i]), arm(helper, PYLONS[i + 1]));
+        }
+        List<BlockPos> blocks = new ArrayList<>(List.of(QUARRY, DEPOT, QUARRY_0, QUARRY_0_OTHER, QUARRY_1, QUARRY_1_OTHER,
+                QUARRY_LEADING, DEPOT_0, DEPOT_0_OTHER, DEPOT_1, DEPOT_1_OTHER));
+        for (int x : PYLONS) {
+            blocks.add(new BlockPos(x, 1, Z));
+        }
+        for (BlockPos pos : blocks) {
+            if (!helper.getBlockState(pos).isAir()) {
+                helper.destroyBlock(pos);
+            }
+        }
+        BlockPos west = helper.absolutePos(new BlockPos(PYLONS[0], 0, 0));
+        BlockPos east = helper.absolutePos(new BlockPos(PYLONS[PYLONS.length - 1], 4, 8));
+        helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(Vec3.atLowerCornerOf(west), Vec3.atLowerCornerOf(east))
+                .inflate(2.0)).forEach(Entity::discard);
+        forceLoad(helper, false);
+    }
+
+    /** Forces the chunks under the {@link #line} loaded, or lets them go. */
+    private static void forceLoad(GameTestHelper helper, boolean forced) {
+        BlockPos west = helper.absolutePos(new BlockPos(PYLONS[0], 1, 2));
+        BlockPos east = helper.absolutePos(new BlockPos(PYLONS[PYLONS.length - 1], 1, 4));
+        for (int cx = Math.min(west.getX(), east.getX()) >> 4; cx <= Math.max(west.getX(), east.getX()) >> 4; cx++) {
+            for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
+                helper.getLevel().setChunkForced(cx, cz, forced);
+            }
+        }
+    }
+
+    private static BlockState fluidHatch(HatchMode mode) {
+        return RailworksRegistries.FLUID_HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, mode);
+    }
+
+    /** A Fluid hatch at {@code pos}, joining the Station beside it, holding {@code buckets} of {@code fluid}. */
+    private static void fluidHatch(GameTestHelper helper, BlockPos pos, HatchMode mode, Fluid fluid, int buckets) {
+        helper.setBlock(pos, fluidHatch(mode));
+        expectJoins(helper, pos);
+        if (buckets > 0) {
+            fill(record(helper, pos).tank(), fluid, buckets * BUCKET);
+        }
+    }
+
+    /** A hatch of items at {@code pos}, joining the Station beside it, holding {@code iron} iron ingots. */
+    private static void itemHatch(GameTestHelper helper, BlockPos pos, HatchMode mode, int iron) {
+        helper.setBlock(pos, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, mode));
+        expectJoins(helper, pos);
+        if (iron > 0) {
+            LogisticsTests.insert(record(helper, pos), new ItemStack(Items.IRON_INGOT, iron));
+        }
+    }
+
+    private static void expectJoins(GameTestHelper helper, BlockPos pos) {
+        var joined = PlatformsNear.joined(helper.getLevel(), helper.absolutePos(pos));
+        if (joined.isEmpty()) {
+            throw helper.assertionException(pos, Component.literal("the hatch joins no Station"));
+        }
+        if (pos.equals(QUARRY_LEADING) && joined.get().spot() != Platform.LEADING) {
+            throw helper.assertionException(pos, Component.literal("the hatch is not beside the leading car: " + joined));
+        }
+    }
+
+    private static Hatches.Hatch record(GameTestHelper helper, BlockPos pos) {
+        return LogisticsTests.record(helper, pos);
+    }
+
+    private static void fill(Tank tank, Fluid fluid, int amount) {
+        try (var transaction = Transaction.openRoot()) {
+            tank.insert(FluidResource.of(fluid), amount, transaction);
+            transaction.commit();
+        }
+    }
+
+    /** Uses {@code player}'s main hand on the top of the block at {@code pos}, as a click does. */
+    private static void use(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
+        BlockPos at = helper.absolutePos(pos);
+        player.gameMode.useItemOn(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.upFromBottomCenterOf(at, 1.0), Direction.UP, at, false));
+    }
+
+    private static void expectRequest(GameTestHelper helper, HatchRequest<Ware> expected) {
+        var request = record(helper, LONE).request();
+        if (!request.equals(Optional.of(expected))) {
+            throw helper.assertionException(LONE, Component.literal("the Fluid hatch asks for " + request + ", not " + expected));
+        }
+    }
+
+    private static void expectHand(GameTestHelper helper, ServerPlayer player, Item item) {
+        if (!player.getMainHandItem().is(item) || player.getMainHandItem().getCount() != 1) {
+            throw helper.assertionException(LONE, Component.literal("the player holds " + player.getMainHandItem() + ", not " + item));
+        }
+    }
+
+    /** Fails unless {@code tank} holds {@code amount} millibuckets of {@code fluid}, after {@code what}. */
+    private static void expectTank(GameTestHelper helper, Tank tank, Fluid fluid, int amount, String what) {
+        FluidStack held = tank == null ? FluidStack.EMPTY : tank.held();
+        boolean matches = amount == 0 ? held.isEmpty() : held.is(fluid) && held.getAmount() == amount;
+        if (!matches) {
+            throw helper.assertionException(LONE, Component.literal(what + ", the tank holds " + held.getAmount() + " of "
+                    + held.getFluid() + ", not " + amount + " of " + fluid));
+        }
+    }
+}

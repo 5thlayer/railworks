@@ -11,11 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.mojang.serialization.Codec;
 import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.CargoCarEntity;
+import io.github._5thlayer.railworks.FluidCarEntity;
 import io.github._5thlayer.railworks.HatchBlock;
 import io.github._5thlayer.railworks.HatchMode;
 import io.github._5thlayer.railworks.Hatches;
-import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelCarRecords;
+import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.PylonColumn;
@@ -23,7 +24,9 @@ import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
+import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
@@ -45,10 +48,13 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -60,7 +66,9 @@ import org.jspecify.annotations.Nullable;
  * rider is carried out of view seated, a mob riding a car whose view goes rides on in its record, a
  * Train whose Span is cut out of view comes off the Rail as its chunk loads, and a Train coasting out
  * of view stops where it would have in view. How the level decides what to show is {@code ViewsTest}'s.
- * These tests share the {@code far_} prefix.
+ * These tests share the {@code far_} prefix, but for a Fluid car's (#10), whose names share
+ * {@code fluid_} with {@code FluidTests}: a Train carrying fluid out of view, and a Fluid car's tank
+ * kept while its view is gone.
  */
 final class FarAwayTests {
 
@@ -79,6 +87,8 @@ final class FarAwayTests {
     private static final BlockPos YARD = new BlockPos(164, 2, Z);
     /** How far around a chunk a ticket of {@link RailworksGameTests#IN_VIEW} simulates: that chunk and those beside it. */
     private static final int AROUND = 3;
+    /** A bucket, in millibuckets. */
+    private static final int BUCKET = (int) Logistics.MILLIBUCKETS_PER_BUCKET;
 
     /** The cars whose entity was found in a saved chunk as it loaded, which no car's view ever should be. */
     private static final Set<UUID> FROM_CHUNKS = ConcurrentHashMap.newKeySet();
@@ -107,6 +117,9 @@ final class FarAwayTests {
                 FarAwayTests::cutOutOfView);
         tests.testOnItsOwn("far_a_manual_train_coasts_out_of_view_and_stops_where_it_would_in_view", 2_000,
                 FarAwayTests::coasts);
+        tests.testOnItsOwn("fluid_an_abstract_train_carries_fluid_out_of_view_and_is_seen_again_where_it_stands", 3_000,
+                FarAwayTests::carriesFluid);
+        tests.testOnItsOwn("fluid_a_fluid_cars_tank_is_kept_while_its_view_is_gone", 1_200, FarAwayTests::tankKept);
     }
 
     // ---- running a job ----
@@ -186,6 +199,103 @@ final class FarAwayTests {
                         helper.assertFalse(FROM_CHUNKS.contains(car.id()), "a car's entity was saved with its chunk: " + car);
                     }
                     inView(helper, DEPOT, false);
+                    clearAway(helper, train);
+                })
+                .thenSucceed();
+    }
+
+    // ---- fluid ----
+
+    /**
+     * The shuttle with a Fluid car in the Cargo car's place, between Fluid hatches: the Mine's provider
+     * holding 20 buckets of water and the Depot's requester asking for 8. It loads at the Mine and runs
+     * out of view to the Depot, unloads there with no chunk of it loaded, and its cars are seen again
+     * where it stands once the Depot comes into view.
+     */
+    private static void carriesFluid(GameTestHelper helper) {
+        RailNetwork network = line(helper);
+        LogisticsTests.station(helper, MINE);
+        LogisticsTests.station(helper, DEPOT);
+        helper.setBlock(PROVIDER, RailworksRegistries.FLUID_HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        helper.setBlock(REQUESTER, RailworksRegistries.FLUID_HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.REQUESTER));
+        LogisticsTests.expectJoined(helper, PROVIDER, MINE);
+        LogisticsTests.expectJoined(helper, REQUESTER, DEPOT);
+        try (var transaction = Transaction.openRoot()) {
+            LogisticsTests.record(helper, PROVIDER).tank().insert(FluidResource.of(Fluids.WATER), 20 * BUCKET, transaction);
+            transaction.commit();
+        }
+        LogisticsTests.record(helper, REQUESTER).ask(Fluids.WATER);
+        Span first = network.get(arm(helper, WEST), arm(helper, WEST + SPAN));
+        Locomotive west = Locomotive.burner();
+        FluidCar fluidCar = FluidCar.create();
+        Locomotive east = Locomotive.burner();
+        Train train = Train.of(new Place(first, first.a(), 10.0), List.of(west, fluidCar))
+                .coupled(network, Train.End.BACK, east, true);
+        LocomotiveEntity westView = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, west);
+        LogisticsTests.spawn(helper, RailworksRegistries.FLUID_CAR_ENTITY.get(), train, fluidCar);
+        LocomotiveEntity eastView = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
+        LocomotiveTests.fill(helper, westView, new ItemStack(Items.COAL, 4));
+        LocomotiveTests.fill(helper, eastView, new ItemStack(Items.COAL, 4));
+        train.setAutomatic(true);
+        Watch watch = watch(helper, train, null);
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    int delivered = hatch(helper, REQUESTER).tank().amount();
+                    helper.assertTrue(delivered == 8 * BUCKET && train.atRest(), "the Depot holds " + delivered + " of water, the Train "
+                            + LevelRails.of(helper.getLevel()).status(helper.getLevel(), train) + " " + train);
+                })
+                .thenExecute(() -> {
+                    helper.assertTrue(watch.abstracted, "the Train was never wholly out of view");
+                    int left = hatch(helper, PROVIDER).tank().amount();
+                    int carried = LevelCarRecords.of(helper.getLevel()).of(fluidCar.id()).map(record -> record.tank().amount()).orElse(-1);
+                    helper.assertTrue(left == 12 * BUCKET && carried == 0,
+                            "the run out of view left the Mine with " + left + " of water and the car with " + carried);
+                    expectOutOfView(helper, train);
+                    inView(helper, DEPOT, true);
+                })
+                .thenWaitUntil(() -> expectInView(helper, train))
+                .thenExecute(() -> {
+                    inView(helper, DEPOT, false);
+                    clearAway(helper, train);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A Locomotive and a Fluid car stand on the far stretch; brought into view, the car is filled with
+     * five buckets of lava; let go of, its view goes and its record keeps the lava; brought back, its
+     * view shows the same tank.
+     */
+    private static void tankKept(GameTestHelper helper) {
+        RailNetwork network = line(helper);
+        Locomotive locomotive = Locomotive.burner();
+        FluidCar fluidCar = FluidCar.create();
+        Train train = standing(helper, network, locomotive, fluidCar);
+        inView(helper, YARD, true);
+        helper.startSequence()
+                .thenWaitUntil(() -> expectInView(helper, train))
+                .thenExecute(() -> {
+                    FluidCarEntity view = (FluidCarEntity) LevelRails.of(helper.getLevel()).view(fluidCar);
+                    try (var transaction = Transaction.openRoot()) {
+                        view.tank().insert(FluidResource.of(Fluids.LAVA), 5 * BUCKET, transaction);
+                        transaction.commit();
+                    }
+                    inView(helper, YARD, false);
+                })
+                .thenWaitUntil(() -> {
+                    expectOutOfView(helper, train);
+                    int kept = LevelCarRecords.of(helper.getLevel()).of(fluidCar.id()).map(record -> record.tank().amount()).orElse(-1);
+                    helper.assertTrue(kept == 5 * BUCKET, "the car's record keeps " + kept + " of lava out of view");
+                })
+                .thenExecute(() -> inView(helper, YARD, true))
+                .thenWaitUntil(() -> {
+                    expectInView(helper, train);
+                    var tank = ((FluidCarEntity) LevelRails.of(helper.getLevel()).view(fluidCar)).tank();
+                    helper.assertTrue(tank != null && tank.fluid().is(Fluids.LAVA) && tank.amount() == 5 * BUCKET,
+                            "the car's view came back holding " + (tank == null ? "nothing" : tank.held().getAmount() + " of " + tank.fluid()));
+                })
+                .thenExecute(() -> {
+                    inView(helper, YARD, false);
                     clearAway(helper, train);
                 })
                 .thenSucceed();
