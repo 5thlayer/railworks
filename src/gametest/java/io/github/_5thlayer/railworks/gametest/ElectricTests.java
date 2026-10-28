@@ -58,8 +58,8 @@ final class ElectricTests {
                 ElectricTests::crafts);
         tests.test("electric_charger_takes_fe_in_up_to_its_rate_a_tick_and_gives_none_out", 20, ElectricTests::chargerTakesFe);
         tests.test("electric_burner_generator_fed_coal_by_a_hopper_makes_300_fe_a_tick_into_a_charger_against_it", 200,
-                ElectricTests::generatorCharges);
-        tests.test("electric_burner_generator_takes_no_fuel_that_leaves_something_behind", 60, ElectricTests::generatorRefusesLava);
+                ElectricTests::burnerGeneratorCharges);
+        tests.test("electric_burner_generator_takes_no_fuel_that_leaves_something_behind", 60, ElectricTests::burnerGeneratorRefusesLava);
         // Their lines run out past the structure, as the refuel tests' do.
         tests.testOnItsOwn("electric_locomotive_starts_empty_its_energy_handler_refuses_insert_and_extract_and_breaking_it_loses_its_charge",
                 20, ElectricTests::locomotiveHandler);
@@ -173,7 +173,7 @@ final class ElectricTests {
 
     // ---- the Burner Generator ----
 
-    private static void generatorCharges(GameTestHelper helper) {
+    private static void burnerGeneratorCharges(GameTestHelper helper) {
         BlockPos charger = GENERATOR.east();
         helper.setBlock(GENERATOR, RailworksRegistries.BURNER_GENERATOR.get());
         helper.setBlock(charger, RailworksRegistries.CHARGER.get());
@@ -195,7 +195,7 @@ final class ElectricTests {
                 .thenSucceed();
     }
 
-    private static void generatorRefusesLava(GameTestHelper helper) {
+    private static void burnerGeneratorRefusesLava(GameTestHelper helper) {
         helper.setBlock(GENERATOR, RailworksRegistries.BURNER_GENERATOR.get());
         BlockPos hopper = hopperOver(helper, GENERATOR, new ItemStack(Items.LAVA_BUCKET));
         var generator = helper.getBlockEntity(GENERATOR, BurnerGeneratorBlockEntity.class);

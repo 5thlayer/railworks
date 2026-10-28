@@ -33,17 +33,17 @@ public final class ChargeSpec {
 
     /** Set by {@code RailworksConfig} when the server config loads or reloads. */
     public static void configure(long joulesPerFe, long locomotiveCapacity, long chargerRate, long chargerBuffer,
-                                 double generatorKilowatts) {
+                                 double burnerGeneratorKilowatts) {
         if (joulesPerFe <= 0L || locomotiveCapacity <= 0L || chargerRate <= 0L || chargerBuffer <= 0L
-                || generatorKilowatts <= 0.0) {
+                || burnerGeneratorKilowatts <= 0.0) {
             throw new IllegalArgumentException("charging " + joulesPerFe + " " + locomotiveCapacity + " " + chargerRate
-                    + " " + chargerBuffer + " " + generatorKilowatts);
+                    + " " + chargerBuffer + " " + burnerGeneratorKilowatts);
         }
         ChargeSpec.joulesPerFe = joulesPerFe;
         ChargeSpec.locomotiveCapacity = locomotiveCapacity;
         ChargeSpec.chargerRate = chargerRate;
         ChargeSpec.chargerBuffer = chargerBuffer;
-        ChargeSpec.burnerGeneratorWatts = generatorKilowatts * 1_000.0;
+        ChargeSpec.burnerGeneratorWatts = burnerGeneratorKilowatts * 1_000.0;
     }
 
     /** Sets every number back to its default. */
