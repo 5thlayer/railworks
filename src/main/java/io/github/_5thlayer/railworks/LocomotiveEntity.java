@@ -5,10 +5,12 @@ package io.github._5thlayer.railworks;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
+import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Throttle;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.network.chat.Component;
@@ -50,6 +52,12 @@ public final class LocomotiveEntity extends CarEntity {
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Component> DATA_STATUS =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.COMPONENT);
+    /** The status line's icons, one an item, an empty stack past the last. */
+    private static final List<EntityDataAccessor<ItemStack>> DATA_STATUS_ICONS = IntStream.range(0, StatusLine.ICONS)
+            .mapToObj(icon -> SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK))
+            .toList();
+    private static final EntityDataAccessor<Integer> DATA_STATUS_MORE =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.INT);
 
     public LocomotiveEntity(EntityType<? extends LocomotiveEntity> type, Level level) {
         super(type, level);
@@ -85,6 +93,16 @@ public final class LocomotiveEntity extends CarEntity {
         return entityData.get(DATA_STATUS);
     }
 
+    /** The items its status line shows as icons, each a stack of its count, as the server last synced them. */
+    public List<ItemStack> statusIconsSeen() {
+        return DATA_STATUS_ICONS.stream().map(entityData::get).filter(stack -> !stack.isEmpty()).toList();
+    }
+
+    /** How many items its status line names beyond its icons, as the server last synced it. */
+    public int statusMoreSeen() {
+        return entityData.get(DATA_STATUS_MORE);
+    }
+
     @Override
     protected void syncCar(ServerLevel level, Train train, Car car) {
         if (car instanceof Locomotive locomotive) {
@@ -92,7 +110,17 @@ public final class LocomotiveEntity extends CarEntity {
             entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         }
         entityData.set(DATA_AUTOMATIC, train.automatic());
-        entityData.set(DATA_STATUS, StatusLine.of(LevelRails.of(level).status(level, train)));
+        Logistics.Status<Item> status = LevelRails.of(level).status(level, train);
+        entityData.set(DATA_STATUS, StatusLine.of(status));
+        List<ItemStack> icons = StatusLine.icons(status);
+        for (int icon = 0; icon < StatusLine.ICONS; icon++) {
+            ItemStack shown = icon < icons.size() ? icons.get(icon) : ItemStack.EMPTY;
+            // A stack equals only itself, so the same icon set again would sync every tick.
+            if (!ItemStack.matches(entityData.get(DATA_STATUS_ICONS.get(icon)), shown)) {
+                entityData.set(DATA_STATUS_ICONS.get(icon), shown);
+            }
+        }
+        entityData.set(DATA_STATUS_MORE, StatusLine.beyondIcons(status));
     }
 
     // ---- the drive ----
@@ -199,6 +227,8 @@ public final class LocomotiveEntity extends CarEntity {
         entityData.define(DATA_FUEL_CAPACITY, 0L);
         entityData.define(DATA_AUTOMATIC, false);
         entityData.define(DATA_STATUS, Component.empty());
+        DATA_STATUS_ICONS.forEach(icon -> entityData.define(icon, ItemStack.EMPTY));
+        entityData.define(DATA_STATUS_MORE, 0);
     }
 
     @Override

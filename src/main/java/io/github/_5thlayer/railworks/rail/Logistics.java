@@ -90,8 +90,8 @@ public final class Logistics<I> {
         MANUAL, WAITING, HOLDING, TO_LOAD, LOADING, TO_UNLOAD, UNLOADING, CANNOT_REACH
     }
 
-    /** So many stacks of an item, as a status line counts what a Train carries. */
-    public record Cargo<I>(I item, int stacks) {
+    /** So many of an item, as a status line counts what a Train carries. */
+    public record Cargo<I>(I item, long count) {
     }
 
     /**
@@ -314,21 +314,21 @@ public final class Logistics<I> {
             case TO_PROVIDER -> Status.at(job.driver.lost() ? Kind.CANNOT_REACH : Kind.TO_LOAD, job.provider);
             case AT_PROVIDER -> Status.at(Kind.LOADING, job.provider);
             case TO_REQUESTER -> job.driver.lost() ? Status.at(Kind.CANNOT_REACH, job.requester)
-                    : new Status<>(Kind.TO_UNLOAD, job.requester.name(), carried(job, goods));
+                    : new Status<>(Kind.TO_UNLOAD, job.requester.name(), carried(job));
             case AT_REQUESTER -> Status.at(Kind.UNLOADING, job.requester);
         };
     }
 
-    /** What a job's loads carry, item by item in the order they were loaded, in stacks rounded up. */
-    private static <I> List<Cargo<I>> carried(Job<I> job, Goods<I> goods) {
+    /** What a job's loads carry, item by item in the order they were loaded. */
+    private static <I> List<Cargo<I>> carried(Job<I> job) {
         Map<I, Long> items = new LinkedHashMap<>();
         for (Load<I> load : job.loads) {
             items.merge(load.item, load.loaded - load.unloaded, Long::sum);
         }
-        return inStacks(items, goods);
+        return counted(items);
     }
 
-    /** What {@code train}'s Cargo cars hold between them, item by item from its first car, in stacks rounded up. */
+    /** What {@code train}'s Cargo cars hold between them, item by item from its first car. */
     private static <I> List<Cargo<I>> holding(Train train, Goods<I> goods) {
         Map<I, Long> items = new LinkedHashMap<>();
         for (Car car : train.cars()) {
@@ -336,15 +336,15 @@ public final class Logistics<I> {
                 goods.contents(cargo).forEach((item, count) -> items.merge(item, count, Long::sum));
             }
         }
-        return inStacks(items, goods);
+        return counted(items);
     }
 
-    /** {@code items}' counts, those above none, in stacks rounded up. */
-    private static <I> List<Cargo<I>> inStacks(Map<I, Long> items, Goods<I> goods) {
+    /** {@code items}' counts, those above none. */
+    private static <I> List<Cargo<I>> counted(Map<I, Long> items) {
         List<Cargo<I>> cargo = new ArrayList<>();
         items.forEach((item, count) -> {
             if (count > 0) {
-                cargo.add(new Cargo<>(item, (int) stacks(count, goods.stackSize(item))));
+                cargo.add(new Cargo<>(item, count));
             }
         });
         return cargo;

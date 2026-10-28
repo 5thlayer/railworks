@@ -37,7 +37,8 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     private static final double REACH = 8.0;
     private static final int FUEL_X = 8;
     private static final int FUEL_Y = 18;
-    private static final int INVENTORY_Y = 61;
+    /** The player's inventory, under the status line's strip in {@code LocomotiveScreen}. */
+    private static final int INVENTORY_Y = 67;
 
     private final Container cab;
     private final @Nullable LocomotiveEntity car;

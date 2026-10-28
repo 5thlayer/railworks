@@ -3,48 +3,64 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 import io.github._5thlayer.railworks.rail.Logistics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * A Train's status line as a player reads it, under the Locomotive menu's Automatic toggle and in
- * Jade: "Manual", "Waiting for a job", "To X to load", "Loading at X", "To X to unload: 6 stacks of
- * iron ore, 2 of coal", "Unloading at X", "Cannot reach X" or "Holding 2 stacks of iron ore, nowhere to deliver".
+ * Jade: "Manual", "Waiting for a job", "To X to load", "Loading at X", "To X to unload", "Unloading
+ * at X", "Cannot reach X" or "Nowhere to deliver". Heading to unload or with nowhere to deliver, the
+ * items it carries follow the words as icons with their counts, the first {@link #ICONS} of them and
+ * then "+M" for the rest.
  */
 public final class StatusLine {
+
+    /** How many items the line shows as icons. */
+    public static final int ICONS = 4;
 
     private StatusLine() {
     }
 
+    /** The line's words. */
     public static Component of(Logistics.Status<Item> status) {
         String key = "status.railworks.train." + status.kind().name().toLowerCase(Locale.ROOT);
-        if (status.kind() == Logistics.Kind.TO_UNLOAD) {
-            return Component.translatable(key, status.station(), cargo(status.cargo()));
-        }
-        if (status.kind() == Logistics.Kind.HOLDING) {
-            return Component.translatable(key, cargo(status.cargo()));
-        }
         return status.station().isEmpty() ? Component.translatable(key) : Component.translatable(key, status.station());
     }
 
-    /** "6 stacks of iron ore, 2 of coal": the first item with its stacks named, the rest with only their count. */
-    private static Component cargo(List<Logistics.Cargo<Item>> cargo) {
-        MutableComponent line = Component.empty();
-        for (int i = 0; i < cargo.size(); i++) {
-            Logistics.Cargo<Item> load = cargo.get(i);
-            Component name = load.item().getName(load.item().getDefaultInstance());
-            String key = i > 0 ? "status.railworks.cargo.more"
-                    : load.stacks() == 1 ? "status.railworks.cargo.stack" : "status.railworks.cargo.stacks";
-            if (i > 0) {
-                line.append(Component.translatable("status.railworks.cargo.separator"));
-            }
-            line.append(Component.translatable(key, load.stacks(), name));
+    /** The first {@link #ICONS} items the line names, each a stack of its count, however many stacks that is. */
+    public static List<ItemStack> icons(Logistics.Status<Item> status) {
+        List<ItemStack> icons = new ArrayList<>();
+        for (Logistics.Cargo<Item> load : status.cargo().subList(0, Math.min(ICONS, status.cargo().size()))) {
+            icons.add(new ItemStack(load.item(), (int) Math.min(Integer.MAX_VALUE, load.count())));
         }
-        return line;
+        return icons;
+    }
+
+    /** How many items the line names beyond its icons. */
+    public static int beyondIcons(Logistics.Status<Item> status) {
+        return Math.max(0, status.cargo().size() - ICONS);
+    }
+
+    /** "+2", after the icons for the items beyond them. */
+    public static Component more(int more) {
+        return Component.translatable("status.railworks.cargo.more", more);
+    }
+
+    /** An icon's count as it fits on the icon, three figures at most and rounded down: "64", "1.5k", "12M", "2.1G". */
+    public static String amount(int count) {
+        if (count < 1_000) {
+            return Integer.toString(count);
+        }
+        String[] units = {"k", "M", "G"};
+        int unit = count < 1_000_000 ? 0 : count < 1_000_000_000 ? 1 : 2;
+        double value = count / Math.pow(1_000, unit + 1);
+        return (value < 10 ? String.format(Locale.ROOT, "%.1f", Math.floor(value * 10) / 10).replace(".0", "")
+                : Integer.toString((int) value)) + units[unit];
     }
 }

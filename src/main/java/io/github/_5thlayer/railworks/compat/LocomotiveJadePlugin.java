@@ -10,6 +10,7 @@ import java.util.Locale;
 import io.github._5thlayer.libworks.machine.jade.MachineItems;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.Railworks;
+import io.github._5thlayer.railworks.StatusLine;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import net.minecraft.network.chat.Component;
@@ -25,14 +26,16 @@ import snownee.jade.api.IWailaCommonRegistration;
 import snownee.jade.api.IWailaPlugin;
 import snownee.jade.api.WailaPlugin;
 import snownee.jade.api.config.IPluginConfig;
+import snownee.jade.api.ui.JadeUI;
 import snownee.jade.api.view.IServerExtensionProvider;
 import snownee.jade.api.view.ViewGroup;
 
 /**
- * A Burner Locomotive in Jade: its Train's status line, its speed and its fuel buffer, read from
- * the entity's synched data, which the server fills every tick; and its fuel slots, as icons with
- * their counts, as {@link CargoCarJadePlugin} shows a Cargo car's cargo. The slots are the car's
- * record in the level, which no client holds, so a server-side item storage provider reads
+ * A Burner Locomotive in Jade: its Train's status line, with the items it names as icons on the
+ * same line, its speed and its fuel buffer, read from the entity's synched data, which the server
+ * fills every tick; and its fuel slots, as icons with their counts, as {@link CargoCarJadePlugin}
+ * shows a Cargo car's cargo. The slots are the car's record in the level, which no client holds, so
+ * a server-side item storage provider reads
  * {@link LocomotiveEntity#fuelSlot(int)} and libworks-runtime's {@link MachineItems.Client} draws
  * them. Found by Jade's annotation scan and named nowhere else, so Jade stays a soft dependency.
  */
@@ -61,6 +64,12 @@ public class LocomotiveJadePlugin implements IWailaPlugin {
                 return;
             }
             tooltip.add(car.statusSeen());
+            for (ItemStack icon : car.statusIconsSeen()) {
+                tooltip.append(JadeUI.item(icon, 1.0F, StatusLine.amount(icon.getCount())));
+            }
+            if (car.statusMoreSeen() > 0) {
+                tooltip.append(JadeUI.text(StatusLine.more(car.statusMoreSeen())));
+            }
             double speed = car.speedPerSecond();
             tooltip.add(Component.translatable("tooltip.railworks.locomotive.jade.speed",
                     String.format(Locale.ROOT, "%.1f", Math.abs(speed)),

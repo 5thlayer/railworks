@@ -6,6 +6,7 @@ package io.github._5thlayer.railworks.gametest;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.CargoCarEntity;
@@ -33,6 +34,7 @@ import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
@@ -207,9 +209,11 @@ final class LogisticsTests {
                         helper.fail("the Cargo car left the Mine with " + cargo.cargo().countItem(Items.IRON_INGOT)
                                 + " iron, not the stack the Depot asks for", MINE);
                     }
+                    expectIcons(helper, leading, "64 minecraft:iron_ingot");
                 })
                 .thenWaitUntil(() -> expectStatus(helper, leading, "status.railworks.train.waiting"))
                 .thenExecute(() -> {
+                    expectIcons(helper, leading, "");
                     long delivered = held(record(helper, REQUESTER));
                     long left = held(record(helper, PROVIDER));
                     if (delivered != 64 || left != 36 || !cargo.cargo().isEmpty()) {
@@ -273,6 +277,7 @@ final class LogisticsTests {
                         helper.fail("the Cargo car holds " + cargo.cargo().countItem(Items.IRON_INGOT)
                                 + " iron, not the stack loaded for the broken requester", REQUESTER);
                     }
+                    expectIcons(helper, leading, "64 minecraft:iron_ingot");
                 })
                 // Holding, it waits: nothing more is fetched from the Mine.
                 .thenIdle(3 * 20)
@@ -554,6 +559,20 @@ final class LogisticsTests {
                     .map(p -> p.besideBlocks(network).stream().map(b -> helper.relativePos(new BlockPos(b.x(), b.y(), b.z()))).toList())
                     .toList();
             helper.fail("the hatch joins " + joined + ", not the Station at " + at + " at its first car spot, beside " + beside, pos);
+        }
+    }
+
+    /**
+     * Fails unless the Locomotive's status line, as a client reads it, shows {@code icons} after its
+     * words, "64 minecraft:iron_ingot" for each, comma-separated, and names no items beyond them.
+     */
+    private static void expectIcons(GameTestHelper helper, LocomotiveEntity locomotive, String icons) {
+        String shown = locomotive.statusIconsSeen().stream()
+                .map(icon -> icon.getCount() + " " + BuiltInRegistries.ITEM.getKey(icon.getItem()))
+                .collect(Collectors.joining(", "));
+        if (!shown.equals(icons) || locomotive.statusMoreSeen() != 0) {
+            helper.fail("the status line shows [" + shown + "] and " + locomotive.statusMoreSeen() + " more, not ["
+                    + icons + "]: " + locomotive.train(), LocomotiveTests.STAND);
         }
     }
 

@@ -180,8 +180,8 @@ class LogisticsTest {
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "set off to unload");
         Logistics.Status<String> heading = logistics.status(train, goods);
         assertEquals("Depot", heading.station());
-        // All the Mine held, a stack and a part one.
-        assertEquals(List.of(new Logistics.Cargo<>("iron", 2)), heading.cargo());
+        // All the Mine held, a stack and a part one, counted in items.
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 100)), heading.cargo());
         runUntil(() -> kind(train) == Logistics.Kind.UNLOADING, "unloading");
         runUntil(() -> kind(train) == Logistics.Kind.WAITING, "done");
         assertEquals(100, goods.held(depot, "iron"));
@@ -369,7 +369,7 @@ class LogisticsTest {
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         assertEquals(64, goods.held(cargo(train, 1), "iron"));
         assertEquals(16, goods.held(cargo(train, 2), "coal"));
-        assertEquals(List.of(new Logistics.Cargo<>("iron", 1), new Logistics.Cargo<>("coal", 1)),
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 64), new Logistics.Cargo<>("coal", 16)),
                 logistics.status(train, goods).cargo());
         runUntil(() -> kind(train) == Logistics.Kind.WAITING, "unloaded");
         assertEquals(64, goods.held(iron, "iron"));
@@ -472,7 +472,7 @@ class LogisticsTest {
         int stall = (int) (Logistics.DEFAULT_STALL_SECONDS * LocomotiveSpec.TICKS_PER_SECOND);
         assertTrue(loading >= stall && loading <= stall + Logistics.DEFAULT_HATCH_TICKS_PER_STACK + 2,
                 "it loaded for " + loading + " ticks");
-        assertEquals(List.of(new Logistics.Cargo<>("iron", 2)), logistics.status(train, goods).cargo());
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 70)), logistics.status(train, goods).cargo());
         runUntil(() -> kind(train) == Logistics.Kind.WAITING && goods.empty(cargo(train, 1)), "delivered");
         assertEquals(70, goods.held(depot, "iron"));
     }
@@ -780,7 +780,7 @@ class LogisticsTest {
         step();
         Logistics.Status<String> status = logistics.status(train, goods);
         assertEquals(Logistics.Kind.HOLDING, status.kind());
-        assertEquals(List.of(new Logistics.Cargo<>("iron", 1)), status.cargo());
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 64)), status.cargo());
         runUntil(train::atRest, "stopped");
         Place at = train.head();
         runFor(200);
@@ -812,7 +812,7 @@ class LogisticsTest {
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
         hatches.remove(coal);
         step();
-        assertEquals(List.of(new Logistics.Cargo<>("iron", 1)), logistics.status(train, goods).cargo());
+        assertEquals(List.of(new Logistics.Cargo<>("iron", 64)), logistics.status(train, goods).cargo());
         runUntil(() -> kind(train) == Logistics.Kind.HOLDING, "unloaded what still has somewhere to go");
         assertEquals(64, goods.held(iron, "iron"));
         assertEquals(16, goods.held(cargo(train, 2), "coal"));
