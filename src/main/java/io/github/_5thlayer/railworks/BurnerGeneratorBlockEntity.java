@@ -31,7 +31,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Burner Generator's block entity: its one fuel slot, which hoppers and pipes fill from any side
- * with furnace fuel that leaves nothing behind when burnt, and its {@link Generator}, which burns it
+ * with furnace fuel that leaves nothing behind when burnt, and its {@link BurnerGenerator}, which burns it
  * at the Burner Locomotive's joules per burn tick into a small FE buffer. Each tick it gives what it
  * holds to the energy handlers on its six sides, so a Charger set against it charges with no cable;
  * its own energy handler is extract only, for any mod's cable to take from. Its menu shows the slot

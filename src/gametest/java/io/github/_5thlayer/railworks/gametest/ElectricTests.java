@@ -48,7 +48,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 final class ElectricTests {
 
     /** Where the Burner Generator stands, a hopper over it and a Charger east of it. */
-    private static final BlockPos GENERATOR = new BlockPos(2, 2, 2);
+    private static final BlockPos BURNER_GENERATOR = new BlockPos(2, 2, 2);
 
     private ElectricTests() {
     }
@@ -174,11 +174,11 @@ final class ElectricTests {
     // ---- the Burner Generator ----
 
     private static void burnerGeneratorCharges(GameTestHelper helper) {
-        BlockPos charger = GENERATOR.east();
-        helper.setBlock(GENERATOR, RailworksRegistries.BURNER_GENERATOR.get());
+        BlockPos charger = BURNER_GENERATOR.east();
+        helper.setBlock(BURNER_GENERATOR, RailworksRegistries.BURNER_GENERATOR.get());
         helper.setBlock(charger, RailworksRegistries.CHARGER.get());
-        hopperOver(helper, GENERATOR, new ItemStack(Items.COAL, 4));
-        EnergyHandler generator = energy(helper, GENERATOR);
+        hopperOver(helper, BURNER_GENERATOR, new ItemStack(Items.COAL, 4));
+        EnergyHandler generator = energy(helper, BURNER_GENERATOR);
         long[] last = {-1L};
         int[] steady = {0};
         helper.onEachTick(() -> {
@@ -196,9 +196,9 @@ final class ElectricTests {
     }
 
     private static void burnerGeneratorRefusesLava(GameTestHelper helper) {
-        helper.setBlock(GENERATOR, RailworksRegistries.BURNER_GENERATOR.get());
-        BlockPos hopper = hopperOver(helper, GENERATOR, new ItemStack(Items.LAVA_BUCKET));
-        var generator = helper.getBlockEntity(GENERATOR, BurnerGeneratorBlockEntity.class);
+        helper.setBlock(BURNER_GENERATOR, RailworksRegistries.BURNER_GENERATOR.get());
+        BlockPos hopper = hopperOver(helper, BURNER_GENERATOR, new ItemStack(Items.LAVA_BUCKET));
+        var generator = helper.getBlockEntity(BURNER_GENERATOR, BurnerGeneratorBlockEntity.class);
         helper.assertFalse(generator.canPlaceItem(BurnerGeneratorBlockEntity.FUEL, new ItemStack(Items.LAVA_BUCKET)),
                 "the fuel slot takes a lava bucket");
         helper.startSequence()

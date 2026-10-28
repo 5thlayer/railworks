@@ -25,18 +25,18 @@ public final class BurnerGeneratorMenu extends AbstractContainerMenu {
     private static final int FUEL_Y = 53;
     private static final int INVENTORY_Y = 84;
 
-    private final Container generator;
+    private final Container burnerGenerator;
     private final ContainerData data;
 
-    /** The server's menu, over the generator's fuel slot and its data. */
-    public BurnerGeneratorMenu(int containerId, Inventory inventory, Container generator, ContainerData data) {
+    /** The server's menu, over the Burner Generator's fuel slot and its data. */
+    public BurnerGeneratorMenu(int containerId, Inventory inventory, Container burnerGenerator, ContainerData data) {
         super(RailworksRegistries.BURNER_GENERATOR_MENU.get(), containerId);
-        checkContainerSize(generator, 1);
+        checkContainerSize(burnerGenerator, 1);
         checkContainerDataCount(data, BurnerGeneratorBlockEntity.DATA_COUNT);
-        this.generator = generator;
+        this.burnerGenerator = burnerGenerator;
         this.data = data;
         Level level = inventory.player.level();
-        addSlot(new Slot(generator, BurnerGeneratorBlockEntity.FUEL, FUEL_X, FUEL_Y) {
+        addSlot(new Slot(burnerGenerator, BurnerGeneratorBlockEntity.FUEL, FUEL_X, FUEL_Y) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return BurnerGeneratorBlockEntity.burns(level, stack);
@@ -58,7 +58,7 @@ public final class BurnerGeneratorMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return generator.stillValid(player);
+        return burnerGenerator.stillValid(player);
     }
 
     /** Shift-click: the fuel slot to the inventory, and the inventory's fuel to the fuel slot. */

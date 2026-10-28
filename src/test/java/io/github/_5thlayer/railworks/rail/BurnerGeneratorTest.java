@@ -15,7 +15,7 @@ class BurnerGeneratorTest {
 
     private static final long COAL = 4_000_000L;
 
-    private final BurnerGenerator generator = new BurnerGenerator();
+    private final BurnerGenerator burnerGenerator = new BurnerGenerator();
     private int lit;
 
     @AfterEach
@@ -24,7 +24,7 @@ class BurnerGeneratorTest {
     }
 
     private boolean tick() {
-        return generator.tick(() -> {
+        return burnerGenerator.tick(() -> {
             lit++;
             return COAL;
         });
@@ -34,13 +34,13 @@ class BurnerGeneratorTest {
     void itMakesThreeHundredFeATickAndBuffersTenTicksOfIt() {
         assertEquals(3_000L, BurnerGenerator.capacity());
         assertTrue(tick());
-        assertEquals(300L, generator.stored());
+        assertEquals(300L, burnerGenerator.stored());
         for (int i = 0; i < 9; i++) {
             assertTrue(tick());
         }
-        assertEquals(3_000L, generator.stored());
+        assertEquals(3_000L, burnerGenerator.stored());
         assertFalse(tick(), "full, it burns nothing");
-        assertEquals(COAL - 10 * 30_000L, generator.fuel().storedJoules());
+        assertEquals(COAL - 10 * 30_000L, burnerGenerator.fuel().storedJoules());
     }
 
     @Test
@@ -48,18 +48,18 @@ class BurnerGeneratorTest {
         int ticks = 0;
         while (lit < 2) {
             tick();
-            generator.extract(Long.MAX_VALUE);
+            burnerGenerator.extract(Long.MAX_VALUE);
             ticks++;
         }
         // 4 MJ at 30,000 J a tick is 133 ticks, the 134th lighting the second lump.
         assertEquals(134, ticks);
-        assertEquals(2 * COAL - 134 * 30_000L, generator.fuel().storedJoules(), "every joule lit is burnt or banked");
+        assertEquals(2 * COAL - 134 * 30_000L, burnerGenerator.fuel().storedJoules(), "every joule lit is burnt or banked");
     }
 
     @Test
     void withNoFuelItMakesNothing() {
-        assertFalse(generator.tick(() -> 0L));
-        assertEquals(0L, generator.stored());
+        assertFalse(burnerGenerator.tick(() -> 0L));
+        assertEquals(0L, burnerGenerator.stored());
     }
 
     @Test
@@ -67,11 +67,11 @@ class BurnerGeneratorTest {
         for (int i = 0; i < 10; i++) {
             tick();
         }
-        assertEquals(250L, generator.extract(250L));
+        assertEquals(250L, burnerGenerator.extract(250L));
         assertFalse(tick(), "less than a tick's room");
-        generator.extract(50L);
+        burnerGenerator.extract(50L);
         assertTrue(tick());
-        assertEquals(3_000L, generator.stored());
+        assertEquals(3_000L, burnerGenerator.stored());
     }
 
     @Test
@@ -80,10 +80,10 @@ class BurnerGeneratorTest {
         ChargeSpec.configure(70L, ChargeSpec.DEFAULT_LOCOMOTIVE_CAPACITY, ChargeSpec.DEFAULT_CHARGER_RATE,
                 ChargeSpec.DEFAULT_CHARGER_BUFFER, ChargeSpec.DEFAULT_BURNER_GENERATOR_KILOWATTS);
         tick();
-        assertEquals(428L, generator.stored());
-        assertEquals(40L, generator.joules());
+        assertEquals(428L, burnerGenerator.stored());
+        assertEquals(40L, burnerGenerator.joules());
         tick();
-        assertEquals(857L, generator.stored());
-        assertEquals(10L, generator.joules());
+        assertEquals(857L, burnerGenerator.stored());
+        assertEquals(10L, burnerGenerator.joules());
     }
 }
