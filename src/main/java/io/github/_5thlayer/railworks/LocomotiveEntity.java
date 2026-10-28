@@ -46,8 +46,6 @@ public final class LocomotiveEntity extends CarEntity {
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Long> DATA_FUEL_CAPACITY =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
-    private static final EntityDataAccessor<ItemStack> DATA_FUEL_ITEM =
-            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<Boolean> DATA_AUTOMATIC =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Component> DATA_STATUS =
@@ -77,14 +75,6 @@ public final class LocomotiveEntity extends CarEntity {
         return entityData.get(DATA_FUEL_CAPACITY);
     }
 
-    /**
-     * The fuel it burns next, the first fuel slot's that holds any: on the server its record's, on a
-     * client as the server last synced it.
-     */
-    public ItemStack fuelItem() {
-        return level().isClientSide() ? entityData.get(DATA_FUEL_ITEM) : fuel().nextFuel();
-    }
-
     /** Whether its Train is automatic, as the server last synced it. */
     public boolean automaticSeen() {
         return entityData.get(DATA_AUTOMATIC);
@@ -101,7 +91,6 @@ public final class LocomotiveEntity extends CarEntity {
             entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
             entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         }
-        entityData.set(DATA_FUEL_ITEM, fuel().nextFuel());
         entityData.set(DATA_AUTOMATIC, train.automatic());
         entityData.set(DATA_STATUS, StatusLine.of(LevelRails.of(level).status(level, train)));
     }
@@ -122,6 +111,11 @@ public final class LocomotiveEntity extends CarEntity {
             }
         }
         return Throttle.NONE;
+    }
+
+    /** On the server, the fuel it burns next, the first fuel slot's that holds any, a copy. */
+    public ItemStack fuelItem() {
+        return fuel().nextFuel();
     }
 
     /** On the server, what fuel slot {@code slot} holds, a copy. */
@@ -203,7 +197,6 @@ public final class LocomotiveEntity extends CarEntity {
         super.defineSynchedData(entityData);
         entityData.define(DATA_FUEL, 0L);
         entityData.define(DATA_FUEL_CAPACITY, 0L);
-        entityData.define(DATA_FUEL_ITEM, ItemStack.EMPTY);
         entityData.define(DATA_AUTOMATIC, false);
         entityData.define(DATA_STATUS, Component.empty());
     }
