@@ -197,17 +197,17 @@ class ElectricLocomotiveTest {
         }
 
         @Override
-        public long held(CargoCar car, String item) {
+        public long held(GoodsCar car, String item) {
             return 0L;
         }
 
         @Override
-        public Map<String, Long> contents(CargoCar car) {
+        public Map<String, Long> contents(GoodsCar car) {
             return Map.of();
         }
 
         @Override
-        public boolean empty(CargoCar car) {
+        public boolean empty(GoodsCar car) {
             return true;
         }
 
@@ -217,12 +217,17 @@ class ElectricLocomotiveTest {
         }
 
         @Override
-        public long load(Logistics.Hatch<String> from, CargoCar into, String item, long most) {
+        public long tank(FluidCar car) {
             return 0L;
         }
 
         @Override
-        public long unload(CargoCar from, Logistics.Hatch<String> into, String item, long most) {
+        public long load(Logistics.Hatch<String> from, GoodsCar into, String item, long most) {
+            return 0L;
+        }
+
+        @Override
+        public long unload(GoodsCar from, Logistics.Hatch<String> into, String item, long most) {
             return 0L;
         }
 

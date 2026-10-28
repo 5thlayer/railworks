@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks;
 
 import java.util.Optional;
 
+import io.github._5thlayer.railworks.rail.Goods;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -21,6 +22,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import org.jspecify.annotations.Nullable;
@@ -28,11 +31,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * A hatch's block entity, which holds nothing of its own: what the hatch holds is its record in the
  * level's {@link LevelHatches}, saved with the level, so a Train loads and unloads it with no chunk
- * loaded. Its item handler is that record's slots, the same on every side. A hatch placed with no
- * player, as by a command, puts itself there, holding nothing, as it loads, as its block's mode says.
+ * loaded. A hatch of items' item handler is that record's slots, and a Fluid hatch's fluid handler its
+ * tank, the same on every side; neither has the other. A hatch placed with no player, as by a command,
+ * puts itself there, holding nothing, as it loads, as its block's kind and mode say.
  *
  * <p>Its watchers draw one item on its sides ({@link #shown}): a requester's request, or the first
- * stack a provider holds. The server works it out each tick and sends it to the watchers as it changes.
+ * stack a provider holds, a fluid drawn as its filled bucket. The server works it out each tick and sends it to the watchers as it changes.
  */
 public final class HatchBlockEntity extends BlockEntity {
 
@@ -41,6 +45,8 @@ public final class HatchBlockEntity extends BlockEntity {
      * there that looks for one before asking the server what a block holds, as Jade does, finds one.
      */
     private static final ResourceHandler<ItemResource> EMPTY = new ItemStacksResourceHandler(0);
+    /** A watcher's fluid handler, with no tank, for the same reason. */
+    private static final ResourceHandler<FluidResource> NO_TANK = new FluidStacksResourceHandler(0, 0);
 
     private static final String SHOWN_KEY = "shown";
 
@@ -57,12 +63,34 @@ public final class HatchBlockEntity extends BlockEntity {
         }
         Hatches hatches = LevelHatches.of(server);
         return Optional.of(hatches.at(worldPosition)
-                .orElseGet(() -> hatches.put(worldPosition, getBlockState().getValue(HatchBlock.MODE))));
+                .orElseGet(() -> hatches.put(worldPosition, holds(), getBlockState().getValue(HatchBlock.MODE))));
     }
 
-    /** What it holds, on every side: hoppers and pipes fill and empty it. For a watcher, a handler holding nothing. */
-    public ResourceHandler<ItemResource> items() {
+    /** Whether its block is a hatch of items or a Fluid hatch. */
+    private Goods.Kind holds() {
+        return getBlockState().getBlock() instanceof HatchBlock block ? block.holds() : Goods.Kind.ITEMS;
+    }
+
+    /**
+     * What a hatch of items holds, on every side: hoppers and pipes fill and empty it. For a watcher, a
+     * handler holding nothing; none for a Fluid hatch.
+     */
+    public @Nullable ResourceHandler<ItemResource> items() {
+        if (holds() != Goods.Kind.ITEMS) {
+            return null;
+        }
         return hatch().<ResourceHandler<ItemResource>>map(Hatches.Hatch::contents).orElse(EMPTY);
+    }
+
+    /**
+     * What a Fluid hatch holds, on every side: any mod's pipes fill and empty its tank. For a watcher, a
+     * handler with no tank; none for a hatch of items.
+     */
+    public @Nullable ResourceHandler<FluidResource> fluids() {
+        if (holds() != Goods.Kind.FLUID) {
+            return null;
+        }
+        return hatch().<ResourceHandler<FluidResource>>map(Hatches.Hatch::tank).orElse(NO_TANK);
     }
 
     /**
@@ -120,8 +148,8 @@ public final class HatchBlockEntity extends BlockEntity {
 
     /**
      * Puts itself in the level's hatches as it loads, if it is not there yet, as after a command placed
-     * it. A record there of the other mode is a stale one, left by a hatch a command removed with no
-     * side effects: what it held is dropped, and a fresh record of this block's mode takes its place.
+     * it. A record there of the other mode or kind is a stale one, left by a hatch a command removed with
+     * no side effects: what it held is dropped, and a fresh record of this block's takes its place.
      * One of the same mode cannot be told from its own, and this block takes it over as it is.
      */
     @Override
@@ -130,7 +158,7 @@ public final class HatchBlockEntity extends BlockEntity {
         if (level instanceof ServerLevel server) {
             Hatches hatches = LevelHatches.of(server);
             HatchMode mode = getBlockState().getValue(HatchBlock.MODE);
-            hatches.at(worldPosition).filter(stale -> stale.mode() != mode).ifPresent(stale -> {
+            hatches.at(worldPosition).filter(stale -> stale.mode() != mode || stale.holds() != holds()).ifPresent(stale -> {
                 hatches.remove(worldPosition);
                 stale.drop(server);
             });

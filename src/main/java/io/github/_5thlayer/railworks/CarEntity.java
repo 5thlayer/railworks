@@ -74,10 +74,11 @@ import org.slf4j.Logger;
  * its chunk; one found in a chunk saved before is only a record to hand over, and goes.
  *
  * <p>Using a car boards it. Sneaking at it opens its menu, as does the inventory key while riding;
- * sneaking gets off. A kind of car nobody rides, the Cargo car, opens its menu when used instead. Shears uncouple it from the car on the side used, parting a Train at rest in
- * two. A player leading a mob puts the mob in instead, and a lead used on a car carrying a mob leads
- * it out. A car comes off the Rail, dropping itself and what it holds, when a Span its Train stands
- * on is cut.
+ * sneaking gets off. A kind of car nobody rides, the Cargo car, opens its menu when used instead,
+ * and the Fluid car, which has none, takes a bucket's use. Shears uncouple it from the car on the
+ * side used, parting a Train at rest in two. A player leading a mob puts the mob in instead, and a
+ * lead used on a car carrying a mob leads it out. A car comes off the Rail, dropping itself and what
+ * it holds, when a Span its Train stands on is cut.
  */
 public abstract class CarEntity extends VehicleEntity implements HasCustomInventoryScreen {
 
@@ -339,7 +340,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         // A car nobody rides is used for what it holds: its own use of the item in hand, else its menu.
         if (!rideable()) {
             InteractionResult used = useHeld(player, hand, held);
-            return used != InteractionResult.PASS ? used : openMenu(player);
+            return used != InteractionResult.PASS || !hasMenu() ? used : openMenu(player);
         }
         // Sneaking at the car from outside opens its menu.
         if (player.isSecondaryUseActive()) {
@@ -383,6 +384,11 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      * rides opens its menu when used.
      */
     protected boolean rideable() {
+        return true;
+    }
+
+    /** Whether this kind of car has a menu to open: a Fluid car has none. */
+    protected boolean hasMenu() {
         return true;
     }
 
@@ -716,8 +722,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (carId != null && oldEntity.level() instanceof ServerLevel from && level() instanceof ServerLevel to
                 && from != to) {
             LevelRails.of(from).carGone(carId);
-            LevelCarRecords.of(from).remove(carId)
-                    .ifPresent(record -> LevelCarRecords.of(to).handOver(carId, recordSlots(), record.getItems()));
+            LevelCarRecords.of(from).remove(carId).ifPresent(record -> LevelCarRecords.of(to)
+                    .handOver(carId, recordSlots(), record.getItems(), record.tank().capacity(), record.tank().held()));
         }
     }
 
@@ -734,13 +740,18 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     /** How many slots its car's record holds: a Cargo car's cargo, a Locomotive's fuel slots. */
     protected abstract int recordSlots();
 
+    /** How many millibuckets its car's record's tank holds, made now: a Fluid car's; none for any other car. */
+    protected int recordTank() {
+        return 0;
+    }
+
     /**
      * What its car holds, on the server: the car's record in the level's {@link CarRecords} (ADR 0008),
      * which this view only shows, made here if the car has none yet. A loose one for a view with no car.
      */
     protected SimpleContainer record() {
         if (carId != null && level() instanceof ServerLevel server) {
-            return LevelCarRecords.of(server).ensure(carId, recordSlots());
+            return LevelCarRecords.of(server).ensure(carId, recordSlots(), recordTank());
         }
         if (loose == null) {
             loose = new SimpleContainer(recordSlots());

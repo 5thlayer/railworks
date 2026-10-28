@@ -5,6 +5,7 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.railworks.rail.ChargeSpec;
 import io.github._5thlayer.railworks.rail.DriveSide;
+import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Platform;
@@ -18,9 +19,10 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 /**
  * {@code railworks-server.toml}: how long, steep and sharply bending a Span may be, the Burner
  * Locomotive's drive and fuel, the Electric Locomotive's charge with the Charger and the Burner
- * Generator that fill it, the drive side, how many car spots a Station's platform has, how
- * many slots a hatch holds, and how fast hatches trade and how long a Train waits on them. A server config, so the client measures the same limits the server
- * strings by.
+ * Generator that fill it, the drive side, how many car spots a Station's platform has, how many
+ * slots a hatch holds, how many buckets a Fluid hatch and a Fluid car hold, and how fast hatches
+ * trade and how long a Train waits on them. A server config, so the client measures the same limits
+ * the server strings by.
  */
 public final class RailworksConfig {
 
@@ -41,6 +43,8 @@ public final class RailworksConfig {
     private static final ModConfigSpec.EnumValue<DriveSide> DRIVE_SIDE;
     private static final ModConfigSpec.IntValue PLATFORM_CARS;
     private static final ModConfigSpec.IntValue HATCH_SLOTS;
+    private static final ModConfigSpec.IntValue FLUID_HATCH_BUCKETS;
+    private static final ModConfigSpec.IntValue FLUID_CAR_BUCKETS;
     private static final ModConfigSpec.IntValue HATCH_TICKS_PER_STACK;
     private static final ModConfigSpec.DoubleValue STALL_SECONDS;
 
@@ -58,7 +62,11 @@ public final class RailworksConfig {
                 .defineInRange("platformCars", Platform.MAX_CARS, 1, Platform.MAX_CARS);
         HATCH_SLOTS = builder.comment("How many slots a hatch holds, a chest's 27 by default. A hatch keeps the slots it was placed with.")
                 .defineInRange("hatchSlots", Hatches.DEFAULT_SLOTS, 1, 54);
-        HATCH_TICKS_PER_STACK = builder.comment("How many ticks a hatch takes to move each stack to or from the Cargo car at its car spot. 20 is a stack a second.")
+        FLUID_HATCH_BUCKETS = builder.comment("How many buckets a Fluid hatch's tank holds. A Fluid hatch keeps the tank it was placed with.")
+                .defineInRange("fluidHatchBuckets", Logistics.DEFAULT_FLUID_HATCH_BUCKETS, 1, 1000);
+        FLUID_CAR_BUCKETS = builder.comment("How many buckets a Fluid car's tank holds. A Fluid car keeps the tank it was made with.")
+                .defineInRange("fluidCarBuckets", FluidCar.DEFAULT_TANK_BUCKETS, 1, 1000);
+        HATCH_TICKS_PER_STACK = builder.comment("How many ticks a hatch takes to move each stack to or from the Cargo car at its car spot, and a Fluid hatch two buckets to or from the Fluid car at its. 20 is a stack a second.")
                 .defineInRange("hatchTicksPerStack", Logistics.DEFAULT_HATCH_TICKS_PER_STACK, 1, 1200);
         STALL_SECONDS = builder.comment("How long an automatic Train waits at a Station with nothing moving before it leaves, in seconds.")
                 .defineInRange("stallSeconds", Logistics.DEFAULT_STALL_SECONDS, 0.0, 600.0);
@@ -107,7 +115,8 @@ public final class RailworksConfig {
                 ChargeSpec.reset();
                 DriveSide.configure(DriveSide.DEFAULT);
                 Platform.configure(Platform.MAX_CARS);
-                Hatches.configure(Hatches.DEFAULT_SLOTS);
+                Hatches.configure(Hatches.DEFAULT_SLOTS, Logistics.DEFAULT_FLUID_HATCH_BUCKETS);
+                FluidCarEntity.configure(FluidCar.DEFAULT_TANK_BUCKETS);
                 Logistics.configure(Logistics.DEFAULT_HATCH_TICKS_PER_STACK, Logistics.DEFAULT_STALL_SECONDS);
             }
         });
@@ -125,7 +134,8 @@ public final class RailworksConfig {
                     BURNER_GENERATOR_KILOWATTS.get());
             DriveSide.configure(DRIVE_SIDE.get());
             Platform.configure(PLATFORM_CARS.get());
-            Hatches.configure(HATCH_SLOTS.get());
+            Hatches.configure(HATCH_SLOTS.get(), FLUID_HATCH_BUCKETS.get());
+            FluidCarEntity.configure(FLUID_CAR_BUCKETS.get());
             Logistics.configure(HATCH_TICKS_PER_STACK.get(), STALL_SECONDS.get());
         }
     }

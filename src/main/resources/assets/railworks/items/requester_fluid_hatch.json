@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "railworks:block/fluid_hatch_requester"
+  }
+}

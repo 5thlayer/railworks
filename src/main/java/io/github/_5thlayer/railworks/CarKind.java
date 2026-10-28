@@ -9,6 +9,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
@@ -23,7 +24,9 @@ public enum CarKind {
     ELECTRIC_LOCOMOTIVE(Locomotive.ELECTRIC_KIND, Locomotive.LENGTH, Blocks.COPPER_BLOCK, Locomotive::electric,
             () -> RailworksRegistries.ELECTRIC_LOCOMOTIVE_ENTITY.get(), () -> RailworksRegistries.ELECTRIC_LOCOMOTIVE.get()),
     CARGO(CargoCar.KIND, CargoCar.LENGTH, Blocks.CHEST, CargoCar::create,
-            () -> RailworksRegistries.CARGO_CAR_ENTITY.get(), () -> RailworksRegistries.CARGO_CAR.get());
+            () -> RailworksRegistries.CARGO_CAR_ENTITY.get(), () -> RailworksRegistries.CARGO_CAR.get()),
+    FLUID(FluidCar.KIND, FluidCar.LENGTH, Blocks.CAULDRON, FluidCar::create,
+            () -> RailworksRegistries.FLUID_CAR_ENTITY.get(), () -> RailworksRegistries.FLUID_CAR.get());
 
     private final String model;
     private final double length;

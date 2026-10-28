@@ -20,6 +20,8 @@ import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
+import io.github._5thlayer.railworks.Ware;
+import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.HatchRequest;
 import io.github._5thlayer.railworks.rail.Platform;
 import net.minecraft.core.BlockPos;
@@ -244,17 +246,17 @@ final class HatchTests {
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT, 7));
         use(helper, player, FIRST);
         use(helper, player, FIRST);
-        expectRequest(helper, Optional.of(new HatchRequest<>(Items.IRON_INGOT, 2)));
+        expectRequest(helper, Optional.of(new HatchRequest<>(Ware.of(Items.IRON_INGOT), 2)));
         if (player.getMainHandItem().getCount() != 7) {
             helper.fail("asking took the item from the hand", FIRST);
         }
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL));
         use(helper, player, FIRST);
-        expectRequest(helper, Optional.of(new HatchRequest<>(Items.COAL, 1)));
+        expectRequest(helper, Optional.of(new HatchRequest<>(Ware.of(Items.COAL), 1)));
         for (int i = 0; i < Hatches.slots() + 3; i++) {
             use(helper, player, FIRST);
         }
-        expectRequest(helper, Optional.of(new HatchRequest<>(Items.COAL, Hatches.slots())));
+        expectRequest(helper, Optional.of(new HatchRequest<>(Ware.of(Items.COAL), Hatches.slots())));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         use(helper, player, FIRST);
         expectRequest(helper, Optional.empty());
@@ -293,7 +295,7 @@ final class HatchTests {
             helper.fail("the hatch was not saved", FIRST);
             return;
         }
-        if (hatch.mode() != HatchMode.REQUESTER || !hatch.request().equals(Optional.of(new HatchRequest<>(Items.IRON_INGOT, 1)))
+        if (hatch.mode() != HatchMode.REQUESTER || !hatch.request().equals(Optional.of(new HatchRequest<>(Ware.of(Items.IRON_INGOT), 1)))
                 || count(hatch.contents()) != 9 || !hatch.contents().getResource(0).is(Items.COAL)
                 || hatch.contents().size() != Hatches.slots()) {
             helper.fail("the hatch loaded as " + hatch.mode() + " asking for " + hatch.request() + " holding "
@@ -673,7 +675,7 @@ final class HatchTests {
 
     /** A hatch of {@code mode} placed by {@code player} at {@code pos}, which must go. */
     private static void hatch(GameTestHelper helper, ServerPlayer player, BlockPos pos, HatchMode mode) {
-        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(HatchItem.of(mode)));
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(HatchItem.of(Goods.Kind.ITEMS, mode)));
         if (!place(helper, player, pos).consumesAction() || !helper.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
             throw helper.assertionException(pos, Component.literal("a hatch beside a car spot was refused"));
         }
@@ -761,7 +763,7 @@ final class HatchTests {
         }
     }
 
-    private static void expectRequest(GameTestHelper helper, Optional<HatchRequest<Item>> expected) {
+    private static void expectRequest(GameTestHelper helper, Optional<HatchRequest<Ware>> expected) {
         if (!record(helper, FIRST).request().equals(expected)) {
             helper.fail("the requester asks for " + record(helper, FIRST).request() + ", not " + expected, FIRST);
         }

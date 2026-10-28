@@ -159,7 +159,7 @@ public final class LocomotiveEntity extends CarEntity {
             entityData.set(DATA_CHARGE_CAPACITY, ChargeSpec.locomotiveCapacity());
         }
         entityData.set(DATA_AUTOMATIC, train.automatic());
-        Logistics.Status<Item> status = LevelRails.of(level).status(level, train);
+        Logistics.Status<Ware> status = LevelRails.of(level).status(level, train);
         entityData.set(DATA_STATUS, StatusLine.of(status));
         List<ItemStack> icons = StatusLine.icons(status);
         for (int icon = 0; icon < StatusLine.ICONS; icon++) {

@@ -8,6 +8,7 @@ import java.util.Map;
 import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
+import io.github._5thlayer.railworks.rail.Goods;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
@@ -22,8 +23,8 @@ import net.minecraft.world.level.block.Block;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A hatch in hand, a provider's or a requester's, which places the hatch as that and which the hatch
- * drops as what it is. Sneak-used in the air, the whole stack turns into the other. The block's own
+ * A hatch in hand, of items or a Fluid hatch, a provider's or a requester's, which places the hatch as
+ * that and which the hatch drops as what it is. Sneak-used in the air, the whole stack turns into the other. The block's own
  * item, the one its recipe makes, is the provider's. It places only beside a car spot or the leading
  * car's place of a Station's platform ({@link PlatformsNear#joined}), so the Placement Preview and the
  * click ask one rule; a refused click says why on the action bar. While one is held, the free blocks
@@ -43,8 +44,12 @@ public final class HatchItem extends BlockItem implements PlansPlacement {
         return mode;
     }
 
-    /** The item a hatch that is {@code mode} is in hand. */
-    public static HatchItem of(HatchMode mode) {
+    /** The item a hatch of {@code holds} that is {@code mode} is in hand. */
+    public static HatchItem of(Goods.Kind holds, HatchMode mode) {
+        if (holds == Goods.Kind.FLUID) {
+            return mode == HatchMode.REQUESTER ? RailworksRegistries.REQUESTER_FLUID_HATCH_ITEM.get()
+                    : RailworksRegistries.FLUID_HATCH_ITEM.get();
+        }
         return mode == HatchMode.REQUESTER ? RailworksRegistries.REQUESTER_HATCH_ITEM.get() : RailworksRegistries.HATCH_ITEM.get();
     }
 
@@ -77,7 +82,8 @@ public final class HatchItem extends BlockItem implements PlansPlacement {
         if (!level.isClientSide()) {
             level.playSound(null, player.getX(), player.getY(), player.getZ(), HatchBlock.SWITCH_SOUND, SoundSource.PLAYERS, 0.5F, 1.0F);
         }
-        return InteractionResult.SUCCESS.heldItemTransformedTo(player.getItemInHand(hand).transmuteCopy(of(mode.other())));
+        HatchItem other = of(((HatchBlock) getBlock()).holds(), mode.other());
+        return InteractionResult.SUCCESS.heldItemTransformedTo(player.getItemInHand(hand).transmuteCopy(other));
     }
 
     /** Only the provider's is the block's own item, the one it is picked and named as when nothing says otherwise. */

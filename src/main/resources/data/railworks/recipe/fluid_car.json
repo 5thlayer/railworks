@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "I I",
+    "IBI",
+    "III"
+  ],
+  "key": {
+    "I": "#c:ingots/iron",
+    "B": "minecraft:bucket"
+  },
+  "result": {
+    "id": "railworks:fluid_car",
+    "count": 1
+  }
+}

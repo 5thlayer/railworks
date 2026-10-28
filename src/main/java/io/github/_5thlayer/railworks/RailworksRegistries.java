@@ -4,6 +4,7 @@
 package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.libworks.WorksTab;
+import io.github._5thlayer.railworks.rail.Goods;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -25,8 +26,8 @@ import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
 
 /**
  * The Module's blocks, items, entity and block entity types, the held Span end, the hatch's and the
- * Burner Generator's item handlers, and the energy handlers of the Charger, the Burner Generator and
- * the Electric Locomotive.
+ * Burner Generator's item handlers, the Fluid hatch's fluid handler, and the energy handlers of the
+ * Charger, the Burner Generator and the Electric Locomotive.
  */
 public final class RailworksRegistries {
 
@@ -80,6 +81,16 @@ public final class RailworksRegistries {
                     .updateInterval(1)
                     .noSummon());
 
+    /** Iron and a bucket: a car that carries one fluid, coupled into a Train. */
+    public static final DeferredItem<CarItem> FLUID_CAR =
+            ITEMS.registerItem("fluid_car", props -> new CarItem(CarKind.FLUID, props));
+    public static final DeferredHolder<EntityType<?>, EntityType<FluidCarEntity>> FLUID_CAR_ENTITY =
+            ENTITIES.registerEntityType("fluid_car", FluidCarEntity::new, MobCategory.MISC, builder -> builder
+                    .sized(CarEntity.WIDTH, CarEntity.HEIGHT)
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .noSummon());
+
     /** A named block beside or under the Rail, which a car stopped by it is at. */
     public static final DeferredBlock<StationBlock> STATION = BLOCKS.registerBlock(StationBlock.BLOCK_NAME, StationBlock::new);
     public static final DeferredItem<StationItem> STATION_ITEM =
@@ -89,7 +100,8 @@ public final class RailworksRegistries {
                     () -> new BlockEntityType<>(StationBlockEntity::new, STATION.get()));
 
     /** A container beside a Station's platform, joining that Station: a provider or a requester. */
-    public static final DeferredBlock<HatchBlock> HATCH = BLOCKS.registerBlock(HatchBlock.BLOCK_NAME, HatchBlock::new);
+    public static final DeferredBlock<HatchBlock> HATCH = BLOCKS.registerBlock(HatchBlock.BLOCK_NAME,
+            props -> new HatchBlock(Goods.Kind.ITEMS, props));
     /**
      * A provider hatch in hand, the block's own item, which its recipe makes. Each mode's item has its
      * own name, so Jade names a hatch by the item it is picked as.
@@ -99,9 +111,19 @@ public final class RailworksRegistries {
     /** A requester hatch in hand, which a provider's turns into, sneak-used in the air, and back. */
     public static final DeferredItem<HatchItem> REQUESTER_HATCH_ITEM = ITEMS.registerItem("requester_hatch",
             props -> new HatchItem(HATCH.get(), HatchMode.REQUESTER, props), Item.Properties::useItemDescriptionPrefix);
+    /** A Fluid hatch: a tank beside a Station's platform, joining that Station, which trades only with a Fluid car. */
+    public static final DeferredBlock<HatchBlock> FLUID_HATCH = BLOCKS.registerBlock(HatchBlock.FLUID_BLOCK_NAME,
+            props -> new HatchBlock(Goods.Kind.FLUID, props));
+    /** A provider Fluid hatch in hand, the block's own item, which its recipe makes. */
+    public static final DeferredItem<HatchItem> FLUID_HATCH_ITEM = ITEMS.registerItem(HatchBlock.FLUID_BLOCK_NAME,
+            props -> new HatchItem(FLUID_HATCH.get(), HatchMode.PROVIDER, props), Item.Properties::useItemDescriptionPrefix);
+    /** A requester Fluid hatch in hand, which a provider's turns into, sneak-used in the air, and back. */
+    public static final DeferredItem<HatchItem> REQUESTER_FLUID_HATCH_ITEM = ITEMS.registerItem("requester_fluid_hatch",
+            props -> new HatchItem(FLUID_HATCH.get(), HatchMode.REQUESTER, props), Item.Properties::useItemDescriptionPrefix);
+    /** Both hatches' block entity, which views a hatch of items' record or a Fluid hatch's. */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HatchBlockEntity>> HATCH_ENTITY =
             BLOCK_ENTITIES.register(HatchBlock.BLOCK_NAME,
-                    () -> new BlockEntityType<>(HatchBlockEntity::new, HATCH.get()));
+                    () -> new BlockEntityType<>(HatchBlockEntity::new, HATCH.get(), FLUID_HATCH.get()));
 
     /** A block beside a Station's platform, joining that Station, that charges the Electric Locomotive beside it. */
     public static final DeferredBlock<ChargerBlock> CHARGER = BLOCKS.registerBlock(ChargerBlock.BLOCK_NAME,
@@ -157,12 +179,13 @@ public final class RailworksRegistries {
     }
 
     /**
-     * A hatch's item handler, on every side: its record's slots. A Charger's energy handler, insert
-     * only, and a Burner Generator's, extract only, beside its fuel slot; an Electric Locomotive's,
-     * read only, onto its charge.
+     * A hatch of items' item handler, on every side: its record's slots; a Fluid hatch's fluid
+     * handler, its record's tank. A Charger's energy handler, insert only, and a Burner Generator's,
+     * extract only, beside its fuel slot; an Electric Locomotive's, read only, onto its charge.
      */
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.Item.BLOCK, HATCH_ENTITY.get(), (hatch, side) -> hatch.items());
+        event.registerBlockEntity(Capabilities.Fluid.BLOCK, HATCH_ENTITY.get(), (hatch, side) -> hatch.fluids());
         event.registerBlockEntity(Capabilities.Energy.BLOCK, CHARGER_ENTITY.get(), (charger, side) -> charger.energy());
         event.registerBlockEntity(Capabilities.Energy.BLOCK, BURNER_GENERATOR_ENTITY.get(), (generator, side) -> generator.energy());
         event.registerBlockEntity(Capabilities.Item.BLOCK, BURNER_GENERATOR_ENTITY.get(), WorldlyContainerWrapper::new);

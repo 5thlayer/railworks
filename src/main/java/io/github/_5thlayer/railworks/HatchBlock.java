@@ -5,6 +5,8 @@ package io.github._5thlayer.railworks;
 
 import java.util.Optional;
 
+import io.github._5thlayer.railworks.rail.Goods;
+import io.github._5thlayer.railworks.rail.HatchRequest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -30,6 +32,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 import org.jspecify.annotations.Nullable;
 
@@ -43,10 +47,18 @@ import org.jspecify.annotations.Nullable;
  * holds, heard as a shulker box opening. Used with an item, a requester asks for a stack more of
  * that kind, another kind replacing its request; an empty hand clears its request, or takes a
  * provider's first stack. Each is told above the hotbar. Broken, it drops what it holds.
+ *
+ * <p>The Fluid hatch is a block of its own of this class: a tank of one fluid, filled and emptied by
+ * any mod's pipes, which trades only with a Fluid car and fuels no Locomotive. Used with a filled
+ * bucket, or any fluid container, a requester asks for {@link HatchRequest#BUCKETS_PER_ASK} buckets
+ * more of its fluid, another fluid replacing its request, and the bucket stays full; a provider takes
+ * the bucket's fluid in, and fills an empty bucket from its tank. An empty hand clears a requester's
+ * request, or tells what a provider holds. Broken, its fluid is spilt.
  */
 public final class HatchBlock extends Block implements EntityBlock {
 
     public static final String BLOCK_NAME = "hatch";
+    public static final String FLUID_BLOCK_NAME = "fluid_hatch";
 
     /** What is heard as a hatch, placed or in hand, switches either way: a shulker box opening. */
     public static final SoundEvent SWITCH_SOUND = SoundEvents.SHULKER_BOX_OPEN;
@@ -54,9 +66,18 @@ public final class HatchBlock extends Block implements EntityBlock {
     /** Whether it is a provider or a requester, which its sides show; its record in {@link LevelHatches} decides. */
     public static final EnumProperty<HatchMode> MODE = EnumProperty.create("mode", HatchMode.class);
 
-    public HatchBlock(BlockBehaviour.Properties props) {
+    private final Goods.Kind holds;
+
+    /** A hatch of items, or a Fluid hatch, as {@code holds} says. */
+    public HatchBlock(Goods.Kind holds, BlockBehaviour.Properties props) {
         super(props.strength(2.0F).sound(SoundType.METAL));
+        this.holds = holds;
         registerDefaultState(stateDefinition.any().setValue(MODE, HatchMode.PROVIDER));
+    }
+
+    /** Whether it is a hatch of items or a Fluid hatch. */
+    public Goods.Kind holds() {
+        return holds;
     }
 
     @Override
@@ -74,7 +95,7 @@ public final class HatchBlock extends Block implements EntityBlock {
     /** Picked as the item it drops, its mode's. */
     @Override
     protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData) {
-        return new ItemStack(HatchItem.of(state.getValue(MODE)));
+        return new ItemStack(HatchItem.of(holds, state.getValue(MODE)));
     }
 
     @Override
@@ -98,7 +119,7 @@ public final class HatchBlock extends Block implements EntityBlock {
         if (level instanceof ServerLevel server) {
             Hatches hatches = LevelHatches.of(server);
             hatches.remove(pos).ifPresent(stale -> stale.drop(server));
-            hatches.put(pos, state.getValue(MODE));
+            hatches.put(pos, holds, state.getValue(MODE));
         }
     }
 
@@ -114,7 +135,9 @@ public final class HatchBlock extends Block implements EntityBlock {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
         entity.hatch().ifPresent(hatch -> {
-            if (hatch.mode() == HatchMode.REQUESTER) {
+            if (holds == Goods.Kind.FLUID) {
+                useFluidHatch(hatch, stack, player, hand, pos);
+            } else if (hatch.mode() == HatchMode.REQUESTER) {
                 player.sendOverlayMessage(HatchReport.requesting(Optional.of(hatch.ask(stack.getItem()))));
             } else {
                 player.sendOverlayMessage(Component.translatable("message.railworks.hatch.provider_by_hoppers"));
@@ -124,8 +147,27 @@ public final class HatchBlock extends Block implements EntityBlock {
     }
 
     /**
+     * A Fluid hatch used with {@code stack}: a requester asks for the fluid it holds, leaving it full;
+     * a provider takes its fluid in, or fills it from the tank, a bucket at a time. Anything holding no
+     * fluid only tells what the hatch takes.
+     */
+    private static void useFluidHatch(Hatches.Hatch hatch, ItemStack stack, Player player, InteractionHand hand, BlockPos pos) {
+        if (hatch.mode() == HatchMode.REQUESTER) {
+            FluidStack contained = FluidUtil.getFirstStackContained(stack);
+            player.sendOverlayMessage(contained.isEmpty()
+                    ? Component.translatable("message.railworks.fluid_hatch.requester_by_bucket")
+                    : HatchReport.requesting(Optional.of(hatch.ask(contained.getFluid()))));
+        } else if (hatch.tank().useByHand(player, hand, pos)) {
+            player.sendOverlayMessage(HatchReport.holding(hatch.tank()));
+        } else {
+            player.sendOverlayMessage(Component.translatable("message.railworks.fluid_hatch.provider_by_pipes"));
+        }
+    }
+
+    /**
      * With an empty hand: sneaking switches it between provider and requester, keeping what it holds;
-     * otherwise it clears a requester's request, or gives a provider's first stack.
+     * otherwise it clears a requester's request, or gives a provider's first stack, or tells what a
+     * provider Fluid hatch holds.
      */
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
@@ -142,6 +184,8 @@ public final class HatchBlock extends Block implements EntityBlock {
             } else if (hatch.mode() == HatchMode.REQUESTER) {
                 hatch.clearRequest();
                 player.sendOverlayMessage(HatchReport.requesting(Optional.empty()));
+            } else if (holds == Goods.Kind.FLUID) {
+                player.sendOverlayMessage(HatchReport.holding(hatch.tank()));
             } else {
                 giveFirstStack(hatch, player);
             }

@@ -104,6 +104,7 @@ public final class RailworksGameTests {
         ClearanceKeptTests.register(tests);
         FarAwayTests.register(tests);
         ElectricTests.register(tests);
+        FluidTests.register(tests);
     }
 
     private static Identifier id(String path) {
