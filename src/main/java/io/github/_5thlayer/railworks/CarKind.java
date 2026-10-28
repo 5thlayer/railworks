@@ -11,6 +11,7 @@ import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
+import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -34,6 +35,8 @@ public enum CarKind {
     private final Supplier<Car> create;
     private final Supplier<EntityType<? extends CarEntity>> entityType;
     private final Supplier<Item> item;
+    /** A car of this kind that no entity views, to ask a Train whether it takes one. */
+    private final Car sample;
 
     CarKind(String model, double length, Block preview, Supplier<Car> create,
             Supplier<EntityType<? extends CarEntity>> entityType, Supplier<Item> item) {
@@ -43,6 +46,7 @@ public enum CarKind {
         this.create = create;
         this.entityType = entityType;
         this.item = item;
+        this.sample = create.get();
     }
 
     /** A kind as it is saved: its model car's {@link Car#kind()}. */
@@ -78,6 +82,11 @@ public enum CarKind {
     /** A new car of this kind, for a new entity to view. */
     Car create() {
         return create.get();
+    }
+
+    /** Whether a car of this kind coupled at {@code end} of {@code train} keeps its Locomotives at its ends. */
+    boolean takenAt(Train train, Train.End end) {
+        return train.takes(end, sample);
     }
 
     EntityType<? extends CarEntity> entityType() {
