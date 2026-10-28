@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "railworks:block/charger/top",
+    "bottom": "railworks:block/charger/bottom",
+    "side": "railworks:block/charger/sides"
+  }
+}

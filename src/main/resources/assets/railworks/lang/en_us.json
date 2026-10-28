@@ -132,5 +132,18 @@
   "railworks.gallery.far_away": "Far Away",
   "railworks.gallery.far_away.1": "Its Train runs",
   "railworks.gallery.far_away.2": "on out of view",
-  "railworks.gallery.far_away.3": "and comes back"
+  "railworks.gallery.far_away.3": "and comes back",
+  "item.railworks.electric_locomotive": "Electric Locomotive",
+  "entity.railworks.electric_locomotive": "Electric Locomotive",
+  "menu.railworks.locomotive.charge": "Charge: %s / %s FE",
+  "block.railworks.charger": "Charger",
+  "item.railworks.charger": "Charger",
+  "block.railworks.creative_charger": "Creative Charger",
+  "item.railworks.creative_charger": "Creative Charger",
+  "message.railworks.charger_off_platform": "A Charger goes beside a Station's platform, at a car's floor beside a car spot or the leading car",
+  "block.railworks.burner_generator": "Burner Generator",
+  "railworks.gallery.charge": "Charge",
+  "railworks.gallery.charge.1": "A Charger fills",
+  "railworks.gallery.charge.2": "the Electric",
+  "railworks.gallery.charge.3": "Train standing by"
 }

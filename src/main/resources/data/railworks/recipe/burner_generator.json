@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ICI",
+    "CFC",
+    "ICI"
+  ],
+  "key": {
+    "I": "#c:ingots/iron",
+    "C": "#c:ingots/copper",
+    "F": "minecraft:furnace"
+  },
+  "result": {
+    "id": "railworks:burner_generator",
+    "count": 1
+  }
+}

@@ -80,7 +80,7 @@ final class LogisticsTests {
     /** North of the west leg, serving Trains heading west: its first car spot beside x 2 and 3. */
     private static final BlockPos MINE = new BlockPos(0, 1, 2);
     /** South of the east leg at the line's end, serving Trains heading east: its first car spot beside x 9 and 10. */
-    private static final BlockPos DEPOT = new BlockPos(12, 1, 6);
+    static final BlockPos DEPOT = new BlockPos(12, 1, 6);
     private static final BlockPos PROVIDER = new BlockPos(3, 2, 2);
     private static final BlockPos REQUESTER = new BlockPos(9, 2, 6);
 
@@ -378,7 +378,7 @@ final class LogisticsTests {
     }
 
     /** A block beside the leading car's place of the Station at {@code station}, clear of the Station's own. */
-    private static BlockPos besideTheLeadingCar(GameTestHelper helper, BlockPos station) {
+    static BlockPos besideTheLeadingCar(GameTestHelper helper, BlockPos station) {
         var network = LevelRails.of(helper.getLevel()).network();
         BlockPos at = helper.absolutePos(station);
         return LevelStations.of(helper.getLevel()).stations().all().stream()
@@ -456,7 +456,7 @@ final class LogisticsTests {
      * The {@link #LINE}, the structure's roof cleared over it, its chunks loaded for the Train's entities
      * to tick: only the structure's are, and the line runs out past it. Its last Span, the east leg.
      */
-    private static Span line(GameTestHelper helper) {
+    static Span line(GameTestHelper helper) {
         forceLoad(helper, true);
         for (BlockPos pylon : LINE) {
             helper.setBlock(pylon, RailworksRegistries.PYLON.get().defaultBlockState());
@@ -477,7 +477,7 @@ final class LogisticsTests {
     }
 
     /** Forces the chunks under the {@link #LINE} loaded, or lets them go. */
-    private static void forceLoad(GameTestHelper helper, boolean forced) {
+    static void forceLoad(GameTestHelper helper, boolean forced) {
         BlockPos west = helper.absolutePos(new BlockPos(-1, 1, 2));
         BlockPos east = helper.absolutePos(new BlockPos(13, 1, 6));
         for (int cx = Math.min(west.getX(), east.getX()) >> 4; cx <= Math.max(west.getX(), east.getX()) >> 4; cx++) {

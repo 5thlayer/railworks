@@ -9,6 +9,9 @@ import io.github._5thlayer.railworks.StatusLine;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import java.text.NumberFormat;
+import java.util.Locale;
+
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
@@ -23,6 +26,9 @@ import org.jspecify.annotations.Nullable;
  * its Train beside them, and the Train's status line under the row, the items it names drawn after
  * its words as icons with their counts. The mode and the status line are the Locomotive entity's
  * synched data, so they follow the server while the menu is open.
+ *
+ * <p>An Electric Locomotive's menu draws a charge gauge across the fuel slots' columns instead, the
+ * share of its capacity its charge holds, and names both in FE when hovered.
  * Placeholder.
  */
 public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMenu> {
@@ -40,6 +46,10 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
     private static final int STATUS_HEIGHT = 18;
     /** The status line's top, under the row. */
     private static final int STATUS_TOP = 17 + 18;
+    /** The charge gauge's frame, its empty part and its charge. */
+    private static final int GAUGE_FRAME = 0xFF373737;
+    private static final int GAUGE_EMPTY = 0xFF8B8B8B;
+    private static final int GAUGE_CHARGE = 0xFFD8913A;
 
     private Button automatic;
 
@@ -87,6 +97,10 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
         if (car == null) {
             return;
         }
+        if (menu.electric()) {
+            int percent = (int) Math.floor(100.0 * share(car));
+            graphics.centeredText(font, percent + "%", 7 + FUEL_COLUMNS * 9, 17 + (18 - font.lineHeight) / 2 + 1, 0xFFFFFFFF);
+        }
         Component status = car.statusSeen();
         int textY = STATUS_TOP + (STATUS_HEIGHT - font.lineHeight) / 2 + 1;
         graphics.text(font, status, 8, textY, LABEL, false);
@@ -98,6 +112,26 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
         }
         if (car.statusMoreSeen() > 0) {
             graphics.text(font, StatusLine.more(car.statusMoreSeen()), x, textY, LABEL, false);
+        }
+    }
+
+    /** What share of its capacity an Electric Locomotive's charge holds, 0 to 1. */
+    private static double share(LocomotiveEntity car) {
+        long capacity = car.chargeCapacitySeen();
+        return capacity <= 0L ? 0.0 : Math.clamp((double) car.chargeSeen() / capacity, 0.0, 1.0);
+    }
+
+    /** Hovering an Electric Locomotive's gauge names its charge and capacity in FE. */
+    @Override
+    protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        super.extractTooltip(graphics, mouseX, mouseY);
+        LocomotiveEntity car = car();
+        int x = mouseX - leftPos;
+        int y = mouseY - topPos;
+        if (menu.electric() && car != null && x >= 7 && x < 7 + FUEL_COLUMNS * 18 && y >= 17 && y < 17 + 18) {
+            NumberFormat fe = NumberFormat.getIntegerInstance(Locale.ROOT);
+            graphics.setTooltipForNextFrame(Component.translatable("menu.railworks.locomotive.charge",
+                    fe.format(car.chargeSeen()), fe.format(car.chargeCapacitySeen())), mouseX, mouseY);
         }
     }
 
@@ -114,9 +148,20 @@ public final class LocomotiveScreen extends AbstractContainerScreen<LocomotiveMe
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, left, top + STATUS_TOP + half, 0.0F, 4.0F, this.imageWidth, STATUS_HEIGHT - half, 256, 256);
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, left, top + STATUS_TOP + STATUS_HEIGHT, 0.0F, 126.0F, this.imageWidth, 96, 256, 256);
         for (int column = 0; column < ROW_SLOTS; column++) {
-            if (column >= FUEL_COLUMNS) {
+            if (column >= FUEL_COLUMNS || menu.electric()) {
                 graphics.fill(left + 7 + column * 18, top + 17, left + 7 + (column + 1) * 18, top + 17 + 18, PANEL);
             }
+        }
+        LocomotiveEntity car = car();
+        if (menu.electric() && car != null) {
+            int x0 = left + 7;
+            int y0 = top + 17;
+            int x1 = x0 + FUEL_COLUMNS * 18;
+            int y1 = y0 + 18;
+            graphics.fill(x0, y0, x1, y1, GAUGE_FRAME);
+            graphics.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, GAUGE_EMPTY);
+            int filled = (int) Math.round((x1 - x0 - 2) * share(car));
+            graphics.fill(x0 + 1, y0 + 1, x0 + 1 + filled, y1 - 1, GAUGE_CHARGE);
         }
     }
 }

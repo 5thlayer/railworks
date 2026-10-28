@@ -55,6 +55,10 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         return new CarRenderer<>(context, CarBody.LOCOMOTIVE);
     }
 
+    public static <T extends CarEntity> CarRenderer<T> electric(EntityRendererProvider.Context context) {
+        return new CarRenderer<>(context, CarBody.ELECTRIC);
+    }
+
     public static <T extends CarEntity> CarRenderer<T> cargo(EntityRendererProvider.Context context) {
         return new CarRenderer<>(context, CarBody.CARGO);
     }

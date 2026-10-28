@@ -44,6 +44,7 @@ class LogisticsTest {
     private final RailNetwork network = new RailNetwork();
     private final Trains trains = new Trains();
     private final List<Logistics.Hatch<String>> hatches = new ArrayList<>();
+    private final List<Logistics.Charger> chargers = new ArrayList<>();
     private final FakeGoods goods = new FakeGoods();
     private final Logistics<String> logistics = new Logistics<>();
     private int nextHatch;
@@ -59,6 +60,7 @@ class LogisticsTest {
         LocomotiveSpec.configure(LocomotiveSpec.DEFAULT_MAX_SPEED, LocomotiveSpec.DEFAULT_ACCELERATION,
                 LocomotiveSpec.DEFAULT_BRAKING, LocomotiveSpec.DEFAULT_FRICTION);
         Logistics.configure(Logistics.DEFAULT_HATCH_TICKS_PER_STACK, Logistics.DEFAULT_STALL_SECONDS);
+        ChargeSpec.reset();
     }
 
     // ---- the network ----
@@ -116,11 +118,47 @@ class LogisticsTest {
         return hatch;
     }
 
+    // ---- the Chargers ----
+
+    /** A Charger beside {@code spot} of {@code station}, its buffer holding {@code fe}. */
+    private Logistics.Charger charger(Station station, int spot, long fe) {
+        Logistics.Charger charger = new Logistics.Charger(nextHatch++, 0, 0, station, spot, false);
+        chargers.add(charger);
+        goods.buffers.put(charger.x(), fe);
+        return charger;
+    }
+
+    private Logistics.Charger creativeCharger(Station station, int spot) {
+        Logistics.Charger charger = new Logistics.Charger(nextHatch++, 0, 0, station, spot, true);
+        chargers.add(charger);
+        return charger;
+    }
+
+    /** An Electric Locomotive whose charge holds {@code fe}. */
+    private Locomotive electric(long fe) {
+        Locomotive locomotive = Locomotive.electric();
+        goods.charges.put(locomotive.id(), fe);
+        return locomotive;
+    }
+
+    /** An Electric Locomotive facing C with {@code cargo} Cargo cars behind it, its charge {@code fe}, its middle {@code x} blocks from A. */
+    private Train electricEastbound(double x, int cargo, long fe) {
+        List<Car> cars = new ArrayList<>(List.of(electric(fe)));
+        for (int i = 0; i < cargo; i++) {
+            cars.add(CargoCar.create());
+        }
+        return automatic(Train.of(onLine(x), cars));
+    }
+
+    private Locomotive first(Train train) {
+        return (Locomotive) train.cars().getFirst();
+    }
+
     // ---- running it ----
 
     /** One server tick: the logistics, then each automatic Train driven. */
     private void step() {
-        logistics.tick(network, trains, hatches, goods);
+        logistics.tick(network, trains, hatches, chargers, goods);
         for (Train train : trains.all()) {
             if (train.automatic()) {
                 logistics.drive(network, train, goods, goods::ignite, trains.takenFrom(network, train));
@@ -668,6 +706,146 @@ class LogisticsTest {
         runUntil(() -> goods.fuel(locomotive, "coal") > 0, "fuelled waiting");
     }
 
+    // ---- charge ----
+
+    @Test
+    void aChargerChargesTheElectricLocomotiveBesideItATrainAtRestManualToo() {
+        line();
+        Logistics.Charger quarry = charger(QUARRY, Platform.LEADING, 1_000_000L);
+        // Its Locomotive at the Quarry's leading car's place.
+        Train train = electricEastbound(8.5, 1, 0L);
+        train.setAutomatic(false);
+        step();
+        assertEquals(10_000L, goods.charge(first(train)), "the Charger's rate on the first tick");
+        runFor(9);
+        assertEquals(100_000L, goods.charge(first(train)));
+        assertEquals(900_000L, goods.buffers.get(quarry.x()));
+    }
+
+    @Test
+    void anAutomaticTrainWaitingAtAStationIsChargedUntilFull() {
+        line();
+        charger(QUARRY, Platform.LEADING, 20_000_000L);
+        Train train = electricEastbound(8.5, 1, ChargeSpec.locomotiveCapacity() - 25_000L);
+        runFor(3);
+        assertEquals(ChargeSpec.locomotiveCapacity(), goods.charge(first(train)), "two ticks at the rate, the third topping it up");
+    }
+
+    @Test
+    void aCreativeChargerFillsItInOneTickAndNeverRunsOut() {
+        line();
+        creativeCharger(QUARRY, Platform.LEADING);
+        Train train = electricEastbound(8.5, 1, 0L);
+        train.setAutomatic(false);
+        step();
+        assertEquals(ChargeSpec.locomotiveCapacity(), goods.charge(first(train)));
+    }
+
+    @Test
+    void severalChargersBesideOneLocomotiveAllGive() {
+        line();
+        charger(QUARRY, Platform.LEADING, 1_000_000L);
+        charger(QUARRY, Platform.LEADING, 1_000_000L);
+        Train train = electricEastbound(8.5, 1, 0L);
+        step();
+        assertEquals(20_000L, goods.charge(first(train)));
+    }
+
+    @Test
+    void aChargerBesideACargoCarOrABurnerLocomotiveGivesNothing() {
+        line();
+        Logistics.Charger besideTheBurner = charger(QUARRY, Platform.LEADING, 1_000_000L);
+        Logistics.Charger besideTheCargo = charger(QUARRY, 0, 1_000_000L);
+        eastbound(8.5, 1);
+        runFor(50);
+        assertEquals(1_000_000L, goods.buffers.get(besideTheBurner.x()));
+        assertEquals(1_000_000L, goods.buffers.get(besideTheCargo.x()));
+    }
+
+    @Test
+    void aTrainOnItsWayHeldAtAnotherStationTakesNoChargeThere() {
+        line();
+        // South of the line, serving Trains heading for C: the leading car at 18.5, a block short of B.
+        Station siding = new Station(19, 6, 1, "Siding");
+        charger(siding, Platform.LEADING, 1_000_000L);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = electricEastbound(5.0, 1, 1_000_000L);
+        goods.put(cargo(train, 1), "iron", 10);
+        // A Train on the Span from B, so it is held at B on its way to deliver, by the Siding.
+        trains.add(Train.of(onLine(30.0), fuelled()));
+        runUntil(() -> train.atRest() && train.head().toFront() == 1.0, "held at B");
+        long held = goods.charge(first(train));
+        runFor(100);
+        assertEquals(Logistics.Kind.TO_UNLOAD, kind(train));
+        assertEquals(held, goods.charge(first(train)), "on its way, not at its job's Station");
+        // Its requester gone, it waits there holding, and is charged.
+        hatches.remove(depot);
+        runUntil(() -> goods.charge(first(train)) > held, "charged waiting");
+    }
+
+    @Test
+    void aTrainOnAJobWaitsWhileChargeFlowsAndLeavesOnceFull() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        requester(DEPOT, 0, "iron", 1);
+        charger(QUARRY, Platform.LEADING, 20_000_000L);
+        // Short of full by far more than one hatch turn tops up, and far more than the stall.
+        Train train = electricEastbound(3.0, 1, ChargeSpec.locomotiveCapacity() - 2_000_000L);
+        runUntil(() -> kind(train) == Logistics.Kind.LOADING, "at the Quarry");
+        int waited = runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded and charged");
+        assertTrue(waited > 200, "it waited " + waited + " ticks, not for its charge");
+        assertEquals(64, goods.held(cargo(train, 1), "iron"));
+        // Full as it left, less the tick it set off on.
+        assertTrue(goods.charge(first(train)) >= ChargeSpec.locomotiveCapacity() - 300L,
+                "it left with " + goods.charge(first(train)) + " FE");
+    }
+
+    @Test
+    void aTrainOnAJobLeavesOnceNothingFlows() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        requester(DEPOT, 0, "iron", 1);
+        // A Charger with little in it and nothing coming in.
+        Logistics.Charger quarry = charger(QUARRY, Platform.LEADING, 5_000L);
+        Train train = electricEastbound(3.0, 1, 1_000_000L);
+        runUntil(() -> kind(train) == Logistics.Kind.LOADING, "at the Quarry");
+        int waited = runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
+        assertEquals(0L, goods.buffers.get(quarry.x()), "it took what the Charger had");
+        assertTrue(waited < Logistics.stallSeconds() * LocomotiveSpec.TICKS_PER_SECOND,
+                "it waited " + waited + " ticks, as long as the stall");
+    }
+
+    @Test
+    void anElectricTrainWithNoChargeTakesNoJobUntilItIsCharged() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = electricEastbound(8.5, 1, 0L);
+        runFor(3 * Logistics.PLAN_TICKS);
+        assertEquals(Logistics.Kind.WAITING, kind(train), "it cannot pull, so no job is planned for it");
+        charger(QUARRY, Platform.LEADING, 1_000_000L);
+        runUntil(() -> goods.held(depot, "iron") == 64, "charged and delivered");
+    }
+
+    @Test
+    void anElectricTrainSpendsItsChargeOnItsJobsAThreeHundredFeTickAtFullPower() {
+        line();
+        provider(QUARRY, 0, "iron", 64);
+        Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
+        Train train = electricEastbound(3.0, 1, 1_000_000L);
+        int powered = 0;
+        for (int tick = 0; tick < BUDGET && goods.held(depot, "iron") < 64; tick++) {
+            long before = goods.charge(first(train));
+            step();
+            long spent = before - goods.charge(first(train));
+            assertTrue(spent == 0L || spent == 300L, "spent " + spent + " FE in a tick");
+            powered += spent > 0L ? 1 : 0;
+        }
+        assertEquals(64, goods.held(depot, "iron"));
+        assertEquals(1_000_000L - 300L * powered, goods.charge(first(train)));
+        assertTrue(powered > 0);
+    }
+
     // ---- claims break ----
 
     @Test
@@ -963,6 +1141,9 @@ class LogisticsTest {
         private final Map<Integer, Map<String, Long>> inHatches = new HashMap<>();
         private final Map<UUID, Map<String, Long>> inCars = new HashMap<>();
         private final Map<UUID, Map<String, Long>> inLocomotives = new HashMap<>();
+        /** Each Electric Locomotive's charge, and each Charger's buffer by its x, in FE. */
+        final Map<UUID, Long> charges = new HashMap<>();
+        final Map<Integer, Long> buffers = new HashMap<>();
         int slots = 27;
         long hatchRoom = Long.MAX_VALUE / 4;
 
@@ -1089,6 +1270,33 @@ class LogisticsTest {
         @Override
         public boolean slotsFuelled(Locomotive locomotive) {
             return inLocomotives.getOrDefault(locomotive.id(), Map.of()).values().stream().anyMatch(count -> count > 0);
+        }
+
+        @Override
+        public long charge(Locomotive locomotive) {
+            return locomotive.isElectric() ? charges.getOrDefault(locomotive.id(), 0L) : 0L;
+        }
+
+        @Override
+        public boolean spendCharge(Locomotive locomotive, long fe) {
+            long held = charge(locomotive);
+            if (held < fe) {
+                return false;
+            }
+            charges.put(locomotive.id(), held - fe);
+            return true;
+        }
+
+        @Override
+        public long charge(Logistics.Charger from, Locomotive into, long most) {
+            long room = ChargeSpec.locomotiveCapacity() - charge(into);
+            long buffer = from.creative() ? Long.MAX_VALUE : buffers.getOrDefault(from.x(), 0L);
+            long moved = Math.max(0L, Math.min(most, Math.min(room, buffer)));
+            if (!from.creative()) {
+                buffers.put(from.x(), buffer - moved);
+            }
+            charges.put(into.id(), charge(into) + moved);
+            return moved;
         }
     }
 }

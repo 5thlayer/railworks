@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CRC",
+    "RLR",
+    "CRC"
+  ],
+  "key": {
+    "C": "#c:ingots/copper",
+    "R": "#c:dusts/redstone",
+    "L": "railworks:burner_locomotive"
+  },
+  "result": {
+    "id": "railworks:electric_locomotive",
+    "count": 1
+  }
+}

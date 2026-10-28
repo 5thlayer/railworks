@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import io.github._5thlayer.railworks.rail.Car;
+import io.github._5thlayer.railworks.rail.ChargeSpec;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.LocomotiveSpec;
 import io.github._5thlayer.railworks.rail.Logistics;
@@ -29,10 +30,14 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
+import net.neoforged.neoforge.transfer.TransferPreconditions;
+import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Burner Locomotive in the world: the view of its {@link Locomotive}, a car in a {@link Train}.
+ * A Locomotive in the world, Burner or Electric as its entity type says: the view of its
+ * {@link Locomotive}, a car in a {@link Train}.
  * The model runs the drive and holds the joule fuel (the car's); this entity feeds it the driver's
  * keys and the fuel slots, and mirrors the fuel, its Train's mode and its status line that a client
  * shows (its menu and Jade) into synched data. Its {@link Locomotive#FUEL_SLOTS} fuel slots each hold
@@ -41,6 +46,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Fuel in hand fills the fuel slots rather than boarding, as a provider beside it at a Station
  * does (ADR 0008); the rest is {@link CarEntity}'s.
+ *
+ * <p>An Electric Locomotive has no fuel slots: its record holds its charge of FE instead, which only
+ * a Charger beside it at a Station fills (ADR 0005, amended in #9). It mirrors the charge into
+ * synched data for its menu's gauge, and its energy handler ({@link #charge()}) is a read-only window
+ * onto it, refusing every insert and extract, so Jade's own energy display shows it.
  */
 public final class LocomotiveEntity extends CarEntity {
 
@@ -58,6 +68,12 @@ public final class LocomotiveEntity extends CarEntity {
             .toList();
     private static final EntityDataAccessor<Integer> DATA_STATUS_MORE =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Long> DATA_CHARGE =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Long> DATA_CHARGE_CAPACITY =
+            SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.LONG);
+
+    private final EnergyHandler charge = new ChargeView();
 
     public LocomotiveEntity(EntityType<? extends LocomotiveEntity> type, Level level) {
         super(type, level);
@@ -65,7 +81,12 @@ public final class LocomotiveEntity extends CarEntity {
 
     @Override
     public CarKind carKind() {
-        return CarKind.LOCOMOTIVE;
+        return electric() ? CarKind.ELECTRIC_LOCOMOTIVE : CarKind.LOCOMOTIVE;
+    }
+
+    /** Whether it is an Electric Locomotive's view, which a client knows from its type. */
+    public boolean electric() {
+        return getType() == RailworksRegistries.ELECTRIC_LOCOMOTIVE_ENTITY.get();
     }
 
     /** Its car, on the server. */
@@ -81,6 +102,30 @@ public final class LocomotiveEntity extends CarEntity {
 
     public long fuelCapacityJoules() {
         return entityData.get(DATA_FUEL_CAPACITY);
+    }
+
+    /** An Electric Locomotive's charge, in FE, as the server last synced it. */
+    public long chargeSeen() {
+        return entityData.get(DATA_CHARGE);
+    }
+
+    /** How many FE an Electric Locomotive's charge holds at most, as the server last synced it. */
+    public long chargeCapacitySeen() {
+        return entityData.get(DATA_CHARGE_CAPACITY);
+    }
+
+    /**
+     * An Electric Locomotive's energy handler, on every side: its charge, its record's on the server
+     * and as last synced on a client, read only. Nothing charges it but a Charger beside it at a
+     * Station, and nothing takes from it but its own drive.
+     */
+    public EnergyHandler charge() {
+        return charge;
+    }
+
+    /** On the server, its charge: its record's in the level's {@link CarRecords}. */
+    long recordCharge() {
+        return record() instanceof CarRecords.Contents contents ? contents.charge() : 0L;
     }
 
     /** Whether its Train is automatic, as the server last synced it. */
@@ -108,6 +153,10 @@ public final class LocomotiveEntity extends CarEntity {
         if (car instanceof Locomotive locomotive) {
             entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
             entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
+        }
+        if (electric()) {
+            entityData.set(DATA_CHARGE, recordCharge());
+            entityData.set(DATA_CHARGE_CAPACITY, ChargeSpec.locomotiveCapacity());
         }
         entityData.set(DATA_AUTOMATIC, train.automatic());
         Logistics.Status<Item> status = LevelRails.of(level).status(level, train);
@@ -180,10 +229,10 @@ public final class LocomotiveEntity extends CarEntity {
 
     // ---- using it ----
 
-    /** Fuel in hand fills the slots as a shortcut; fuel they cannot take boards instead. */
+    /** Fuel in hand fills a Burner's slots as a shortcut; fuel they cannot take boards instead, as anything does an Electric. */
     @Override
     protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
-        if (fuelValue(level(), held) > 0L && fuel().roomFor(held) > 0) {
+        if (!electric() && fuelValue(level(), held) > 0L && fuel().roomFor(held) > 0) {
             if (!level().isClientSide()) {
                 held.shrink(fuel().add(held));
             }
@@ -196,7 +245,7 @@ public final class LocomotiveEntity extends CarEntity {
     @Override
     public void openCustomInventoryScreen(Player player) {
         open(player, new SimpleMenuProvider((id, inventory, opener) -> new LocomotiveMenu(id, inventory, record(), this),
-                Component.translatable("entity.railworks.burner_locomotive")));
+                getType().getDescription()));
     }
 
     /** Switches its Train between automatic and manual, as the menu's toggle does; false for a car no Train holds. */
@@ -215,7 +264,7 @@ public final class LocomotiveEntity extends CarEntity {
 
     @Override
     protected Item getDropItem() {
-        return RailworksRegistries.LOCOMOTIVE.get();
+        return electric() ? RailworksRegistries.ELECTRIC_LOCOMOTIVE.get() : RailworksRegistries.LOCOMOTIVE.get();
     }
 
     // ---- saving ----
@@ -229,11 +278,14 @@ public final class LocomotiveEntity extends CarEntity {
         entityData.define(DATA_STATUS, Component.empty());
         DATA_STATUS_ICONS.forEach(icon -> entityData.define(icon, ItemStack.EMPTY));
         entityData.define(DATA_STATUS_MORE, 0);
+        entityData.define(DATA_CHARGE, 0L);
+        entityData.define(DATA_CHARGE_CAPACITY, ChargeSpec.DEFAULT_LOCOMOTIVE_CAPACITY);
     }
 
+    /** A Burner's fuel slots; an Electric's record holds no slots, only its charge. */
     @Override
     protected int recordSlots() {
-        return LocomotiveMenu.CAB_SLOTS;
+        return electric() ? 0 : LocomotiveMenu.CAB_SLOTS;
     }
 
     @Override
@@ -251,6 +303,32 @@ public final class LocomotiveEntity extends CarEntity {
                     () -> input.read("locomotive", Train.LEGACY_LOCOMOTIVE_CODEC).ifPresent(train -> adoptLegacy(train, 0, held)));
         } else {
             cab.ifPresent(this::takeSaved);
+        }
+    }
+
+    /** An Electric Locomotive's charge as an energy handler: shown, never filled or drawn through it. */
+    private final class ChargeView implements EnergyHandler {
+
+        @Override
+        public long getAmountAsLong() {
+            return level() instanceof ServerLevel ? recordCharge() : chargeSeen();
+        }
+
+        @Override
+        public long getCapacityAsLong() {
+            return level() instanceof ServerLevel ? ChargeSpec.locomotiveCapacity() : chargeCapacitySeen();
+        }
+
+        @Override
+        public int insert(int amount, TransactionContext transaction) {
+            TransferPreconditions.checkNonNegative(amount);
+            return 0;
+        }
+
+        @Override
+        public int extract(int amount, TransactionContext transaction) {
+            TransferPreconditions.checkNonNegative(amount);
+            return 0;
         }
     }
 }

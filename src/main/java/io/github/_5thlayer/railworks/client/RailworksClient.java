@@ -25,10 +25,13 @@ public final class RailworksClient {
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(RailworksRegistries.LOCOMOTIVE_MENU.get(), LocomotiveScreen::new);
+        event.register(RailworksRegistries.ELECTRIC_LOCOMOTIVE_MENU.get(), LocomotiveScreen::new);
+        event.register(RailworksRegistries.BURNER_GENERATOR_MENU.get(), BurnerGeneratorScreen::new);
     }
 
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(RailworksRegistries.LOCOMOTIVE_ENTITY.get(), CarRenderer::locomotive);
+        event.registerEntityRenderer(RailworksRegistries.ELECTRIC_LOCOMOTIVE_ENTITY.get(), CarRenderer::electric);
         event.registerEntityRenderer(RailworksRegistries.CARGO_CAR_ENTITY.get(), CarRenderer::cargo);
         event.registerBlockEntityRenderer(RailworksRegistries.PYLON_ENTITY.get(), context -> new SpanRenderer());
         event.registerBlockEntityRenderer(RailworksRegistries.HATCH_ENTITY.get(), context -> new HatchRenderer());

@@ -11,6 +11,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -24,6 +25,9 @@ import org.jspecify.annotations.Nullable;
  * entity id goes to the client in two of the menu's data slots, each sending a short, so the
  * client's screen reads the Train's mode and status line from the entity's synched data, and the
  * toggle is a menu button.
+ *
+ * <p>An Electric Locomotive's menu, a menu type of its own, has no cab slots: its screen draws a
+ * charge gauge where the fuel slots would be, from the entity's synched charge.
  */
 public final class LocomotiveMenu extends AbstractContainerMenu {
 
@@ -41,14 +45,16 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     private static final int INVENTORY_Y = 67;
 
     private final Container cab;
+    private final boolean electric;
     private final @Nullable LocomotiveEntity car;
     /** The Locomotive's entity id, low half then high half, as the menu's data slots send it. */
     private final ContainerData carId;
 
-    /** The server's menu, over the car's fuel slots, its record in the level's {@link CarRecords}. */
+    /** The server's menu, over the car's fuel slots, its record in the level's {@link CarRecords}; an Electric's has none. */
     public LocomotiveMenu(int containerId, Inventory inventory, Container cab, LocomotiveEntity car) {
-        super(RailworksRegistries.LOCOMOTIVE_MENU.get(), containerId);
+        super(type(car.electric()), containerId);
         this.cab = cab;
+        this.electric = car.electric();
         this.car = car;
         int id = car.getId();
         this.carId = new SimpleContainerData(2);
@@ -62,11 +68,35 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
      * id once the server sends it: the server decides when the menu closes.
      */
     public LocomotiveMenu(int containerId, Inventory inventory) {
-        super(RailworksRegistries.LOCOMOTIVE_MENU.get(), containerId);
-        this.cab = new SimpleContainer(CAB_SLOTS);
+        this(containerId, inventory, false);
+    }
+
+    /** An Electric Locomotive's client menu, with no cab slots. */
+    public static LocomotiveMenu electric(int containerId, Inventory inventory) {
+        return new LocomotiveMenu(containerId, inventory, true);
+    }
+
+    private LocomotiveMenu(int containerId, Inventory inventory, boolean electric) {
+        super(type(electric), containerId);
+        this.cab = new SimpleContainer(electric ? 0 : CAB_SLOTS);
+        this.electric = electric;
         this.car = null;
         this.carId = new SimpleContainerData(2);
         addSlots(inventory);
+    }
+
+    private static MenuType<LocomotiveMenu> type(boolean electric) {
+        return electric ? RailworksRegistries.ELECTRIC_LOCOMOTIVE_MENU.get() : RailworksRegistries.LOCOMOTIVE_MENU.get();
+    }
+
+    /** Whether it is an Electric Locomotive's, with no cab slots. */
+    public boolean electric() {
+        return electric;
+    }
+
+    /** How many of its slots are the cab's, before the player's inventory. */
+    private int cabSlots() {
+        return electric ? 0 : CAB_SLOTS;
     }
 
     /** The Locomotive's entity id, as the server sent it; 0 on a client until it arrives. */
@@ -81,9 +111,9 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
     }
 
     private void addSlots(Inventory inventory) {
-        checkContainerSize(cab, CAB_SLOTS);
+        checkContainerSize(cab, cabSlots());
         Level level = inventory.player.level();
-        for (int fuel = 0; fuel < Locomotive.FUEL_SLOTS; fuel++) {
+        for (int fuel = 0; fuel < cabSlots(); fuel++) {
             addSlot(new Slot(cab, FUEL + fuel, FUEL_X + fuel * 18, FUEL_Y) {
                 @Override
                 public boolean mayPlace(ItemStack stack) {
@@ -112,9 +142,9 @@ public final class LocomotiveMenu extends AbstractContainerMenu {
         }
         ItemStack stack = slot.getItem();
         ItemStack before = stack.copy();
-        boolean moved = slotIndex < CAB_SLOTS
-                ? moveItemStackTo(stack, CAB_SLOTS, slots.size(), true)
-                : moveItemStackTo(stack, 0, CAB_SLOTS, false);
+        boolean moved = slotIndex < cabSlots()
+                ? moveItemStackTo(stack, cabSlots(), slots.size(), true)
+                : cabSlots() > 0 && moveItemStackTo(stack, 0, cabSlots(), false);
         if (!moved) {
             return ItemStack.EMPTY;
         }

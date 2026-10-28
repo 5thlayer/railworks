@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.ChargeSpec;
 import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Logistics;
@@ -24,7 +25,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * A level's goods as {@link Logistics} asks for them: a hatch's are its record in the level's
  * {@link LevelHatches}, and a Cargo car's and a Locomotive's fuel slots the car's record in its
- * {@link LevelCarRecords}, all there with their chunks unloaded (ADR 0008). Only a car whose view
+ * {@link LevelCarRecords}, all there with their chunks unloaded (ADR 0008), as are an Electric
+ * Locomotive's charge, its car's record too, and a Charger's buffer, its record in the level's
+ * {@link LevelChargers} (ADR 0005, amended in #9). Only a car whose view
  * has not yet made its record, one of a world saved before the level kept them whose entity has not
  * loaded since, holds nothing, has no room and is not empty. An item's kind is its {@link Item}, its
  * components ignored: a stack of it moves as it is, components and all.
@@ -216,6 +219,42 @@ final class LevelGoods implements Goods<Item> {
     public boolean slotsFuelled(Locomotive locomotive) {
         FuelSlots fuel = fuel(locomotive);
         return fuel != null && fuel.hasFuel();
+    }
+
+    @Override
+    public long charge(Locomotive locomotive) {
+        CarRecords.Contents record = record(locomotive);
+        return record == null ? 0L : record.charge();
+    }
+
+    @Override
+    public boolean spendCharge(Locomotive locomotive, long fe) {
+        CarRecords.Contents record = record(locomotive);
+        if (record == null || record.charge() < fe) {
+            return false;
+        }
+        record.setCharge(record.charge() - fe);
+        return true;
+    }
+
+    @Override
+    public long charge(Logistics.Charger from, Locomotive into, long most) {
+        CarRecords.Contents record = record(into);
+        Chargers.Charger charger = LevelChargers.of(level).at(new BlockPos(from.x(), from.y(), from.z())).orElse(null);
+        if (record == null || charger == null) {
+            return 0L;
+        }
+        long moved = Math.max(0L, Math.min(most, Math.min(ChargeSpec.locomotiveCapacity() - record.charge(), charger.held())));
+        if (moved > 0L) {
+            charger.take(moved);
+            record.setCharge(record.charge() + moved);
+        }
+        return moved;
+    }
+
+    /** {@code locomotive}'s record, for an Electric Locomotive only; null for a Burner, or one whose view has not made it. */
+    private CarRecords.@Nullable Contents record(Locomotive locomotive) {
+        return locomotive.isElectric() ? LevelCarRecords.of(level).of(locomotive.id()).orElse(null) : null;
     }
 
     private @Nullable ItemStacksResourceHandler hatchContents(Logistics.Hatch<Item> hatch) {

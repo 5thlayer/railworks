@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 public enum CarKind {
     LOCOMOTIVE(Locomotive.KIND, Locomotive.LENGTH, Blocks.FURNACE, Locomotive::burner,
             () -> RailworksRegistries.LOCOMOTIVE_ENTITY.get()),
+    ELECTRIC_LOCOMOTIVE(Locomotive.ELECTRIC_KIND, Locomotive.LENGTH, Blocks.COPPER_BLOCK, Locomotive::electric,
+            () -> RailworksRegistries.ELECTRIC_LOCOMOTIVE_ENTITY.get()),
     CARGO(CargoCar.KIND, CargoCar.LENGTH, Blocks.CHEST, CargoCar::create,
             () -> RailworksRegistries.CARGO_CAR_ENTITY.get());
 

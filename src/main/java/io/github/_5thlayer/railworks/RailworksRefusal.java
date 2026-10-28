@@ -5,7 +5,7 @@ package io.github._5thlayer.railworks;
 
 import io.github._5thlayer.groundworks.Refusal;
 
-/** Why a Pylon, a car, a Station or a hatch would not place. */
+/** Why a Pylon, a car, a Station, a hatch or a Charger would not place. */
 public enum RailworksRefusal implements Refusal {
     /** A Pylon aimed at a column whose next segment's position is occupied or past the build limit. */
     BLOCKED_TOP,
@@ -32,4 +32,6 @@ public enum RailworksRefusal implements Refusal {
     STATION_OVERLAPS,
     /** A hatch beside no car spot of a Station's platform, where it would join no Station. */
     HATCH_OFF_PLATFORM,
+    /** A Charger beside no car spot of a Station's platform, where it would join no Station. */
+    CHARGER_OFF_PLATFORM,
 }
