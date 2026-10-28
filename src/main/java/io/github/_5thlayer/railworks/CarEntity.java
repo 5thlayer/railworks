@@ -99,9 +99,11 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     private static final byte LAST = 2;
     private static final byte REVERSED = 4;
     private static final byte AT_REST = 8;
-    /** At its end of the Train, coupling a Locomotive, or a Cargo car, would leave a Locomotive between other cars. */
-    private static final byte REFUSES_LOCOMOTIVE = 16;
-    private static final byte REFUSES_CARGO = 32;
+    /**
+     * At its end of the Train, coupling a car of a kind would leave a Locomotive between other cars:
+     * this bit for the first {@link CarKind}, and one bit up for each after it.
+     */
+    private static final byte REFUSES = 16;
 
     private static final EntityDataAccessor<BlockPos> DATA_SPAN_A =
             SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -230,7 +232,12 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      * Locomotives at the Train's ends, as {@code Train.takes} says on the server.
      */
     boolean seenTaking(CarKind kind) {
-        return (links() & (kind == CarKind.LOCOMOTIVE ? REFUSES_LOCOMOTIVE : REFUSES_CARGO)) == 0;
+        return (links() & refuses(kind)) == 0;
+    }
+
+    /** The {@link #DATA_LINKS} bit saying its Train does not take a car of {@code kind} at this car's end. */
+    private static byte refuses(CarKind kind) {
+        return (byte) (REFUSES << kind.ordinal());
     }
 
     private byte links() {
@@ -333,11 +340,10 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if ((links & (FIRST | LAST)) != 0) {
             // A car at both ends is a Train of one, which takes either car at either end.
             Train.End end = (links & FIRST) != 0 ? Train.End.FRONT : Train.End.BACK;
-            if (!train.takes(end, true)) {
-                links |= REFUSES_LOCOMOTIVE;
-            }
-            if (!train.takes(end, false)) {
-                links |= REFUSES_CARGO;
+            for (CarKind kind : CarKind.values()) {
+                if (!kind.takenAt(train, end)) {
+                    links |= refuses(kind);
+                }
             }
         }
         entityData.set(DATA_LINKS, links);
@@ -373,7 +379,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (player.isSecondaryUseActive()) {
             return openMenu(player);
         }
-        if (held.is(Items.LEAD) && mobRider() instanceof Mob mob && mob instanceof Leashable leashable
+        if (held.is(Items.LEAD) && mobInBay() instanceof Mob mob && mob instanceof Leashable leashable
                 && leashable.canBeLeashed()) {
             if (!level().isClientSide()) {
                 leadOut(player, held, mob, leashable);
@@ -525,14 +531,14 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return getPassengers().stream().allMatch(passenger -> passenger == driver);
     }
 
-    /** Whether {@code passenger} sits in the cab, or got out of it, rather than the bay. */
-    private boolean inCab(Entity passenger) {
+    /** Whether {@code passenger} is the cab's player: its Driver, or the player who just got out of the cab. */
+    private boolean isCabPlayer(Entity passenger) {
         return passenger.getId() == entityData.get(DATA_CAB);
     }
 
     /** Whether {@code passenger} rides in a car's bay: what a client asks to draw them standing. */
     public static boolean standsInBay(Entity passenger) {
-        return passenger.getVehicle() instanceof CarEntity car && !car.inCab(passenger);
+        return passenger.getVehicle() instanceof CarEntity car && !car.isCabPlayer(passenger);
     }
 
     /**
@@ -542,7 +548,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      */
     @Override
     protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
-        if (inCab(passenger)) {
+        if (isCabPlayer(passenger)) {
             return turned(CarBody.CAB_SEAT);
         }
         return turned(CarBody.BAY_SPOT).add(passenger.getVehicleAttachmentPoint(this));
@@ -557,7 +563,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     @Override
     protected void positionRider(Entity passenger, MoveFunction moveFunction) {
         super.positionRider(passenger, moveFunction);
-        if (!(passenger instanceof Player) && !inCab(passenger)) {
+        if (!(passenger instanceof Player) && !isCabPlayer(passenger)) {
             passenger.setYRot(getYRot());
             passenger.setYHeadRot(getYRot());
             if (passenger instanceof LivingEntity living) {
@@ -578,7 +584,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      */
     @Override
     public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
-        CarBody.Point seat = inCab(passenger) ? CarBody.CAB_SEAT : CarBody.BAY_SPOT;
+        CarBody.Point seat = isCabPlayer(passenger) ? CarBody.CAB_SEAT : CarBody.BAY_SPOT;
         Vec3 along = Vec3.directionFromRotation(0.0F, getYRot());
         Vec3 right = new Vec3(-along.z, 0.0, along.x);
         // Toward the side the passenger looks; a mob faces ahead, and takes the right first.
@@ -655,7 +661,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      * rides it gets off.
      */
     void takeAway(ServerLevel level) {
-        Entity mob = mobRider();
+        Entity mob = mobInBay();
         CompoundTag rider = mob == null ? null : saved(mob);
         if (rider != null) {
             List<Entity> riding = mob.getSelfAndPassengers().toList();
@@ -667,8 +673,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         drop();
     }
 
-    /** The mob riding it, in the bay, not a player; null for none. */
-    private @Nullable Entity mobRider() {
+    /** Its Rider in the bay when that is a mob, not a player; null for none. */
+    private @Nullable Entity mobInBay() {
         return getPassengers().stream().filter(passenger -> !(passenger instanceof Player)).findFirst().orElse(null);
     }
 
@@ -677,7 +683,7 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      * no chunk saves it with the view, and it rides on when the server starts again.
      */
     void keepRider(ServerLevel level) {
-        Entity mob = mobRider();
+        Entity mob = mobInBay();
         setRider(level, mob == null ? null : saved(mob));
     }
 

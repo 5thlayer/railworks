@@ -292,19 +292,14 @@ public final class Train {
      * saved breaking the rule runs on, but takes no car.
      */
     public boolean takes(End end, Car car) {
-        return takes(end, car instanceof Locomotive);
-    }
-
-    /** Whether a Locomotive, or else a Cargo car, coupled at {@code end} keeps Locomotives at the Train's ends. */
-    public boolean takes(End end, boolean locomotive) {
         List<Boolean> makeup = new ArrayList<>(cars.size() + 1);
-        for (Car car : cars) {
-            makeup.add(car instanceof Locomotive);
+        for (Car coupled : cars) {
+            makeup.add(coupled instanceof Locomotive);
         }
         if (end == End.FRONT) {
-            makeup.addFirst(locomotive);
+            makeup.addFirst(car instanceof Locomotive);
         } else {
-            makeup.addLast(locomotive);
+            makeup.addLast(car instanceof Locomotive);
         }
         return locomotivesAtEnds(makeup);
     }

@@ -80,8 +80,9 @@ public final class PlatformsNear {
      * Where a hatch could go near {@code pos}, as a held hatch draws it, car spot by car spot: the
      * free blocks beside a spot of the platform of a Station near, empty enough to place in, those
      * on one side of the Rail as one box, two for a spot and three for the leading car's place, or
-     * each still free on its own when some are taken, falling half a car gap short of its spot's ends, so the spots read as the cars that will stand there. Those beside
-     * the leading car's place, where a provider fuels the Locomotive that usually leads, say so.
+     * each still free on its own when some are taken, falling half a car gap short of its spot's
+     * ends, so the spots read as the cars that will stand there. Those beside the leading car's
+     * place, where a provider fuels the Locomotive that usually leads, say so.
      */
     public static List<FreeSpot> freeSpots(Level level, BlockPos pos) {
         RailNetwork network = network(level);
