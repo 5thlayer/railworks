@@ -189,22 +189,24 @@ public final class LocomotiveEntity extends CarEntity {
         return fuelValue(level(), stack) > 0L && stack.getCraftingRemainder() == null ? fuelRoomFor(stack) : 0;
     }
 
-    /** Puts what fits of {@code stack} in its fuel slots, as fuel in hand fills them, and says how many went in. */
+    /**
+     * Puts what fits of {@code stack} in its fuel slots, those holding the same fuel first, then empty
+     * ones, and nowhere else in the cab; how many went in, {@code stack} itself left as it is.
+     */
     int addFuel(ItemStack stack) {
         int[] shares = shares(stack, stack.getCount());
         int added = 0;
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END; slot++) {
-            int share = shares[slot - LocomotiveMenu.FUEL];
-            if (share <= 0) {
+        for (int i = 0; i < Locomotive.FUEL_SLOTS; i++) {
+            if (shares[i] <= 0) {
                 continue;
             }
-            ItemStack in = cab.getItem(slot);
+            ItemStack in = cab.getItem(LocomotiveMenu.FUEL + i);
             if (in.isEmpty()) {
-                cab.setItem(slot, stack.copyWithCount(share));
+                cab.setItem(LocomotiveMenu.FUEL + i, stack.copyWithCount(shares[i]));
             } else {
-                in.grow(share);
+                in.grow(shares[i]);
             }
-            added += share;
+            added += shares[i];
         }
         if (added > 0) {
             cab.setChanged();
@@ -219,7 +221,7 @@ public final class LocomotiveEntity extends CarEntity {
     protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
         if (fuelValue(level(), held) > 0L && fuelRoomFor(held) > 0) {
             if (!level().isClientSide()) {
-                fillFuel(held);
+                held.shrink(addFuel(held));
             }
             return InteractionResult.SUCCESS;
         }
@@ -235,11 +237,6 @@ public final class LocomotiveEntity extends CarEntity {
         return room;
     }
 
-    /** Moves what fits of {@code held} into the fuel slots, and nowhere else in the cab. */
-    private void fillFuel(ItemStack held) {
-        held.shrink(addFuel(held));
-    }
-
     /**
      * How many of up to {@code count} of {@code stack} each fuel slot takes, those holding the same
      * fuel first, then empty ones.
@@ -247,17 +244,17 @@ public final class LocomotiveEntity extends CarEntity {
     private int[] shares(ItemStack stack, int count) {
         int[] shares = new int[Locomotive.FUEL_SLOTS];
         int left = count;
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && left > 0; slot++) {
-            ItemStack in = cab.getItem(slot);
+        for (int i = 0; i < Locomotive.FUEL_SLOTS && left > 0; i++) {
+            ItemStack in = cab.getItem(LocomotiveMenu.FUEL + i);
             if (!in.isEmpty() && ItemStack.isSameItemSameComponents(in, stack)) {
-                shares[slot - LocomotiveMenu.FUEL] = Math.min(in.getMaxStackSize() - in.getCount(), left);
-                left -= shares[slot - LocomotiveMenu.FUEL];
+                shares[i] = Math.min(in.getMaxStackSize() - in.getCount(), left);
+                left -= shares[i];
             }
         }
-        for (int slot = LocomotiveMenu.FUEL; slot < FUEL_END && left > 0; slot++) {
-            if (cab.getItem(slot).isEmpty()) {
-                shares[slot - LocomotiveMenu.FUEL] = Math.min(stack.getMaxStackSize(), left);
-                left -= shares[slot - LocomotiveMenu.FUEL];
+        for (int i = 0; i < Locomotive.FUEL_SLOTS && left > 0; i++) {
+            if (cab.getItem(LocomotiveMenu.FUEL + i).isEmpty()) {
+                shares[i] = Math.min(stack.getMaxStackSize(), left);
+                left -= shares[i];
             }
         }
         return shares;
