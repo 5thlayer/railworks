@@ -494,6 +494,9 @@ public final class LevelRails extends SavedData {
         if (outcome.result() == Stringing.Result.STRUNG || outcome.result() == Stringing.Result.CUT) {
             changed(level, from, to);
         }
+        if (outcome.result() == Stringing.Result.CUT) {
+            derailOffRail(level);
+        }
         return outcome;
     }
 
@@ -576,6 +579,20 @@ public final class LevelRails extends SavedData {
             refund -= part;
         }
         changed(level, cut.stream().flatMap(s -> Stream.of(s.a(), s.b())).toArray(Arm[]::new));
+        derailOffRail(level);
+    }
+
+    /**
+     * Each Train a Span was just cut under falls off the Rail now, not at the level's next tick, so a
+     * Span strung again in the same tick, as a command rebuilding a line strings it, is never held by
+     * a Train that is no longer on it.
+     */
+    private void derailOffRail(ServerLevel level) {
+        for (Train train : trains.all()) {
+            if (trains.of(train.cars().getFirst().id()) == train && !train.onRail(network)) {
+                derail(level, train);
+            }
+        }
     }
 
     /** Save, and resend each touched chunk's Spans to whoever watches it. */

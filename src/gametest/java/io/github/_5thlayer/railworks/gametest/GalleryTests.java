@@ -39,7 +39,7 @@ import net.minecraft.world.phys.Vec3;
  * strung and not joined. Beyond the build, the coupling scene's sign, clicked, builds it again,
  * leaving one Train and nothing loose, and the two logistics scenes are built working: each
  * requester's chest gets what it asks for, as the refuel scene's does once its dry Train is fuelled,
- * and the far-away scene's Train delivers at its far end out of view. How a Train plans and runs its jobs is the mechanics' own
+ * and the far-away scene's Train fetches ore from its far end out of view. How a Train plans and runs its jobs is the mechanics' own
  * game tests' to check, never the Gallery's. Each test turns the pack on, which reloads the server's
  * data, and off again, passing or failing, so each runs in a batch of its own.
  */
@@ -62,8 +62,9 @@ final class GalleryTests {
     private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(20, 0, -7);
     /** The refuel scene's provider of coal beside Mine's leading car's place, from where it is run. */
     private static final BlockPos LEADING_FUEL = new BlockPos(5, 2, -5);
-    /** The far-away scene's requester, at its line's far end, from where it is run. */
-    private static final BlockPos FAR_REQUESTER = new BlockPos(258, 2, -7);
+    /** The far-away scene's Mine, at its line's far end, and the chest under Smelter's requester by its plot, from where it is run. */
+    private static final BlockPos FAR_MINE = new BlockPos(260, 2, -5);
+    private static final BlockPos NEAR_CHEST = new BlockPos(7, 0, -5);
     /** The ends of the strip its line runs along, out past its plot, from where it is run. */
     private static final BlockPos FAR_WEST = new BlockPos(22, 0, -8);
     private static final BlockPos FAR_EAST = new BlockPos(262, 0, -4);
@@ -107,8 +108,9 @@ final class GalleryTests {
                 GalleryCheck.TICKS, GalleryTests::logisticsDeliver);
         tests.testOnItsOwn("refuel_the_gallery_scene_fuels_its_dry_train_which_then_delivers",
                 GalleryCheck.TICKS, GalleryTests::refuelDelivers);
-        tests.testOnItsOwn("far_the_gallery_scene_runs_its_train_out_of_view_to_deliver_at_the_far_end",
-                GalleryCheck.TICKS, GalleryTests::farAwayDelivers);
+        // Its Train runs out 240 blocks and back, after the scene is built twice.
+        tests.testOnItsOwn("far_the_gallery_scene_brings_ore_back_from_its_far_end_out_of_view",
+                3 * GalleryCheck.TICKS, GalleryTests::farAwayDelivers);
     }
 
     /**
@@ -207,8 +209,9 @@ final class GalleryTests {
 
     /**
      * The far-away scene: its far part built once the chunks along its line load, and those let go of,
-     * its Train runs out of view, every car of it unseen, and delivers ore to the far requester, whose
-     * record the level holds with no chunk of it loaded.
+     * its Train runs out of view, every car of it unseen, to load ore at the far Mine with no chunk of
+     * it loaded, and brings it back to Smelter's chest by the plot. Built again, as its sign builds it,
+     * while its Train is out there, it leaves one Train on the line and nothing loose along it.
      */
     private static void farAwayDelivers(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
@@ -231,25 +234,35 @@ final class GalleryTests {
                 unseen[0] = true;
             }
         });
+        List<Train> first = new java.util.ArrayList<>();
         GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, ONE_SCENE, (source, steps) -> steps
                 .thenExecute(() -> {
                     GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "far_away"));
+                    first.addAll(trainsIn(helper, plot));
+                    helper.assertTrue(first.size() == 1, "the scene set " + first + ", not one Train");
+                    train.addAll(first);
+                })
+                // Built again, as its sign builds it, once its Train is out of view on the far stretch.
+                .thenWaitUntil(() -> helper.assertTrue(unseen[0], "the Train was never wholly out of view"))
+                .thenExecute(() -> {
+                    GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "far_away"));
+                    train.clear();
+                    unseen[0] = false;
                     train.addAll(trainsIn(helper, plot));
-                    helper.assertTrue(train.size() == 1, "the scene set " + train + ", not one Train");
+                    helper.assertTrue(train.size() == 1, "building again set " + train + ", not one Train");
                 })
                 .thenWaitUntil(() -> {
-                    var requester = LevelHatches.of(helper.getLevel()).at(at.offset(FAR_REQUESTER));
-                    long held = 0;
-                    if (requester.isPresent()) {
-                        for (int slot = 0; slot < requester.get().contents().size(); slot++) {
-                            held += requester.get().contents().getAmountAsLong(slot);
-                        }
-                    }
-                    helper.assertTrue(held > 0, "the far requester holds no ore yet: " + requester.isPresent());
-                    helper.assertTrue(unseen[0], "the Train was never wholly out of view");
-                    var depot = at.offset(FAR_REQUESTER.offset(2, 0, 2));
-                    helper.assertFalse(helper.getLevel().getForceLoadedChunks().contains(net.minecraft.world.level.ChunkPos.containing(depot).pack()),
+                    var rails = LevelRails.of(helper.getLevel());
+                    var old = first.getFirst();
+                    helper.assertTrue(old.cars().stream().allMatch(car -> rails.trains().of(car.id()) == null
+                            && !rails.fallen().contains(car.id())), "the first build's Train is still out on the line");
+                    holds(helper, at.offset(NEAR_CHEST), Items.IRON_ORE);
+                    helper.assertTrue(unseen[0], "the Train built again was never wholly out of view");
+                    helper.assertFalse(helper.getLevel().getForceLoadedChunks().contains(net.minecraft.world.level.ChunkPos.containing(at.offset(FAR_MINE)).pack()),
                             "the scene kept its far end's chunk loaded");
+                    var loose = helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
+                            net.minecraft.world.phys.AABB.encapsulatingFullBlocks(at.offset(FAR_WEST), at.offset(FAR_EAST).above(8)));
+                    helper.assertTrue(loose.isEmpty(), "building again left items along the line: " + loose.stream().map(ItemEntity::getItem).toList());
                 })).thenSucceed();
     }
 
