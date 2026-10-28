@@ -31,10 +31,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * A Burner Locomotive in the world: the view of its {@link Locomotive}, a car in a {@link Train}.
  * The model runs the drive and holds the joule fuel (the car's); this entity feeds it the driver's
- * keys and the fuel slot, and mirrors the fuel, its Train's mode and its status line that a client
- * shows (its menu and Jade) into synched data.
+ * keys and the fuel slots, and mirrors the fuel, its Train's mode and its status line that a client
+ * shows (its menu and Jade) into synched data. Its {@link Locomotive#FUEL_SLOTS} fuel slots each hold
+ * a stack of one fuel, the fuels free to differ, and burn from the first that holds any.
  *
- * <p>Fuel in hand fills the fuel slot rather than boarding; the rest is {@link CarEntity}'s.
+ * <p>Fuel in hand fills the fuel slots rather than boarding, as a provider beside it at a Station
+ * does (ADR 0008, amended in #53); the rest is {@link CarEntity}'s.
  */
 public final class LocomotiveEntity extends CarEntity {
 
@@ -49,13 +51,13 @@ public final class LocomotiveEntity extends CarEntity {
     private static final EntityDataAccessor<Component> DATA_STATUS =
             SynchedEntityData.defineId(LocomotiveEntity.class, EntityDataSerializers.COMPONENT);
 
-    /** What the cab holds, which the menu shows: the fuel slot, with room beside it for what #3 adds. */
+    /** What the cab holds, which the menu shows: the fuel slots. */
     private final SimpleContainer cab = new SimpleContainer(LocomotiveMenu.CAB_SLOTS) {
         @Override
         public void setChanged() {
             super.setChanged();
             if (!level().isClientSide()) {
-                entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
+                entityData.set(DATA_FUEL_ITEM, nextFuel());
             }
         }
     };
@@ -84,7 +86,7 @@ public final class LocomotiveEntity extends CarEntity {
         return entityData.get(DATA_FUEL_CAPACITY);
     }
 
-    /** The fuel waiting in the slot, which a client sees. */
+    /** The fuel it burns next, the first fuel slot's that holds any, which a client sees. */
     public ItemStack fuelItem() {
         return entityData.get(DATA_FUEL_ITEM);
     }
@@ -105,7 +107,7 @@ public final class LocomotiveEntity extends CarEntity {
             entityData.set(DATA_FUEL, locomotive.fuel().storedJoules());
             entityData.set(DATA_FUEL_CAPACITY, locomotive.fuel().gaugeCapacity());
         }
-        entityData.set(DATA_FUEL_ITEM, cab.getItem(LocomotiveMenu.FUEL).copy());
+        entityData.set(DATA_FUEL_ITEM, nextFuel());
         entityData.set(DATA_AUTOMATIC, train.automatic());
         entityData.set(DATA_STATUS, StatusLine.of(LevelRails.of(level).status(level, train)));
     }
@@ -128,20 +130,42 @@ public final class LocomotiveEntity extends CarEntity {
         return Throttle.NONE;
     }
 
-    /** Whether its slot holds fuel, which logistics counts as able to pull before its buffer is lit. */
-    boolean hasFuel() {
-        return fuelValue(level(), cab.getItem(LocomotiveMenu.FUEL)) > 0L;
+    /** On the server, what fuel slot {@code slot} holds, a copy. */
+    public ItemStack fuelSlot(int slot) {
+        return cab.getItem(LocomotiveMenu.FUEL + slot).copy();
     }
 
-    /** Burns one fuel item from the slot whole and says what it was worth; 0 when there is none. */
+    /** The first of its fuel slots holding fuel; -1 for none. */
+    private int firstFuelled() {
+        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS; slot++) {
+            if (fuelValue(level(), cab.getItem(slot)) > 0L) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    /** A copy of the fuel it burns next; empty for none. */
+    private ItemStack nextFuel() {
+        int slot = firstFuelled();
+        return slot < 0 ? ItemStack.EMPTY : cab.getItem(slot).copy();
+    }
+
+    /** Whether its slots hold fuel, which logistics counts as able to pull before its buffer is lit. */
+    boolean hasFuel() {
+        return firstFuelled() >= 0;
+    }
+
+    /** Burns one fuel item whole from the first slot that holds any and says what it was worth; 0 when there is none. */
     long ignite() {
-        ItemStack fuel = cab.getItem(LocomotiveMenu.FUEL);
-        long joules = fuelValue(level(), fuel);
-        if (joules <= 0L) {
+        int slot = firstFuelled();
+        if (slot < 0) {
             return 0L;
         }
+        ItemStack fuel = cab.getItem(slot);
+        long joules = fuelValue(level(), fuel);
         var remainder = fuel.getCraftingRemainder();
-        cab.removeItem(LocomotiveMenu.FUEL, 1);
+        cab.removeItem(slot, 1);
         if (remainder != null && level() instanceof ServerLevel server) {
             spawnAtLocation(server, remainder.create());
         }
@@ -153,9 +177,26 @@ public final class LocomotiveEntity extends CarEntity {
         return stack.isEmpty() ? 0L : LocomotiveSpec.joules(stack.getBurnTime(null, level.fuelValues()));
     }
 
+    /**
+     * How many of {@code stack} a provider may put in its fuel slots: as many as they take, of a fuel
+     * that leaves nothing behind when burnt, so no bucket is dropped under the Rail; none of
+     * anything else.
+     */
+    long fuelRoomFromHatch(ItemStack stack) {
+        return fuelValue(level(), stack) > 0L && stack.getCraftingRemainder() == null ? fuelRoomFor(stack) : 0;
+    }
+
+    /** Puts what fits of {@code stack} in its fuel slots, as fuel in hand fills them, and says how many went in. */
+    int addFuel(ItemStack stack) {
+        int before = stack.getCount();
+        ItemStack left = stack.copy();
+        fillFuel(left);
+        return before - left.getCount();
+    }
+
     // ---- using it ----
 
-    /** Fuel in hand fills the slot as a shortcut; fuel the slot cannot take boards instead. */
+    /** Fuel in hand fills the slots as a shortcut; fuel they cannot take boards instead. */
     @Override
     protected InteractionResult useHeld(Player player, InteractionHand hand, ItemStack held) {
         if (fuelValue(level(), held) > 0L && fuelRoomFor(held) > 0) {
@@ -167,26 +208,38 @@ public final class LocomotiveEntity extends CarEntity {
         return InteractionResult.PASS;
     }
 
-    /** How many of {@code held} the fuel slot takes: it holds the same fuel or nothing. */
+    /** How many of {@code held} the fuel slots take: each holds the same fuel or nothing. */
     private int fuelRoomFor(ItemStack held) {
-        ItemStack slot = cab.getItem(LocomotiveMenu.FUEL);
-        if (slot.isEmpty()) {
-            return held.getMaxStackSize();
+        int room = 0;
+        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS; slot++) {
+            ItemStack in = cab.getItem(slot);
+            if (in.isEmpty()) {
+                room += held.getMaxStackSize();
+            } else if (ItemStack.isSameItemSameComponents(in, held)) {
+                room += in.getMaxStackSize() - in.getCount();
+            }
         }
-        return ItemStack.isSameItemSameComponents(slot, held) ? slot.getMaxStackSize() - slot.getCount() : 0;
+        return room;
     }
 
-    /** Moves what fits of {@code held} into the fuel slot, and nowhere else in the cab. */
+    /** Moves what fits of {@code held} into the fuel slots, those holding the same fuel first, then empty ones, and nowhere else in the cab. */
     private void fillFuel(ItemStack held) {
-        int moved = Math.min(fuelRoomFor(held), held.getCount());
-        ItemStack slot = cab.getItem(LocomotiveMenu.FUEL);
-        if (slot.isEmpty()) {
-            cab.setItem(LocomotiveMenu.FUEL, held.copyWithCount(moved));
-        } else {
-            slot.grow(moved);
-            cab.setChanged();
+        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS && !held.isEmpty(); slot++) {
+            ItemStack in = cab.getItem(slot);
+            if (!in.isEmpty() && ItemStack.isSameItemSameComponents(in, held)) {
+                int moved = Math.min(in.getMaxStackSize() - in.getCount(), held.getCount());
+                in.grow(moved);
+                held.shrink(moved);
+            }
         }
-        held.shrink(moved);
+        for (int slot = LocomotiveMenu.FUEL; slot < LocomotiveMenu.FUEL + Locomotive.FUEL_SLOTS && !held.isEmpty(); slot++) {
+            if (cab.getItem(slot).isEmpty()) {
+                int moved = Math.min(held.getMaxStackSize(), held.getCount());
+                cab.setItem(slot, held.copyWithCount(moved));
+                held.shrink(moved);
+            }
+        }
+        cab.setChanged();
     }
 
     /** The menu, from the inventory key while riding and from sneaking at the car. */

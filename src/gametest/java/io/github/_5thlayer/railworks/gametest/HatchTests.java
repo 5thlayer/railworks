@@ -62,7 +62,8 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * Hatches join a Station's platform (#36, ADR 0008): a Station north of {@link LocomotiveTests}'
  * Span, which runs east from x 1 to x 9 along z 3, at x 3 serves Trains heading west, so its platform
  * runs back east from it: the leading car's place beside x 3 and 4, its first car spot beside x 5 and
- * 6 and its second beside x 7 and 8, either side of the Rail at a car's floor, y 2. A hatch places beside a car spot and nowhere else, keeps its mode, request and
+ * 6 and its second beside x 7 and 8, either side of the Rail at a car's floor, y 2. A hatch places beside a car spot or the
+ * leading car's place (#53) and nowhere else, keeps its mode, request and
  * contents in the level's {@link LevelHatches}, is reached by hoppers through its block, and joins
  * the Station as long as its platform covers it. Which block is beside which spot is
  * {@code PlatformTest}'s. All share the {@code logistics_hatch_} prefix.
@@ -71,7 +72,7 @@ final class HatchTests {
 
     /** Where the Station stands, beside the Rail a block below a car's floor, north of it. */
     private static final BlockPos STATION = new BlockPos(3, 1, 2);
-    /** Beside the leading car's place, which has no car spot. */
+    /** Beside the leading car's place, which has no car spot but takes a hatch as one does. */
     private static final BlockPos LEADER = new BlockPos(4, 2, 2);
     /** Beside the first car spot at a car's floor, over the block behind the Station. */
     private static final BlockPos FIRST = new BlockPos(6, 2, 2);
@@ -80,15 +81,17 @@ final class HatchTests {
     /** Beside the second car spot. */
     private static final BlockPos SECOND = new BlockPos(7, 2, 2);
     /** Ahead of the Station, beside no car spot. */
-    private static final BlockPos AHEAD = new BlockPos(4, 2, 2);
+    private static final BlockPos AHEAD = new BlockPos(2, 2, 2);
+    /** What {@link #expectJoined} expects of a hatch that joins no Station. */
+    private static final int JOINS_NOTHING = Integer.MIN_VALUE;
 
     private HatchTests() {
     }
 
     static void register(RailworksGameTests.Registrar tests) {
         tests.test("logistics_hatch_crafts_from_iron_round_a_chest_and_a_hopper", 20, HatchTests::crafts);
-        tests.test("logistics_hatch_places_beside_a_car_spot_and_joins_its_station", 20, HatchTests::places);
-        tests.test("logistics_hatch_is_refused_beside_no_car_spot_and_beside_the_leading_car", 20, HatchTests::refused);
+        tests.test("logistics_hatch_places_beside_a_car_spot_or_the_leading_car_and_joins_its_station", 20, HatchTests::places);
+        tests.test("logistics_hatch_is_refused_beside_no_car_spot", 20, HatchTests::refused);
         tests.test("logistics_hatch_free_car_spots_are_drawn_while_one_is_held", 20, HatchTests::freeSpots);
         tests.test("logistics_hatch_switches_in_the_air_and_placed_keeping_what_it_holds", 20, HatchTests::switches);
         tests.test("logistics_hatch_requester_asks_for_a_stack_more_and_an_empty_hand_clears_it", 20, HatchTests::requests);
@@ -134,15 +137,17 @@ final class HatchTests {
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
         hatch(helper, player, ACROSS, HatchMode.PROVIDER);
         hatch(helper, player, SECOND, HatchMode.REQUESTER);
+        hatch(helper, player, LEADER, HatchMode.PROVIDER);
         expectJoined(helper, FIRST, 0);
         expectJoined(helper, ACROSS, 0);
         expectJoined(helper, SECOND, 1);
+        expectJoined(helper, LEADER, Platform.LEADING);
         if (helper.getBlockState(SECOND).getValue(HatchBlock.MODE) != HatchMode.REQUESTER
                 || record(helper, SECOND).mode() != HatchMode.REQUESTER) {
             helper.fail("a requester hatch did not place as a requester", SECOND);
         }
-        if (station(helper).hatches() != 3) {
-            helper.fail("the Station counts " + station(helper).hatches() + " hatches, not 3", STATION);
+        if (station(helper).hatches() != 4) {
+            helper.fail("the Station counts " + station(helper).hatches() + " hatches, not 4", STATION);
         }
         helper.succeed();
     }
@@ -158,26 +163,24 @@ final class HatchTests {
                 || player.getMainHandItem().getCount() != 4) {
             helper.fail("a hatch ahead of the Station was placed or spent", AHEAD);
         }
-        if (place(helper, player, LEADER).consumesAction() || !helper.getBlockState(LEADER).isAir()) {
-            helper.fail("a hatch beside the leading car's place was placed", LEADER);
-        }
         helper.succeed();
     }
 
     private static void freeSpots(GameTestHelper helper) {
         ServerPlayer player = withStation(helper);
         BlockPos first = helper.absolutePos(FIRST);
-        // Drawn spot by spot: two spots, each a box on either side of the Rail, a car gap short of its ends.
+        // Drawn spot by spot: the leading car's place and two spots, each a box on either side of the
+        // Rail, a car gap short of its ends.
         List<AABB> spots = ownSpots(helper);
-        if (spots.size() != 4 || !spots.stream().allMatch(box -> Math.abs(box.getXsize() - 1.8) < 1e-6 && box.getZsize() == 1.0)
+        if (spots.size() != 6 || !spots.stream().allMatch(box -> Math.abs(box.getXsize() - 1.8) < 1e-6 && box.getZsize() == 1.0)
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(first).deflate(0.01)))
-                || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(LEADER)).deflate(0.01))
-                        || box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {
+                || spots.stream().noneMatch(box -> box.intersects(new AABB(helper.absolutePos(LEADER)).deflate(0.01)))
+                || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {
             helper.fail("the free car spots are drawn as " + spots, STATION);
         }
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
         List<AABB> left = ownSpots(helper);
-        if (left.size() != 4 || left.stream().filter(box -> Math.abs(box.getXsize() - 0.9) < 1e-6).count() != 1
+        if (left.size() != 6 || left.stream().filter(box -> Math.abs(box.getXsize() - 0.9) < 1e-6).count() != 1
                 || left.stream().anyMatch(box -> box.intersects(new AABB(first).deflate(0.01)))) {
             helper.fail("with a hatch beside the first spot, the free car spots are drawn as " + left, FIRST);
         }
@@ -327,7 +330,7 @@ final class HatchTests {
         hatch(helper, player, FIRST, HatchMode.PROVIDER);
         insert(helper, FIRST, new ItemStack(Items.COAL, 4));
         helper.setBlock(STATION, Blocks.AIR);
-        expectJoined(helper, FIRST, -1);
+        expectJoined(helper, FIRST, JOINS_NOTHING);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.STATION_ITEM.get()));
         StationTests.place(helper, player, STATION);
         expectJoined(helper, FIRST, 0);
@@ -335,7 +338,7 @@ final class HatchTests {
         var network = LevelRails.of(helper.getLevel()).network();
         var span = LocomotiveTests.span(helper);
         network.remove(span.a(), span.b());
-        expectJoined(helper, FIRST, -1);
+        expectJoined(helper, FIRST, JOINS_NOTHING);
         if (count(record(helper, FIRST).contents()) != 4) {
             helper.fail("the hatch lost what it held with its Station", FIRST);
         }
@@ -439,6 +442,9 @@ final class HatchTests {
         if (!"Iron Mine".equals(args[0]) || !Integer.valueOf(2).equals(args[1])) {
             helper.fail("Jade says the hatch joins " + args[0] + " at car spot " + args[1] + ", not the Iron Mine at 2", SECOND);
         }
+        hatch(helper, player, LEADER, HatchMode.PROVIDER);
+        expectLines(helper, HatchReport.of(helper.getBlockEntity(LEADER, HatchBlockEntity.class)).lines(),
+                List.of("tooltip.railworks.hatch.jade.provider", "tooltip.railworks.hatch.jade.station_leading"));
         helper.setBlock(STATION, Blocks.AIR);
         expectLines(helper, HatchReport.of(helper.getBlockEntity(SECOND, HatchBlockEntity.class)).lines(),
                 List.of("tooltip.railworks.hatch.jade.requester", "message.railworks.hatch.requesting",
@@ -593,7 +599,7 @@ final class HatchTests {
         helper.startSequence()
                 .thenIdle(1)
                 .thenExecute(() -> {
-                    expectJoined(helper, FIRST, -1);
+                    expectJoined(helper, FIRST, JOINS_NOTHING);
                     insert(helper, FIRST, new ItemStack(Items.IRON_INGOT, 5));
                 })
                 .thenIdle(1)
@@ -717,11 +723,11 @@ final class HatchTests {
     private static void expectJoined(GameTestHelper helper, BlockPos pos, int spot) {
         Optional<Platform.Joined> joined = PlatformsNear.joined(helper.getLevel(), helper.absolutePos(pos));
         BlockPos station = helper.absolutePos(STATION);
-        boolean right = spot < 0 ? joined.isEmpty()
+        boolean right = spot == JOINS_NOTHING ? joined.isEmpty()
                 : joined.isPresent() && joined.get().spot() == spot && joined.get().station().x() == station.getX()
                 && joined.get().station().y() == station.getY() && joined.get().station().z() == station.getZ();
         if (!right) {
-            helper.fail("the hatch joins " + joined + ", not " + (spot < 0 ? "nothing" : "the Station at car spot " + spot), pos);
+            helper.fail("the hatch joins " + joined + ", not " + (spot == JOINS_NOTHING ? "nothing" : "the Station at car spot " + spot), pos);
         }
     }
 

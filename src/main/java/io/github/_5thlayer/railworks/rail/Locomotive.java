@@ -23,6 +23,8 @@ public final class Locomotive implements Car {
 
     /** Blocks along the Line, coupler to coupler: a car's {@link CarBody#PITCH}. */
     public static final double LENGTH = CarBody.PITCH;
+    /** How many fuel slots it has, each a stack of one fuel, the fuels free to differ. */
+    public static final int FUEL_SLOTS = 4;
 
     static final MapCodec<Locomotive> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             ID_FIELD.forGetter(Locomotive::id),

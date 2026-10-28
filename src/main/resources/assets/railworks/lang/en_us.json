@@ -70,6 +70,7 @@
   "tooltip.railworks.hatch.jade.provider": "Provider",
   "tooltip.railworks.hatch.jade.requester": "Requester",
   "tooltip.railworks.hatch.jade.station": "Station: %s, car spot %s",
+  "tooltip.railworks.hatch.jade.station_leading": "Station: %s, leading car",
   "tooltip.railworks.hatch.jade.no_station": "Joined to no Station: a plain container",
   "tooltip.railworks.station.jade.hatches": "Hatches: %s",
   "config.jade.plugin_railworks.hatch": "Hatch",
@@ -128,5 +129,9 @@
   "railworks.gallery.flyover": "Flyover",
   "railworks.gallery.flyover.1": "Lines cross at",
   "railworks.gallery.flyover.2": "any height and",
-  "railworks.gallery.flyover.3": "need not join"
+  "railworks.gallery.flyover.3": "need not join",
+  "railworks.gallery.refuel": "Refuel",
+  "railworks.gallery.refuel.1": "A provider of",
+  "railworks.gallery.refuel.2": "coal fuels the",
+  "railworks.gallery.refuel.3": "Train standing by"
 }

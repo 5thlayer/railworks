@@ -20,8 +20,8 @@ import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 import org.joml.Vector3f;
 
 /**
- * While a hatch is held, whatever the aim, an outline round the free blocks beside each car spot of the
- * platforms near the player, a spot's two on a side as one box falling half a car gap short of its
+ * While a hatch is held, whatever the aim, an outline round the free blocks beside the leading car's
+ * place and each car spot of the platforms near the player, a spot's two on a side as one box falling half a car gap short of its
  * ends ({@link PlatformsNear#freeSpots}), where a hatch could go, asked of the
  * client's Spans and the Station blocks it has loaded, twice a second or as the player moves.
  */
