@@ -57,7 +57,7 @@ One of the Locomotives and Cargo cars a Train is made of, coupled to the car ahe
 _Avoid_: wagon, carriage, vehicle, rolling stock
 
 **Locomotive**:
-A car that pulls its Train forward. The Burner Locomotive burns fuel; the Electric Locomotive runs on FE.
+A car that pulls its Train forward. The Burner Locomotive burns fuel, up to four stacks of it, put in by hand or by a provider beside it at a Station; the Electric Locomotive runs on FE.
 _Avoid_: engine (Wireworks' steam engine), loco
 
 **Cargo car**:
@@ -81,7 +81,7 @@ The Straight leg behind a Station where a Train stopped there stands: its leadin
 _Avoid_: siding, bay, loading area
 
 **Car spot**:
-The two blocks of a platform where a stopped car behind the leading car stands, counted back from the leading car; the first is the place of the car coupled to it. The leading car, usually a Locomotive, has no car spot, so no hatch stands beside it.
+The two blocks of a platform where a stopped car behind the leading car stands, counted back from the leading car; the first is the place of the car coupled to it. The leading car, usually a Locomotive, has no car spot, but a hatch may stand beside its place as beside a car spot.
 _Avoid_: slot (an inventory's), position, bay
 
 **Automatic**:
@@ -91,11 +91,11 @@ _Avoid_: autopilot, scheduled, unattended
 ### Logistics
 
 **Hatch**:
-A container beside a Station's platform at a car's floor, joining that Station, which trades with the Cargo car standing at its car spot. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
+A container beside a Station's platform at a car's floor, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: it trades with a Cargo car, and a provider fuels a Locomotive. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
 _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 
 **Provider**:
-A hatch offering what is put in it to requesters at the same car spot of other Stations; it never asks.
+A hatch offering what is put in it to requesters at the same car spot of other Stations, and fuelling the Locomotive of an automatic Train beside it from what no job claims; it never asks.
 _Avoid_: source, output hatch, giver
 
 **Requester**:
