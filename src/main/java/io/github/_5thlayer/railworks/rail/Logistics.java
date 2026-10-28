@@ -534,7 +534,7 @@ public final class Logistics<I> {
             if (room <= 0) {
                 continue;
             }
-            if (goods.charge(charger, locomotive, charger.creative() ? room : Math.min(ChargeSpec.chargerRate(), room)) > 0) {
+            if (goods.giveCharge(charger, locomotive, charger.creative() ? room : Math.min(ChargeSpec.chargerRate(), room)) > 0) {
                 moved = true;
                 charged.add(locomotive);
             }

@@ -82,7 +82,8 @@ public final class Locomotive implements Car {
 
     /**
      * Whether each Locomotive can pay a tick beyond its buffer, as {@link Train#pulls} asks: fuel waits
-     * in a Burner's slots, or an Electric's charge covers what its buffer lacks.
+     * in a Burner's slots, or an Electric's charge covers what its buffer lacks. A charge short of a
+     * tick's draw, under 300 FE at the defaults, pulls nothing and waits for a Charger.
      */
     public static Predicate<Locomotive> waiting(Goods<?> goods) {
         return locomotive -> locomotive.electric ? goods.charge(locomotive) >= locomotive.feToDraw()

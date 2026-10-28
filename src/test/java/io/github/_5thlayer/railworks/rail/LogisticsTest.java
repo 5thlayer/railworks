@@ -1288,7 +1288,7 @@ class LogisticsTest {
         }
 
         @Override
-        public long charge(Logistics.Charger from, Locomotive into, long most) {
+        public long giveCharge(Logistics.Charger from, Locomotive into, long most) {
             long room = ChargeSpec.locomotiveCapacity() - charge(into);
             long buffer = from.creative() ? Long.MAX_VALUE : buffers.getOrDefault(from.x(), 0L);
             long moved = Math.max(0L, Math.min(most, Math.min(room, buffer)));

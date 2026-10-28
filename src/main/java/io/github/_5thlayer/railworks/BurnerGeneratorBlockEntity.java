@@ -3,7 +3,7 @@
 
 package io.github._5thlayer.railworks;
 
-import io.github._5thlayer.railworks.rail.Generator;
+import io.github._5thlayer.railworks.rail.BurnerGenerator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
@@ -50,7 +50,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
     private static final int[] SLOTS = {FUEL};
 
     private NonNullList<ItemStack> items = NonNullList.withSize(1, ItemStack.EMPTY);
-    private final Generator generator = new Generator();
+    private final BurnerGenerator generator = new BurnerGenerator();
     private final Energy energy = new Energy();
     private final ContainerData data = new ContainerData() {
         @Override
@@ -212,7 +212,7 @@ public final class BurnerGeneratorBlockEntity extends BaseContainerBlockEntity i
 
         @Override
         public long getCapacityAsLong() {
-            return Generator.capacity();
+            return BurnerGenerator.capacity();
         }
 
         /** Nothing puts FE into a Burner Generator: it makes its own. */

@@ -77,7 +77,7 @@ class ElectricLocomotiveTest {
     @Test
     void theFeToJouleRateSetsHowMuchATickDraws() {
         ChargeSpec.configure(50L, ChargeSpec.DEFAULT_LOCOMOTIVE_CAPACITY, ChargeSpec.DEFAULT_CHARGER_RATE,
-                ChargeSpec.DEFAULT_CHARGER_BUFFER, ChargeSpec.DEFAULT_GENERATOR_KILOWATTS);
+                ChargeSpec.DEFAULT_CHARGER_BUFFER, ChargeSpec.DEFAULT_BURNER_GENERATOR_KILOWATTS);
         Locomotive locomotive = electric(1_000_000L);
         forward(Train.of(atStart(), locomotive), 10);
         assertEquals(1_000_000L - 10 * 600L, goods.charge(locomotive));
@@ -87,7 +87,7 @@ class ElectricLocomotiveTest {
     void aRateThatSplitsATickDrawsWholeFeAndKeepsTheSliverForTheNext() {
         // 30,000 J a tick at 70 J an FE is 428.57 FE: 429 the first tick, and the 30 J over carried on.
         ChargeSpec.configure(70L, ChargeSpec.DEFAULT_LOCOMOTIVE_CAPACITY, ChargeSpec.DEFAULT_CHARGER_RATE,
-                ChargeSpec.DEFAULT_CHARGER_BUFFER, ChargeSpec.DEFAULT_GENERATOR_KILOWATTS);
+                ChargeSpec.DEFAULT_CHARGER_BUFFER, ChargeSpec.DEFAULT_BURNER_GENERATOR_KILOWATTS);
         Locomotive locomotive = electric(1_000_000L);
         forward(Train.of(atStart(), locomotive), 7);
         long spent = 1_000_000L - goods.charge(locomotive);
@@ -182,7 +182,7 @@ class ElectricLocomotiveTest {
         }
 
         @Override
-        public long charge(Logistics.Charger from, Locomotive into, long most) {
+        public long giveCharge(Logistics.Charger from, Locomotive into, long most) {
             return 0L;
         }
 
