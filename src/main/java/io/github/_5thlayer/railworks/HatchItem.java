@@ -9,6 +9,7 @@ import io.github._5thlayer.groundworks.PlacementPlan;
 import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.groundworks.PlansPlacement;
 import io.github._5thlayer.railworks.rail.Goods;
+import io.github._5thlayer.railworks.rail.Logistics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
@@ -42,6 +43,11 @@ public final class HatchItem extends BlockItem implements PlansPlacement {
     /** What a hatch it places is. */
     public HatchMode mode() {
         return mode;
+    }
+
+    /** Whether a hatch it places can fuel a Locomotive from beside its Engine room ({@link Logistics#fuels}). */
+    public boolean fuels() {
+        return Logistics.fuels(mode == HatchMode.PROVIDER, ((HatchBlock) getBlock()).holds());
     }
 
     /** The item a hatch of {@code holds} that is {@code mode} is in hand. */

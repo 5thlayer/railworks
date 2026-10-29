@@ -13,6 +13,7 @@ import io.github._5thlayer.railworks.PlatformsNear;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -22,20 +23,24 @@ import org.joml.Vector3f;
 
 /**
  * While a hatch or a Charger is held, whatever the aim, an outline round the free blocks beside each car spot
- * of the platforms near the player, and beside each leading car's place in a colour of its own, a
- * spot's blocks on a side as one box falling half a car gap short of its ends
- * ({@link PlatformsNear#freeSpots}), where a hatch could go, asked of the client's Spans and the
- * Station blocks it has loaded, twice a second or as the player moves.
+ * and the leading car's place of the platforms near the player, a spot's blocks on a side as one box
+ * falling half a car gap short of its ends ({@link PlatformsNear#freeSpots}), where a hatch could go,
+ * asked of the client's Spans and the Station blocks it has loaded, twice a second or as the player
+ * moves. For what fuels or charges a Locomotive from beside its Engine room
+ * ({@link PlatformsNear#marksEngineRooms}), each free block beside one is outlined again just inside,
+ * in a colour of its own.
  */
 final class HatchSpots {
 
     /** The Station's cream, so the outlines read as Railworks' and apart from Groundworks' red. */
     private static final int COLOUR = 0xFFD8C8A0;
-    /** A coal fire's amber, for the leading car's place, where a provider fuels its Locomotive. */
-    private static final int LEADING_COLOUR = 0xFFF0A040;
+    /** A coal fire's amber, for a block beside an Engine room, where a Locomotive standing there is fuelled or charged. */
+    private static final int ENGINE_ROOM_COLOUR = 0xFFF0A040;
     private static final float WIDTH = 2.0F;
     // A little inside the blocks, so vanilla's own outline of an aimed block stays apart.
     private static final double INSET = 0.06;
+    /** Further inside for a block beside an Engine room, so its outline stands apart from its spot's round it. */
+    private static final double ENGINE_ROOM_INSET = 2 * INSET;
 
     /** How often the free blocks are worked out again while the player stands still, in ticks. */
     private static final int REFRESH_TICKS = 10;
@@ -59,16 +64,22 @@ final class HatchSpots {
     }
 
     static void onMarker(PlacementPreviewEvent.Marker event) {
-        if (!(event.getStack().getItem() instanceof HatchItem) && !(event.getStack().getItem() instanceof ChargerItem)) {
+        Item item = event.getStack().getItem();
+        if (!(item instanceof HatchItem) && !(item instanceof ChargerItem)) {
             return;
         }
+        boolean engineRooms = PlatformsNear.marksEngineRooms(item);
         SubmitCustomGeometryEvent geometry = event.getGeometry();
         Vec3 camera = geometry.getLevelRenderState().cameraRenderState.pos;
         PoseStack poseStack = geometry.getPoseStack();
         for (PlatformsNear.FreeSpot spot : free(event.getLevel(), event.getPlayer().blockPosition())) {
+            if (spot.engineRoom() && !engineRooms) {
+                continue;
+            }
             AABB box = spot.box();
-            int colour = spot.leading() ? LEADING_COLOUR : COLOUR;
-            VoxelShape outline = Shapes.create(box.move(-box.minX, -box.minY, -box.minZ).deflate(INSET));
+            int colour = spot.engineRoom() ? ENGINE_ROOM_COLOUR : COLOUR;
+            VoxelShape outline = Shapes.create(box.move(-box.minX, -box.minY, -box.minZ)
+                    .deflate(spot.engineRoom() ? ENGINE_ROOM_INSET : INSET));
             poseStack.pushPose();
             poseStack.translate(box.minX - camera.x(), box.minY - camera.y(), box.minZ - camera.z());
             geometry.getSubmitNodeCollector().submitCustomGeometry(poseStack, RenderTypes.lines(), (pose, buffer) ->

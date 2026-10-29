@@ -75,7 +75,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * contents in the level's {@link LevelHatches}, is reached by hoppers through its block, and joins
  * the Station as long as its platform covers it. Which block is beside which spot is
  * {@code PlatformTest}'s. All share the {@code logistics_hatch_} prefix, and those for the row's
- * place, {@code logistics_hatch_row_}.
+ * place, {@code logistics_hatch_row_}, and for the Engine rooms a held hatch marks, {@code logistics_hatch_engine_room_}.
  */
 final class HatchTests {
 
@@ -113,6 +113,9 @@ final class HatchTests {
                         RailworksRegistries.HATCH.get(), RailworksRefusal.HATCH_OFF_PLATFORM));
         tests.test("logistics_hatch_row_a_held_hatch_outlines_the_rows_free_blocks_alone", 20, HatchTests::rowOutline);
         tests.test("logistics_hatch_free_car_spots_are_drawn_while_one_is_held", 20, HatchTests::freeSpots);
+        tests.test("logistics_hatch_engine_room_free_blocks_are_marked_among_the_free_car_spots", 20, HatchTests::freeEngineRooms);
+        tests.test("logistics_hatch_engine_room_marked_only_with_a_provider_of_items_or_a_charger_in_hand", 20,
+                HatchTests::marksEngineRooms);
         tests.test("logistics_hatch_switches_in_the_air_and_placed_keeping_what_it_holds", 20, HatchTests::switches);
         tests.test("logistics_hatch_requester_asks_for_a_stack_more_and_an_empty_hand_clears_it", 20, HatchTests::requests);
         tests.test("logistics_hatch_provider_gives_an_empty_hand_its_first_stack", 20, HatchTests::gives);
@@ -193,26 +196,15 @@ final class HatchTests {
         // Drawn spot by spot: the leading car's five-block place and two five-block spots, each a box on
         // either side of the Rail, a car gap short of its ends. The Station stands in the row too, in the
         // first block of the leading car's place on its side, so that side's other four are drawn one by one.
-        List<PlatformsNear.FreeSpot> free = ownFreeSpots(helper);
         List<AABB> spots = ownSpots(helper);
-        List<PlatformsNear.FreeSpot> whole = free.stream().filter(spot -> spot.box().getZsize() > 1.0).toList();
-        if (spots.size() != 9 || whole.size() != 5 || !whole.stream().allMatch(spot -> spot.box().getXsize() == 1.0
-                        && Math.abs(spot.box().getZsize() - ((spot.leading() ? Platform.LEAD : Platform.SPOT) - CarBody.GAP)) < 1e-6)
+        List<AABB> whole = spots.stream().filter(box -> box.getZsize() > 1.0).toList();
+        if (spots.size() != 9 || whole.size() != 5 || !whole.stream().allMatch(box -> box.getXsize() == 1.0
+                        && Math.abs(box.getZsize() - (Platform.SPOT - CarBody.GAP)) < 1e-6)
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(first).deflate(0.01)))
                 || spots.stream().noneMatch(box -> box.intersects(new AABB(helper.absolutePos(LEADER)).deflate(0.01)))
                 || spots.stream().anyMatch(box -> box.intersects(station))
                 || spots.stream().anyMatch(box -> box.intersects(new AABB(helper.absolutePos(AHEAD)).deflate(0.01)))) {
             helper.fail("the free car spots are drawn as " + spots, STATION);
-        }
-        // Those beside the leading car's place, either side of the Rail, are told apart: the whole side
-        // across the Rail and the four the Station leaves on its own.
-        List<AABB> leading = free.stream()
-                .filter(PlatformsNear.FreeSpot::leading).map(PlatformsNear.FreeSpot::box).toList();
-        AABB leader = new AABB(helper.absolutePos(LEADER)).deflate(0.01);
-        AABB across = new AABB(helper.absolutePos(LEADER).west(4)).deflate(0.01);
-        if (leading.size() != 5 || leading.stream().noneMatch(box -> box.intersects(leader))
-                || leading.stream().noneMatch(box -> box.intersects(across))) {
-            helper.fail("the free blocks beside the leading car's place are drawn as " + leading, LEADER);
         }
         // A hatch at the first spot's first block leaves its other four on that side drawn one by one,
         // the last half a car gap short of the spot's end.
@@ -224,6 +216,48 @@ final class HatchTests {
                 || firstSpot.stream().filter(box -> Math.abs(box.getZsize() - 0.9) < 1e-6).count() != 1
                 || left.stream().anyMatch(box -> box.intersects(new AABB(first).deflate(0.01)))) {
             helper.fail("with a hatch beside the first spot, the free car spots are drawn as " + left, FIRST);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The free blocks beside an Engine room, the middle block of the leading car's place and of each
+     * car spot, either side of the Rail, are marked on their own, where a provider fuels a Locomotive
+     * and a Charger charges one; a hatch standing in one leaves it unmarked.
+     */
+    private static void freeEngineRooms(GameTestHelper helper) {
+        ServerPlayer player = withStation(helper);
+        List<BlockPos> engineRooms = List.of(LEADER, LEADER.west(4), FIRST.south(2), ACROSS, SECOND.north(2), SECOND.north(2).west(4));
+        List<AABB> marked = ownEngineRooms(helper);
+        if (marked.size() != engineRooms.size() || !engineRooms.stream().allMatch(pos -> marked.contains(new AABB(helper.absolutePos(pos))))) {
+            helper.fail("the free Engine room blocks are marked as " + marked, LEADER);
+        }
+        hatch(helper, player, LEADER, HatchMode.PROVIDER);
+        List<AABB> left = ownEngineRooms(helper);
+        if (left.size() != engineRooms.size() - 1 || left.contains(new AABB(helper.absolutePos(LEADER)))) {
+            helper.fail("with a hatch beside the leading car's Engine room, the free Engine room blocks are marked as " + left, LEADER);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Only what fuels or charges a Locomotive from beside its Engine room marks the Engine rooms in
+     * hand: a provider of items and a Charger or a Creative Charger, not a requester nor a Fluid hatch.
+     */
+    private static void marksEngineRooms(GameTestHelper helper) {
+        List<Item> marking = List.of(RailworksRegistries.HATCH_ITEM.get(), RailworksRegistries.CHARGER_ITEM.get(),
+                RailworksRegistries.CREATIVE_CHARGER_ITEM.get());
+        List<Item> notMarking = List.of(RailworksRegistries.REQUESTER_HATCH_ITEM.get(), RailworksRegistries.FLUID_HATCH_ITEM.get(),
+                RailworksRegistries.REQUESTER_FLUID_HATCH_ITEM.get(), Items.CHEST);
+        for (Item item : marking) {
+            if (!PlatformsNear.marksEngineRooms(item)) {
+                helper.fail(item + " in hand marks no Engine room, though it fuels or charges a Locomotive from beside one");
+            }
+        }
+        for (Item item : notMarking) {
+            if (PlatformsNear.marksEngineRooms(item)) {
+                helper.fail(item + " in hand marks the Engine rooms, though it fuels and charges no Locomotive");
+            }
         }
         helper.succeed();
     }
@@ -260,7 +294,12 @@ final class HatchTests {
 
     /** The free car spots' boxes drawn in this test's own plot. */
     private static List<AABB> ownSpots(GameTestHelper helper) {
-        return ownFreeSpots(helper).stream().map(PlatformsNear.FreeSpot::box).toList();
+        return ownFreeSpots(helper).stream().filter(spot -> !spot.engineRoom()).map(PlatformsNear.FreeSpot::box).toList();
+    }
+
+    /** The free Engine room blocks marked in this test's own plot. */
+    private static List<AABB> ownEngineRooms(GameTestHelper helper) {
+        return ownFreeSpots(helper).stream().filter(PlatformsNear.FreeSpot::engineRoom).map(PlatformsNear.FreeSpot::box).toList();
     }
 
     /**

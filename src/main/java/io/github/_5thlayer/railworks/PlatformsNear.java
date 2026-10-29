@@ -20,6 +20,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -38,9 +39,9 @@ public final class PlatformsNear {
 
     /**
      * What a held hatch draws: the free blocks beside one car spot on one side of the Rail, as a
-     * box, and whether the spot is the leading car's place.
+     * box, or, marked {@code engineRoom}, one of them beside the spot's Engine room on its own.
      */
-    public record FreeSpot(AABB box, boolean leading) {
+    public record FreeSpot(AABB box, boolean engineRoom) {
     }
 
     private PlatformsNear() {
@@ -129,8 +130,9 @@ public final class PlatformsNear {
      * free blocks beside a spot of the platform of a Station near, empty enough to place in, those
      * on one side of the Rail as one box, two for a spot and three for the leading car's place, or
      * each still free on its own when some are taken, falling half a car gap short of its spot's
-     * ends, so the spots read as the cars that will stand there. Those beside the leading car's
-     * place, where a provider fuels the Locomotive that usually leads, say so.
+     * ends, so the spots read as the cars that will stand there. Each free block beside an Engine
+     * room, the middle of the leading car's place or of a spot, comes too as one of its own, which
+     * only what {@link #marksEngineRooms} draws.
      */
     public static List<FreeSpot> freeSpots(Level level, BlockPos pos) {
         RailNetwork network = network(level);
@@ -148,16 +150,27 @@ public final class PlatformsNear {
                     List<Platform.Beside> free = side.blocks().stream()
                             .filter(beside -> level.getBlockState(block(beside)).canBeReplaced())
                             .toList();
-                    boolean leading = side.spot() == Platform.LEADING;
                     if (free.size() == side.blocks().size()) {
-                        boxes.add(new FreeSpot(drawn, leading));
+                        boxes.add(new FreeSpot(drawn, false));
                     } else {
-                        free.forEach(beside -> boxes.add(new FreeSpot(new AABB(block(beside)).intersect(drawn), leading)));
+                        free.forEach(beside -> boxes.add(new FreeSpot(new AABB(block(beside)).intersect(drawn), false)));
                     }
+                    free.stream()
+                            .filter(beside -> platform.besideEngineRoom(beside.x(), beside.y(), beside.z()))
+                            .forEach(beside -> boxes.add(new FreeSpot(new AABB(block(beside)), true)));
                 }
             });
         }
         return boxes;
+    }
+
+    /**
+     * Whether {@code item} in hand marks the free blocks beside the Engine rooms, where it would fuel
+     * or charge a Locomotive standing there: a hatch that fuels one ({@link HatchItem#fuels}) and a
+     * Charger. A requester and a Fluid hatch fuel none, so they draw only the spots.
+     */
+    public static boolean marksEngineRooms(Item item) {
+        return item instanceof ChargerItem || item instanceof HatchItem hatch && hatch.fuels();
     }
 
     /**
