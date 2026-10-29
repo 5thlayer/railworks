@@ -7,6 +7,8 @@ import java.util.List;
 
 import io.github._5thlayer.railworks.BurnerGeneratorBlockEntity;
 import io.github._5thlayer.railworks.CarRecords;
+import io.github._5thlayer.railworks.ChargerBlockEntity;
+import io.github._5thlayer.railworks.ChargerReport;
 import io.github._5thlayer.railworks.LevelCarRecords;
 import io.github._5thlayer.railworks.LevelChargers;
 import io.github._5thlayer.railworks.LocomotiveEntity;
@@ -23,6 +25,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
@@ -45,10 +48,13 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * Creative Charger filling one at once, a Charger placing only in the row two blocks off the Rail
  * at a Cargo car's chests' height (#72), and a Burner Generator fed by a hopper charging a Charger set
  * against it. Which Trains a Charger serves and when a Train waits on it are {@code LogisticsTest}'s,
- * in the model. Prefixed {@code electric_}.
+ * in the model. Prefixed {@code electric_}, but for a Charger beside a Locomotive's cab rather than
+ * its Engine room charging nothing (#74), prefixed {@code engine_room_}.
  */
 final class ElectricTests {
 
+    /** Beside the cab of the Locomotive standing at the Depot's leading car's place: the block behind the Depot's own. */
+    private static final BlockPos CAB = LogisticsTests.DEPOT.west();
     /** Where the Burner Generator stands, a hopper over it and a Charger east of it. */
     private static final BlockPos BURNER_GENERATOR = new BlockPos(2, 2, 2);
 
@@ -70,6 +76,8 @@ final class ElectricTests {
                 20, ElectricTests::locomotiveHandler);
         tests.testOnItsOwn("electric_charger_charges_a_manual_train_at_rest_beside_it_at_its_rate", 200, ElectricTests::chargesManual);
         tests.testOnItsOwn("electric_creative_charger_fills_a_locomotive_beside_it_in_one_tick", 100, ElectricTests::creativeFills);
+        tests.testOnItsOwn("engine_room_a_charger_beside_an_electric_locomotives_cab_charges_nothing_and_jade_says_so", 100,
+                ElectricTests::cabCharges);
         tests.testOnItsOwn("electric_locomotive_driven_by_hand_draws_300_fe_a_tick_and_stops_when_empty", 20, ElectricTests::drives);
     }
 
@@ -125,13 +133,18 @@ final class ElectricTests {
 
     /**
      * The Depot, a Charger of {@code block} in the row beside its leading car's place, at the Depot's
-     * own height, and a manual Electric
-     * Locomotive, a Cargo car behind it, standing there empty. The Locomotive.
+     * own height, beside the leading Locomotive's Engine room, and a manual Electric Locomotive, a
+     * Cargo car behind it, standing there empty. The Locomotive.
      */
     private static LocomotiveEntity atTheDepot(GameTestHelper helper, Block block) {
+        return atTheDepot(helper, block, true);
+    }
+
+    /** {@link #atTheDepot}, the Charger beside the Locomotive's Engine room, or beside its cab, by the Depot. */
+    private static LocomotiveEntity atTheDepot(GameTestHelper helper, Block block, boolean engineRoom) {
         Span last = LogisticsTests.line(helper);
         LogisticsTests.station(helper, LogisticsTests.DEPOT);
-        BlockPos charger = LogisticsTests.besideTheLeadingCar(helper, LogisticsTests.DEPOT);
+        BlockPos charger = engineRoom ? LogisticsTests.besideTheLeadingEngineRoom(helper, LogisticsTests.DEPOT) : CAB;
         if (charger.getY() != LogisticsTests.DEPOT.getY()) {
             throw helper.assertionException(charger, Component.literal("the block beside the leading car is not in the Depot's row"));
         }
@@ -147,7 +160,7 @@ final class ElectricTests {
 
     private static void chargesManual(GameTestHelper helper) {
         LocomotiveEntity locomotive = atTheDepot(helper, RailworksRegistries.CHARGER.get());
-        EnergyHandler charger = energy(helper, LogisticsTests.besideTheLeadingCar(helper, LogisticsTests.DEPOT));
+        EnergyHandler charger = energy(helper, LogisticsTests.besideTheLeadingEngineRoom(helper, LogisticsTests.DEPOT));
         long[] last = {0L};
         helper.onEachTick(() -> {
             // A cable feeding it the Charger's rate each tick.
@@ -166,7 +179,7 @@ final class ElectricTests {
 
     private static void creativeFills(GameTestHelper helper) {
         LocomotiveEntity locomotive = atTheDepot(helper, RailworksRegistries.CREATIVE_CHARGER.get());
-        EnergyHandler charger = energy(helper, LogisticsTests.besideTheLeadingCar(helper, LogisticsTests.DEPOT));
+        EnergyHandler charger = energy(helper, LogisticsTests.besideTheLeadingEngineRoom(helper, LogisticsTests.DEPOT));
         helper.onEachTick(() -> {
             long now = charge(helper, locomotive);
             helper.assertTrue(now == 0L || now == ChargeSpec.locomotiveCapacity(), "it holds " + now + " FE, neither empty nor full");
@@ -180,6 +193,38 @@ final class ElectricTests {
                 .thenWaitUntil(() -> helper.assertTrue(charge(helper, locomotive) == ChargeSpec.locomotiveCapacity(), "not yet full"))
                 .thenExecute(() -> LogisticsTests.forceLoad(helper, false))
                 .thenSucceed();
+    }
+
+    /**
+     * A Creative Charger beside the cab of the Electric Locomotive standing at the Depot, not its
+     * Engine room, gives it nothing, and Jade on it says so; moved beside the Engine room, it fills
+     * the Locomotive, and Jade says that too.
+     */
+    private static void cabCharges(GameTestHelper helper) {
+        LocomotiveEntity locomotive = atTheDepot(helper, RailworksRegistries.CREATIVE_CHARGER.get(), false);
+        BlockPos engineRoom = LogisticsTests.besideTheLeadingEngineRoom(helper, LogisticsTests.DEPOT);
+        helper.startSequence()
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    helper.assertTrue(charge(helper, locomotive) == 0L, "the Charger beside the cab gave " + charge(helper, locomotive) + " FE");
+                    expectJade(helper, CAB, List.of("tooltip.railworks.charger.jade.station_leading",
+                            "tooltip.railworks.charger.jade.not_engine_room"));
+                    helper.setBlock(engineRoom, RailworksRegistries.CREATIVE_CHARGER.get());
+                    expectJade(helper, engineRoom, List.of("tooltip.railworks.charger.jade.station_leading",
+                            "tooltip.railworks.charger.jade.engine_room"));
+                })
+                .thenWaitUntil(() -> helper.assertTrue(charge(helper, locomotive) == ChargeSpec.locomotiveCapacity(),
+                        "not yet full from beside the Engine room"))
+                .thenExecute(() -> LogisticsTests.forceLoad(helper, false))
+                .thenSucceed();
+    }
+
+    /** Jade on the Charger at {@code pos} shows lines of {@code keys}, in order. */
+    private static void expectJade(GameTestHelper helper, BlockPos pos, List<String> keys) {
+        List<String> said = ChargerReport.of(helper.getBlockEntity(pos, ChargerBlockEntity.class)).lines().stream()
+                .map(line -> line.getContents() instanceof TranslatableContents words ? words.getKey() : line.getString())
+                .toList();
+        helper.assertTrue(said.equals(keys), "Jade on the Charger says " + said + ", not " + keys);
     }
 
     // ---- the Burner Generator ----

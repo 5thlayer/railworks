@@ -103,6 +103,9 @@ class LogisticsTest {
     }
 
     // ---- the hatches ----
+    //
+    // Each stands beside the middle block of its car spot, a Locomotive's Engine room where one
+    // stands there, unless moved off it by besideAnotherBlock.
 
     private Logistics.Hatch<String> provider(Station station, int spot, String item, long count) {
         return provider(station, spot, Goods.Kind.ITEMS, item, count);
@@ -113,14 +116,15 @@ class LogisticsTest {
     }
 
     private Logistics.Hatch<String> provider(Station station, int spot, Goods.Kind kind, String item, long count) {
-        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, true, kind, Optional.empty());
+        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, true, true, kind,
+                Optional.empty());
         hatches.add(hatch);
         goods.put(hatch, item, count);
         return hatch;
     }
 
     private Logistics.Hatch<String> requester(Station station, int spot, Goods.Kind kind, String item, int count) {
-        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, false, kind,
+        Logistics.Hatch<String> hatch = new Logistics.Hatch<>(nextHatch++, 0, 0, station, spot, true, false, kind,
                 Optional.of(new HatchRequest<>(item, count)));
         hatches.add(hatch);
         return hatch;
@@ -130,14 +134,14 @@ class LogisticsTest {
 
     /** A Charger beside {@code spot} of {@code station}, its buffer holding {@code fe}. */
     private Logistics.Charger charger(Station station, int spot, long fe) {
-        Logistics.Charger charger = new Logistics.Charger(nextHatch++, 0, 0, station, spot, false);
+        Logistics.Charger charger = new Logistics.Charger(nextHatch++, 0, 0, station, spot, true, false);
         chargers.add(charger);
         goods.buffers.put(charger.x(), fe);
         return charger;
     }
 
     private Logistics.Charger creativeCharger(Station station, int spot) {
-        Logistics.Charger charger = new Logistics.Charger(nextHatch++, 0, 0, station, spot, true);
+        Logistics.Charger charger = new Logistics.Charger(nextHatch++, 0, 0, station, spot, true, true);
         chargers.add(charger);
         return charger;
     }
@@ -681,6 +685,45 @@ class LogisticsTest {
     }
 
     @Test
+    void onlyAProviderBesideALocomotivesEngineRoomFuelsIt() {
+        line();
+        Logistics.Hatch<String> besideTheCab = besideAnotherBlock(provider(QUARRY, Platform.LEADING, "coal", 16));
+        Train train = eastbound(23.5, 1);
+        runFor(100);
+        assertEquals(0, goods.fuel((Locomotive) train.cars().getFirst(), "coal"));
+        assertEquals(16, goods.held(besideTheCab, "coal"));
+        provider(QUARRY, Platform.LEADING, "coal", 16);
+        runFor(100);
+        assertEquals(16, goods.fuel((Locomotive) train.cars().getFirst(), "coal"), "from beside its Engine room");
+    }
+
+    @Test
+    void theBackLocomotiveOfAShuttleIsFuelledFromBesideItsOwnEngineRoom() {
+        line();
+        // Locomotive, Cargo car, Locomotive: the back one stands at spot 1 of the Quarry.
+        Logistics.Hatch<String> besideTheBay = besideAnotherBlock(provider(QUARRY, 1, "coal", 16));
+        provider(QUARRY, 1, "wood", 16);
+        Train train = shuttle(23.5);
+        Locomotive back = (Locomotive) train.cars().getLast();
+        runFor(100);
+        assertEquals(16, goods.fuel(back, "wood"), "from beside its own Engine room");
+        assertEquals(0, goods.fuel(back, "coal"));
+        assertEquals(16, goods.held(besideTheBay, "coal"));
+        assertEquals(0, goods.fuel((Locomotive) train.cars().getFirst(), "wood"), "no provider beside the front one's");
+    }
+
+    @Test
+    void aHatchBesideAnyBlockOfTheLeadingCarsPlaceTradesWithACargoCarLeading() {
+        line();
+        Logistics.Hatch<String> quarry = besideAnotherBlock(provider(QUARRY, Platform.LEADING, "iron", 64));
+        Logistics.Hatch<String> depot = besideAnotherBlock(requester(DEPOT, Platform.LEADING, "iron", 1));
+        Train train = automatic(Train.of(onLine(15.0), List.of(CargoCar.create(), fuelled())));
+        runUntil(() -> kind(train) == Logistics.Kind.WAITING && goods.held(depot, "iron") > 0, "delivered");
+        assertEquals(0, goods.held(quarry, "iron"));
+        assertEquals(64, goods.held(depot, "iron"));
+    }
+
+    @Test
     void onlyFuelThatBurnsLeavingNothingGoesIn() {
         line();
         Logistics.Hatch<String> quarry = provider(QUARRY, Platform.LEADING, "lava_bucket", 1);
@@ -807,6 +850,19 @@ class LogisticsTest {
         runFor(50);
         assertEquals(1_000_000L, goods.buffers.get(besideTheBurner.x()));
         assertEquals(1_000_000L, goods.buffers.get(besideTheCargo.x()));
+    }
+
+    @Test
+    void onlyAChargerBesideAnElectricLocomotivesEngineRoomChargesIt() {
+        line();
+        Logistics.Charger besideTheCab = besideAnotherBlock(charger(QUARRY, Platform.LEADING, 1_000_000L));
+        Train train = electricEastbound(23.5, 1, 0L);
+        runFor(20);
+        assertEquals(0L, goods.charge(first(train)));
+        assertEquals(1_000_000L, goods.buffers.get(besideTheCab.x()));
+        charger(QUARRY, Platform.LEADING, 1_000_000L);
+        step();
+        assertEquals(10_000L, goods.charge(first(train)), "from beside its Engine room");
     }
 
     @Test
@@ -989,7 +1045,7 @@ class LogisticsTest {
         requester(DEPOT, 0, "iron", 1);
         Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_LOAD, "set off");
-        replace(mine, new Logistics.Hatch<>(mine.x(), mine.y(), mine.z(), MINE, 0, false, Goods.Kind.ITEMS, Optional.empty()));
+        replace(mine, new Logistics.Hatch<>(mine.x(), mine.y(), mine.z(), MINE, 0, true, false, Goods.Kind.ITEMS, Optional.empty()));
         step();
         assertEquals(Logistics.Kind.WAITING, kind(train));
     }
@@ -1021,7 +1077,7 @@ class LogisticsTest {
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
         Train train = shuttle(50.0);
         runUntil(() -> kind(train) == Logistics.Kind.TO_UNLOAD, "loaded");
-        replace(depot, new Logistics.Hatch<>(depot.x(), depot.y(), depot.z(), DEPOT, 0, true, Goods.Kind.ITEMS, Optional.empty()));
+        replace(depot, new Logistics.Hatch<>(depot.x(), depot.y(), depot.z(), DEPOT, 0, true, true, Goods.Kind.ITEMS, Optional.empty()));
         step();
         assertEquals(Logistics.Kind.HOLDING, kind(train));
     }
@@ -1338,10 +1394,26 @@ class LogisticsTest {
         hatches.set(hatches.indexOf(hatch), with);
     }
 
+    /** {@code hatch} beside another block of its car spot than the middle, a Locomotive's cab or bay, which is the hatch it becomes. */
+    private Logistics.Hatch<String> besideAnotherBlock(Logistics.Hatch<String> hatch) {
+        Logistics.Hatch<String> moved = new Logistics.Hatch<>(hatch.x(), hatch.y(), hatch.z(), hatch.station(),
+                hatch.spot(), false, hatch.provider(), hatch.holds(), hatch.request());
+        replace(hatch, moved);
+        return moved;
+    }
+
+    /** {@code charger} beside another block of its car spot than the middle, a Locomotive's cab or bay, which is the Charger it becomes. */
+    private Logistics.Charger besideAnotherBlock(Logistics.Charger charger) {
+        Logistics.Charger moved = new Logistics.Charger(charger.x(), charger.y(), charger.z(), charger.station(),
+                charger.spot(), false, charger.creative());
+        chargers.set(chargers.indexOf(charger), moved);
+        return moved;
+    }
+
     /** {@code hatch}, a requester, asking for {@code stacks} of {@code item} now, which is the hatch it becomes. */
     private Logistics.Hatch<String> ask(Logistics.Hatch<String> hatch, String item, int stacks) {
         Logistics.Hatch<String> asking = new Logistics.Hatch<>(hatch.x(), hatch.y(), hatch.z(), hatch.station(),
-                hatch.spot(), false, hatch.holds(), Optional.of(new HatchRequest<>(item, stacks)));
+                hatch.spot(), hatch.engineRoom(), false, hatch.holds(), Optional.of(new HatchRequest<>(item, stacks)));
         replace(hatch, asking);
         return asking;
     }

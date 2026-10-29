@@ -167,9 +167,53 @@ class PlatformTest {
         assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(26, 7, -2), "beside its fifth block");
         assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(26, 7, 2), "beside its fifth block");
         assertEquals(OptionalInt.of(Platform.LEADING), platform.spotBeside(30, 7, 2), "the Station's own block");
-        assertEquals(Optional.of(new Platform.Joined(south(30), Platform.LEADING)),
+        assertEquals(Optional.of(new Platform.Joined(south(30), Platform.LEADING, false)),
                 Platform.joined(network, List.of(south(30)), 26, 7, -2));
         assertEquals(10, platform.besideBlocks(network).stream().filter(b -> b.spot() == Platform.LEADING).count());
+    }
+
+    @Test
+    void theBlockBesideALocomotivesEngineRoomIsBesideTheMiddleOfTheLeadingCarsPlace() {
+        line();
+        Platform platform = platform(south(30));
+        // The leading Locomotive stands from 25.5 to 30.5, its Engine room over its middle block, at 28.
+        assertTrue(platform.besideEngineRoom(28, 7, -2));
+        assertTrue(platform.besideEngineRoom(28, 7, 2));
+        assertFalse(platform.besideEngineRoom(29, 7, 2), "beside its cab");
+        assertFalse(platform.besideEngineRoom(30, 7, 2), "the Station's own block, beside its cab's front");
+        assertFalse(platform.besideEngineRoom(27, 7, 2), "beside its bay");
+        assertFalse(platform.besideEngineRoom(26, 7, -2), "beside its bay's back");
+        assertFalse(platform.besideEngineRoom(28, 6, 2), "off the row");
+        assertEquals(Optional.of(new Platform.Joined(south(30), Platform.LEADING, true)),
+                Platform.joined(network, List.of(south(30)), 28, 7, -2));
+    }
+
+    @Test
+    void theBlockBesideALocomotivesEngineRoomIsBesideTheMiddleOfACarSpot() {
+        line();
+        Platform platform = platform(south(30));
+        // A Locomotive at a car spot, as the back one of L-C-L, has its Engine room over the spot's middle.
+        assertTrue(platform.besideEngineRoom(23, 7, 2), "the first spot's middle, at 23");
+        assertTrue(platform.besideEngineRoom(18, 7, -2), "the second's, at 18");
+        assertTrue(platform.besideEngineRoom(8, 7, 2), "the fourth's, at 8");
+        assertFalse(platform.besideEngineRoom(22, 7, 2));
+        assertFalse(platform.besideEngineRoom(24, 7, 2));
+        assertFalse(platform.besideEngineRoom(25, 7, -2), "beside the spot's first block");
+        assertFalse(platform.besideEngineRoom(3, 7, 2), "behind the last spot");
+        assertEquals(10, platform.besideBlocks(network).stream()
+                .filter(b -> platform.besideEngineRoom(b.x(), b.y(), b.z())).count(), "one each side of five places");
+        assertEquals(Optional.of(new Platform.Joined(south(30), 1, true)),
+                Platform.joined(network, List.of(south(30)), 18, 7, 2));
+    }
+
+    @Test
+    void theEngineRoomsBlockFollowsTheServingWay() {
+        line();
+        // Serving Trains heading for A, the leading car's place runs from 28.5 to 33.5, its middle at 31.
+        Platform platform = platform(north(29));
+        assertTrue(platform.besideEngineRoom(31, 7, 2));
+        assertTrue(platform.besideEngineRoom(36, 7, -2), "the first spot's middle");
+        assertFalse(platform.besideEngineRoom(29, 7, -2), "the Station's own block");
     }
 
     @Test
@@ -248,11 +292,12 @@ class PlatformTest {
         Station mine = south(25);
         Station smelter = north(31);
         List<Station> stations = List.of(smelter, mine);
-        assertEquals(Optional.of(new Platform.Joined(mine, 1)), Platform.joined(network, stations, 15, 7, -2));
-        assertEquals(Optional.of(new Platform.Joined(smelter, 0)), Platform.joined(network, stations, 38, 7, 2));
-        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING)), Platform.joined(network, stations, 35, 7, 2),
+        assertEquals(Optional.of(new Platform.Joined(mine, 1, false)), Platform.joined(network, stations, 15, 7, -2));
+        assertEquals(Optional.of(new Platform.Joined(smelter, 0, true)), Platform.joined(network, stations, 38, 7, 2),
+                "beside the middle of its first spot");
+        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING, false)), Platform.joined(network, stations, 35, 7, 2),
                 "beside the smelter's leading car's fifth block");
-        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING)), Platform.joined(network, stations, 31, 7, 2),
+        assertEquals(Optional.of(new Platform.Joined(smelter, Platform.LEADING, false)), Platform.joined(network, stations, 31, 7, 2),
                 "beside the smelter's leading car");
         assertEquals(Optional.empty(), Platform.joined(network, stations, 28, 7, 2), "between the two platforms");
         assertEquals(Optional.empty(), Platform.joined(network, List.of(), 20, 7, -2), "with no Station");

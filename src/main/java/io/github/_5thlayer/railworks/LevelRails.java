@@ -406,7 +406,7 @@ public final class LevelRails extends SavedData {
                 continue;
             }
             PlatformsNear.joined(level, pos).ifPresent(at -> joined.add(new Logistics.Charger(pos.getX(), pos.getY(),
-                    pos.getZ(), at.station(), at.spot(), charger.creative())));
+                    pos.getZ(), at.station(), at.spot(), at.engineRoom(), charger.creative())));
         }
         return List.copyOf(joined);
     }
@@ -417,7 +417,8 @@ public final class LevelRails extends SavedData {
         for (Hatches.Hatch hatch : LevelHatches.of(level).all()) {
             BlockPos pos = hatch.pos();
             PlatformsNear.joined(level, pos).ifPresent(at -> joined.add(new Logistics.Hatch<>(pos.getX(), pos.getY(),
-                    pos.getZ(), at.station(), at.spot(), hatch.mode() == HatchMode.PROVIDER, hatch.holds(), hatch.request())));
+                    pos.getZ(), at.station(), at.spot(), at.engineRoom(), hatch.mode() == HatchMode.PROVIDER, hatch.holds(),
+                    hatch.request())));
         }
         return List.copyOf(joined);
     }

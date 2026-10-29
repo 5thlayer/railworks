@@ -1,11 +1,12 @@
 # Charging at a Station: the refuel scene's line and Stations, its shuttle of two Electric
 # Locomotives standing at Mine with no charge. Creative Chargers stand beside Mine's leading car's
 # place, where the Locomotive facing west stands, and beside its second car spot, where the one
-# facing east stands, and fill both before the Train takes its first job. Beside Smelter's leading
-# car's place, where the Locomotive that led the Train round the line stands to unload, a Charger
-# stands against a Burner Generator behind it, away from the Rail, which a hopper feeds coal from a
-# chest: it charges that Locomotive each time it comes, with no cable, so the shuttle runs with
-# nobody near it until Mine runs dry.
+# facing east stands, each by the Locomotive's Engine room, its middle block, the one block a Charger
+# charges it from, and fill both before the Train takes its first job. Beside the Engine room of the
+# Locomotive that led the Train round the line, standing at Smelter's leading car's place to
+# unload, a Charger stands against a Burner Generator behind it, away from the Rail, which a hopper
+# feeds coal from a chest: it charges that Locomotive each time it comes, with no cable, so the
+# shuttle runs with nobody near it until Mine runs dry.
 function railworks:gallery/clear
 function railworks:gallery/sign {scene:"charge"}
 function railworks:gallery/shuttle {south:"Mine",north:"Smelter"}

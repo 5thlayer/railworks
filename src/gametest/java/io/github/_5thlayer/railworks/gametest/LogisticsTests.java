@@ -67,7 +67,10 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * {@code refuel_}, for a rider logging out of a Train on its job (#56), whose names share
  * {@code logout_} with {@code LocomotiveTests}' logging out, for a job run with its Cargo car
  * out of view (#59), whose name shares {@code record_} with {@code CarRecordTests}, and for the
- * leading car's place covering a Locomotive's five blocks (#62, #70), whose name shares {@code loco_length_}.
+ * leading car's place covering a Locomotive's five blocks (#62, #70), whose name shares {@code loco_length_},
+ * and for a Locomotive fuelled only from beside its Engine room (#74), whose name shares
+ * {@code engine_room_} with {@code EngineRoomTests}. A provider fuelling a Locomotive stands beside
+ * its Engine room, the middle block of the leading car's place.
  */
 final class LogisticsTests {
 
@@ -122,8 +125,8 @@ final class LogisticsTests {
         tests.testOnItsOwn("refuel_a_stack_the_fuel_slots_cannot_take_is_passed_over", 400, LogisticsTests::refuelsPastAStack);
         tests.testOnItsOwn("logout_leaves_the_riders_car_in_its_train_on_its_job", 1_200, LogisticsTests::riderLogsOut);
         tests.testOnItsOwn("record_a_job_loads_and_unloads_a_cargo_car_out_of_view", 1_200, LogisticsTests::cargoOutOfView);
-        tests.testOnItsOwn("loco_length_a_provider_by_a_stopped_locomotives_back_block_fuels_it_and_the_first_spot_loads_the_car_behind",
-                400, LogisticsTests::backBlock);
+        tests.testOnItsOwn("engine_room_a_stopped_locomotive_is_fuelled_from_beside_its_engine_room_not_its_cab_or_bay_and_the_first_spot_loads_the_car_behind",
+                400, LogisticsTests::engineRoom);
     }
 
     // ---- the mode ----
@@ -344,7 +347,7 @@ final class LogisticsTests {
     private static LocomotiveEntity atTheDepot(GameTestHelper helper, List<ItemStack> fuel) {
         Span last = line(helper);
         station(helper, DEPOT);
-        BlockPos hatch = besideTheLeadingCar(helper, DEPOT);
+        BlockPos hatch = besideTheLeadingEngineRoom(helper, DEPOT);
         helper.setBlock(hatch, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
         fuel.forEach(stack -> insert(record(helper, hatch), stack));
         Locomotive east = Locomotive.burner();
@@ -358,7 +361,7 @@ final class LogisticsTests {
 
     private static void refuels(GameTestHelper helper) {
         LocomotiveEntity locomotive = atTheDepot(helper);
-        BlockPos fuel = besideTheLeadingCar(helper, DEPOT);
+        BlockPos fuel = besideTheLeadingEngineRoom(helper, DEPOT);
         locomotive.train().setAutomatic(true);
         ItemStack full = new ItemStack(Items.COAL, 64);
         helper.startSequence()
@@ -406,19 +409,29 @@ final class LogisticsTests {
     /**
      * A Train of a dry Locomotive facing east, a Cargo car and a fuelled Locomotive facing west, standing
      * automatic at the Depot, its leading car's place five blocks long: a provider of coal beside its
-     * fifth block, the one furthest from the Station, fills the leading Locomotive's slots, and a
+     * middle block, the leading Locomotive's Engine room, fills its slots, while providers of charcoal
+     * beside its fifth block, the bay's back, and beside its cab, by the Station, give it none; and a
      * provider of iron beside the first car spot, for the Mine's requester, loads the Cargo car
      * coupled right behind it.
      */
-    private static void backBlock(GameTestHelper helper) {
+    private static void engineRoom(GameTestHelper helper) {
         Span last = line(helper);
         station(helper, MINE);
         station(helper, DEPOT);
-        BlockPos fuel = besideTheLeadingCarsBack(helper, DEPOT);
-        if (DEPOT.getX() - fuel.getX() != (int) Platform.LEAD - 1) {
-            helper.fail("the block beside the leading car's back is at x " + fuel.getX() + ", not four behind the Depot", fuel);
+        BlockPos bay = besideTheLeadingCarsBack(helper, DEPOT);
+        if (DEPOT.getX() - bay.getX() != (int) Platform.LEAD - 1) {
+            helper.fail("the block beside the leading car's back is at x " + bay.getX() + ", not four behind the Depot", bay);
         }
-        helper.setBlock(fuel, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        BlockPos cab = DEPOT.west();
+        BlockPos fuel = besideTheLeadingEngineRoom(helper, DEPOT);
+        if (DEPOT.getX() - fuel.getX() != (int) (Platform.LEAD / 2.0)) {
+            helper.fail("the block beside the leading car's Engine room is at x " + fuel.getX() + ", not two behind the Depot", fuel);
+        }
+        for (BlockPos pos : List.of(bay, cab, fuel)) {
+            helper.setBlock(pos, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
+        }
+        insert(record(helper, bay), new ItemStack(Items.CHARCOAL, 64));
+        insert(record(helper, cab), new ItemStack(Items.CHARCOAL, 64));
         insert(record(helper, fuel), new ItemStack(Items.COAL, 300));
         // The first car spot's hatch provides here, and the Mine's requests.
         helper.setBlock(REQUESTER, RailworksRegistries.HATCH.get().defaultBlockState().setValue(HatchBlock.MODE, HatchMode.PROVIDER));
@@ -441,6 +454,13 @@ final class LogisticsTests {
         ItemStack full = new ItemStack(Items.COAL, 64);
         helper.startSequence()
                 .thenWaitUntil(() -> LocomotiveTests.expectSlots(helper, leading, List.of(full, full, full, full)))
+                .thenExecute(() -> {
+                    for (BlockPos pos : List.of(bay, cab)) {
+                        if (held(record(helper, pos)) != 64) {
+                            helper.fail("a provider beside the Locomotive's cab or bay gave it fuel", pos);
+                        }
+                    }
+                })
                 .thenWaitUntil(() -> {
                     if (held(record(helper, REQUESTER)) == 64) {
                         helper.fail("the first car spot's hatch still holds its iron, the car "
@@ -465,18 +485,18 @@ final class LogisticsTests {
                 .orElseThrow(() -> helper.assertionException(station, Component.literal("nothing beside its leading car's place")));
     }
 
-    /** A block beside the leading car's place of the Station at {@code station}, clear of the Station's own. */
-    static BlockPos besideTheLeadingCar(GameTestHelper helper, BlockPos station) {
+    /** A block beside the leading car's middle block, the Engine room of a Locomotive standing there, of the Station at {@code station}. */
+    static BlockPos besideTheLeadingEngineRoom(GameTestHelper helper, BlockPos station) {
         var network = LevelRails.of(helper.getLevel()).network();
         BlockPos at = helper.absolutePos(station);
         return LevelStations.of(helper.getLevel()).stations().all().stream()
                 .filter(s -> s.x() == at.getX() && s.y() == at.getY() && s.z() == at.getZ())
                 .flatMap(s -> Platform.of(network, s).stream())
-                .flatMap(p -> p.besideBlocks(network).stream())
-                .filter(b -> b.spot() == Platform.LEADING)
-                // Back to the test's own positions: from its origin, as absolutePos counts them.
+                .flatMap(p -> p.besideBlocks(network).stream()
+                        .filter(b -> b.spot() == Platform.LEADING && p.besideEngineRoom(b.x(), b.y(), b.z())))
+                // On the Station's side of the Rail, back to the test's own positions: from its origin, as absolutePos counts them.
+                .filter(b -> b.z() == at.getZ())
                 .map(b -> new BlockPos(b.x(), b.y(), b.z()).subtract(helper.absolutePos(BlockPos.ZERO)))
-                .filter(pos -> !pos.equals(station))
                 .findFirst()
                 .orElseThrow(() -> helper.assertionException(station, Component.literal("nothing beside its leading car's place")));
     }

@@ -53,18 +53,20 @@ import java.util.function.ToLongFunction;
  * holding.
  *
  * <p>Fuel goes in at a Station too (ADR 0008): an automatic Train at rest at one, on a
- * job or waiting, has each Locomotive standing beside a provider there topped up from it, a stack a
- * turn, of fuel no load claims, as far as its fuel slots take it; a Train on a job waits while there
- * is more. A hatch beside the leading car's place, {@link Platform#LEADING}, serves the car standing
- * there as a car spot's does, pairing in jobs with the leading car's place of the other Station.
+ * job or waiting, has each Locomotive with a provider beside its Engine room there topped up from
+ * it, a stack a turn, of fuel no load claims, as far as its fuel slots take it; a Train on a job waits
+ * while there is more. Only the block beside the Engine room fuels a Locomotive, at the leading car's
+ * place or at a car spot (ADR 0010); a hatch beside any block of a place trades with a Cargo or Fluid
+ * car standing there. A hatch beside the leading car's place, {@link Platform#LEADING}, serves the car
+ * standing there as a car spot's does, pairing in jobs with the leading car's place of the other Station.
  *
  * <p>Charge goes in at a Station too (ADR 0005, amended in #9): each Charger there gives the
- * Electric Locomotive standing beside it up to {@link ChargeSpec#chargerRate()} FE a tick, a Creative
+ * Electric Locomotive whose Engine room it stands beside up to {@link ChargeSpec#chargerRate()} FE a tick, a Creative
  * Charger all it takes, of any Train at rest at that Station, manual as well as automatic: an
  * automatic one waiting there with no job or stopped there on its job, never one held there on its
  * way elsewhere. Several Chargers beside one Locomotive all give. A Train on a job waits while
  * charge flows into a Locomotive not yet full, and leaves once each is full or nothing flows. A
- * Charger beside any other car gives nothing.
+ * Charger beside a Locomotive's cab or bay, or beside any other car, gives nothing.
  *
  * <p>Goods are of two {@link Goods.Kind kinds}, items and fluid, and each hatch is of one. A hatch of
  * items trades only with a Cargo car, a Fluid hatch only with a Fluid car, so a load is planned at a
@@ -96,11 +98,13 @@ public final class Logistics<I> {
 
     /**
      * A hatch as logistics sees it: where it stands, which is its identity, the Station it joins and
-     * the car spot it is beside there, whether it is a provider or a requester, the kind of goods it
-     * holds, and what a requester asks for. Only a hatch that joins a Station is handed in.
+     * the car spot it is beside there, whether it is beside the spot's middle block, a Locomotive's
+     * Engine room where one stands there ({@link Platform#besideEngineRoom}), whether it is a provider
+     * or a requester, the kind of goods it holds, and what a requester asks for. Only a hatch that
+     * joins a Station is handed in.
      */
-    public record Hatch<I>(int x, int y, int z, Station station, int spot, boolean provider, Goods.Kind holds,
-                           Optional<HatchRequest<I>> request) {
+    public record Hatch<I>(int x, int y, int z, Station station, int spot, boolean engineRoom, boolean provider,
+                           Goods.Kind holds, Optional<HatchRequest<I>> request) {
 
         boolean samePlace(Hatch<?> other) {
             return x == other.x && y == other.y && z == other.z;
@@ -109,10 +113,11 @@ public final class Logistics<I> {
 
     /**
      * A Charger as logistics sees it: where it stands, which is its identity, the Station it joins
-     * and the car spot it is beside there, and whether it is a Creative Charger, which never runs
-     * out. Only a Charger that joins a Station is handed in.
+     * and the car spot it is beside there, whether it is beside the spot's middle block, a
+     * Locomotive's Engine room where one stands there, and whether it is a Creative Charger, which
+     * never runs out. Only a Charger that joins a Station is handed in.
      */
-    public record Charger(int x, int y, int z, Station station, int spot, boolean creative) {
+    public record Charger(int x, int y, int z, Station station, int spot, boolean engineRoom, boolean creative) {
     }
 
     /** What a status line says an automatic Train does. */
@@ -280,9 +285,9 @@ public final class Logistics<I> {
     /**
      * One tick: Trains no longer automatic, or gone, coupled or parted, drop their jobs and with them
      * their claims; loads claimed against a hatch no longer there as it was are dropped; each automatic
-     * Train at rest at a Station is fuelled by the providers beside its Locomotives; each Train at
-     * rest at a Station is charged by the Chargers beside its Electric Locomotives, as far as its job
-     * lets it; each automatic Train stopped on a job trades with the hatches there and leaves when it
+     * Train at rest at a Station is fuelled by the providers beside its Locomotives' Engine rooms; each
+     * Train at rest at a Station is charged by the Chargers beside its Electric Locomotives', as far
+     * as its job lets it; each automatic Train stopped on a job trades with the hatches there and leaves when it
      * is done; and once every {@link #PLAN_TICKS} jobs are planned. {@code hatches} and
      * {@code chargers} are those that join a Station, in the order they were placed.
      */
@@ -480,9 +485,9 @@ public final class Logistics<I> {
 
     /**
      * One tick of fuelling {@code train} (ADR 0008): at rest at a Station, waiting with no job or
-     * stopped at its job's, each provider there beside one of its Locomotives moves a stack of fuel
-     * into it every {@link #hatchTicksPerStack()} ticks, the first on the first tick at rest, of what
-     * no load claims, as far as its fuel slots take it; a Train on its way, held at another Station,
+     * stopped at its job's, each provider there beside the Engine room of one of its Locomotives
+     * moves a stack of fuel into it every {@link #hatchTicksPerStack()} ticks, the first on the first
+     * tick at rest, of what no load claims, as far as its fuel slots take it; a Train on its way, held at another Station,
      * takes none, and a Fluid hatch gives none. Its Train waits on its job while there is more to move.
      * Whether any fuel moved.
      */
@@ -501,7 +506,7 @@ public final class Logistics<I> {
         boolean moved = false;
         Beside beside = new Beside(network, train, job);
         for (Hatch<I> hatch : hatches) {
-            Locomotive locomotive = hatch.provider() ? beside.locomotive(hatch.station(), hatch.spot()) : null;
+            Locomotive locomotive = hatch.provider() && hatch.engineRoom() ? beside.locomotive(hatch.station(), hatch.spot()) : null;
             if (locomotive == null || locomotive.isElectric() || hatch.holds() != Goods.Kind.ITEMS) {
                 continue;
             }
@@ -521,8 +526,8 @@ public final class Logistics<I> {
 
     /**
      * One tick of charging {@code train}: at rest at a Station, manual or waiting with no
-     * {@code job}, or stopped at its job's, each Charger there beside one of its Electric Locomotives
-     * gives it up to its rate, a Creative Charger all it takes; a Train on its way, held at another
+     * {@code job}, or stopped at its job's, each Charger there beside the Engine room of one of its
+     * Electric Locomotives gives it up to its rate, a Creative Charger all it takes; a Train on its way, held at another
      * Station, takes none. What moved, and whether it moved into a Locomotive with room left.
      */
     private Charged charge(RailNetwork network, Train train, Job<I> job, List<Charger> chargers, Goods<I> goods) {
@@ -533,7 +538,7 @@ public final class Logistics<I> {
         Set<Locomotive> charged = new HashSet<>();
         Beside beside = new Beside(network, train, job);
         for (Charger charger : chargers) {
-            Locomotive locomotive = beside.locomotive(charger.station(), charger.spot());
+            Locomotive locomotive = charger.engineRoom() ? beside.locomotive(charger.station(), charger.spot()) : null;
             if (locomotive == null || !locomotive.isElectric()) {
                 continue;
             }

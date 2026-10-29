@@ -525,7 +525,8 @@ final class HatchTests {
         }
         hatch(helper, player, LEADER, HatchMode.PROVIDER);
         expectLines(helper, HatchReport.of(helper.getBlockEntity(LEADER, HatchBlockEntity.class)).lines(),
-                List.of("tooltip.railworks.hatch.jade.provider", "tooltip.railworks.hatch.jade.station_leading"));
+                List.of("tooltip.railworks.hatch.jade.provider", "tooltip.railworks.hatch.jade.station_leading",
+                        "tooltip.railworks.hatch.jade.engine_room"));
         helper.setBlock(STATION, Blocks.AIR);
         expectLines(helper, HatchReport.of(helper.getBlockEntity(SECOND, HatchBlockEntity.class)).lines(),
                 List.of("tooltip.railworks.hatch.jade.requester", "message.railworks.hatch.requesting",
