@@ -23,6 +23,7 @@ class ClearanceTest {
     @AfterEach
     void resetLimits() {
         SpanRules.configureGrade(SpanRules.DEFAULT_GRADE_LIMIT);
+        SpanRules.configureBend(SpanRules.DEFAULT_BEND_LIMIT);
     }
 
     @Test
@@ -116,29 +117,47 @@ class ClearanceTest {
 
     @Test
     void aBentSpanOfTheSwingClearLengthAfterAStraightLegLeavesItsRowClearAndAShorterOneDoesNot() {
-        // A Straight leg east to A, then a Span on in line to B, bending at the limit there, either
-        // way, onto a Span of any length: the row two off the leg at a Cargo car's chests' height,
-        // where hatches stand, against the bent Span's and the next one's Clearance.
-        for (int bent = 1; bent <= 12; bent++) {
+        // At the default limit, 45 degrees, bending onto a diagonal of any length: 4 blocks.
+        assertEquals(4, Clearance.swingClearLength());
+        expectSwingClear(Clearance.swingClearLength(), 1, 1);
+    }
+
+    @Test
+    void aSharperConfiguredBendLimitNeedsALongerBentSpanAndAGentlerOneNoLonger() {
+        SpanRules.configureBend(90.0);
+        int right = Clearance.swingClearLength();
+        assertTrue(right > 4, "a right angle swings clear only " + right + " on");
+        expectSwingClear(right, 0, 1);
+        SpanRules.configureBend(Math.toDegrees(Math.atan2(1, 2)));
+        int gentle = Clearance.swingClearLength();
+        assertTrue(gentle <= 4, "a gentle bend swings clear only " + gentle + " on");
+        expectSwingClear(gentle, 2, 1);
+    }
+
+    /**
+     * A Straight leg east to A, then a Span on in line to B, bending there onto a Span heading
+     * ({@code dx}, {@code dz}), at every length up to ten times that: shorter than {@code length} its
+     * cars swing into the row two off the leg at a Cargo car's chests' height, where hatches stand, for
+     * some length beyond, and from {@code length} to a dozen more blocks they never do.
+     */
+    private static void expectSwingClear(int length, int dx, int dz) {
+        for (int bent = Math.max(1, length - 1); bent <= length + 12; bent++) {
             boolean clash = false;
-            for (int turn : new int[] {-1, 1}) {
-                for (int k = 1; k <= 10; k++) {
-                    Arm b = new Arm(bent, 5, 0);
-                    Arm c = new Arm(bent + k, 5, k * turn);
-                    RailNetwork line = new RailNetwork();
-                    line.add(Span.of(new Arm(-20, 5, 0), A, 1));
-                    line.add(Span.of(A, b, 1));
-                    line.add(Span.of(b, c, 1));
-                    Set<Clearance.Cell> cells = new HashSet<>(Clearance.along(line.curve(line.get(A, b))));
-                    cells.addAll(Clearance.along(line.curve(line.get(b, c))));
-                    for (int x = -20; x <= 0; x++) {
-                        clash |= cells.contains(new Clearance.Cell(x, 7, 2)) || cells.contains(new Clearance.Cell(x, 7, -2));
-                    }
+            for (int k = 1; k <= 10; k++) {
+                Arm b = new Arm(bent, 5, 0);
+                Arm c = new Arm(bent + dx * k, 5, dz * k);
+                RailNetwork line = new RailNetwork();
+                line.add(Span.of(new Arm(-20, 5, 0), A, 1));
+                line.add(Span.of(A, b, 1));
+                line.add(Span.of(b, c, 1));
+                Set<Clearance.Cell> cells = new HashSet<>(Clearance.along(line.curve(line.get(A, b))));
+                cells.addAll(Clearance.along(line.curve(line.get(b, c))));
+                for (int x = -20; x <= 0; x++) {
+                    clash |= cells.contains(new Clearance.Cell(x, 7, 2)) || cells.contains(new Clearance.Cell(x, 7, -2));
                 }
             }
-            assertEquals(bent < Clearance.SWING_CLEAR_LENGTH, clash, "a bent Span " + bent + " long");
+            assertEquals(bent < length, clash, "a bent Span " + bent + " long, onto (" + dx + ", " + dz + ")");
         }
-        assertEquals(4, Clearance.SWING_CLEAR_LENGTH);
     }
 
     @Test
