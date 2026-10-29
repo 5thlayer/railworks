@@ -89,7 +89,7 @@ A Train with none of its cars in view, run by the level on the same tick and the
 _Avoid_: ghost train, virtual train, unloaded train
 
 **Straight leg**:
-Rail without a bend, square to the blocks: Spans each in line through both their Arms, or ending there, running along x or z, and running on into no bent Span shorter than four blocks, whose cars swing into the row beside it. A Cargo car loads only on one, and a Station is placed only by one (ADR 0007).
+Rail without a bend, square to the blocks: Spans each in line through both their Arms, or ending there, running along x or z, and running on into no bent Span so short that its cars swing into the row beside it: four blocks at the default bend limit, more for a sharper one. A Cargo car loads only on one, and a Station is placed only by one (ADR 0007).
 _Avoid_: straight track
 
 **Station**:
