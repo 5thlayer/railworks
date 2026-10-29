@@ -91,17 +91,24 @@ class ClearanceTest {
 
     @Test
     void aRigidBodyAtTheBendLimitStaysInsideABentSpansClearanceAtEveryStep() {
-        // Bent through both Arms at the limit, 45 degrees, from the shortest diagonal to a long one.
+        // Bent through both Arms at the limit, 45 degrees, from the shortest diagonal to a long one,
+        // level and climbing at about the grade limit, a quarter. The Span's own Pylon columns are
+        // not in its Clearance, though a climbing body's tail dips into its Arms as it leaves them.
         for (int k = 2; k <= 21; k++) {
-            Arm b = new Arm(k, 5, k);
-            RailNetwork bent = new RailNetwork();
-            bent.add(Span.of(new Arm(-k, 5, 0), A, 1));
-            bent.add(Span.of(b, new Arm(2 * k, 5, k), 1));
-            RailCurve curve = RailCurve.between(bent, A, b);
-            var cells = Clearance.along(curve);
-            for (double s = 0.0; s <= curve.length(); s += 0.025) {
-                for (Clearance.Cell cell : body(curve.at(s))) {
-                    assertTrue(cells.contains(cell), "diagonal " + k + ", body " + s + " along, at " + cell);
+            for (int climb : new int[] {0, k / 3}) {
+                Arm b = new Arm(k, 5 + climb, k);
+                RailNetwork bent = new RailNetwork();
+                bent.add(Span.of(new Arm(-k, 5, 0), A, 1));
+                bent.add(Span.of(b, new Arm(2 * k, 5 + climb, k), 1));
+                RailCurve curve = RailCurve.between(bent, A, b);
+                var cells = Clearance.along(curve);
+                for (double s = 0.0; s <= curve.length(); s += 0.025) {
+                    for (Clearance.Cell cell : body(curve.at(s))) {
+                        boolean column = (cell.x() == A.x() && cell.z() == A.z() && cell.y() <= A.y())
+                                || (cell.x() == b.x() && cell.z() == b.z() && cell.y() <= b.y());
+                        assertTrue(column || cells.contains(cell),
+                                "diagonal " + k + " climbing " + climb + ", body " + s + " along, at " + cell);
+                    }
                 }
             }
         }

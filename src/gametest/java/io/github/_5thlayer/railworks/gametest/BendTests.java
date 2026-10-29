@@ -41,7 +41,7 @@ import net.minecraft.world.phys.Vec3;
  */
 final class BendTests {
 
-    /** A line bending 45 degrees, the limit, at {@link #B}: east from A, then north-east to C. */
+    /** A line bending 45 degrees, the limit, at {@link #B}: east from A, then south-east to C. */
     static final BlockPos A = new BlockPos(1, 1, 2);
     static final BlockPos B = new BlockPos(8, 1, 2);
     static final BlockPos C = new BlockPos(13, 1, 7);
@@ -67,11 +67,16 @@ final class BendTests {
 
     private static void spanRefused(GameTestHelper helper) {
         ground(helper);
-        string(helper, A, B);
+        // Outside the straight Span's Clearance: it strings past the stone.
         helper.setBlock(SWUNG_INTO, Blocks.STONE);
+        string(helper, A, B);
         var outcome = LevelRails.of(helper.getLevel()).string(helper.getLevel(), helper.absolutePos(B), helper.absolutePos(C));
         if (outcome.result() != Stringing.Result.BLOCKED) {
             helper.fail("the Span bending the line at B past stone its cars swing into was " + outcome.result(), SWUNG_INTO);
+        }
+        BlockPos blocked = helper.absolutePos(SWUNG_INTO);
+        if (!new Clearance.Cell(blocked.getX(), blocked.getY(), blocked.getZ()).equals(outcome.blocked())) {
+            helper.fail("the Span was refused for " + outcome.blocked() + ", not the stone a car swings into", SWUNG_INTO);
         }
         helper.succeed();
     }
@@ -79,7 +84,6 @@ final class BendTests {
     private static void blockRefused(GameTestHelper helper) {
         ground(helper);
         string(helper, A, B);
-        string(helper, B, C);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         BlockPos stand = helper.absolutePos(new BlockPos(4, 1, -1));
@@ -87,16 +91,27 @@ final class BendTests {
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.STONE, 4));
         BlockPos under = SWUNG_INTO.below();
         helper.setBlock(under, Blocks.STONE);
-        BlockPos absolute = helper.absolutePos(under);
-        player.gameMode.useItemOn(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND,
-                new BlockHitResult(Vec3.atCenterOf(absolute).relative(Direction.UP, 0.5), Direction.UP, absolute, false));
+        // Beside the straight line the block stays; once the line bends at B it is refused.
+        placeOnTop(helper, player, under);
+        if (!helper.getBlockState(SWUNG_INTO).is(Blocks.STONE)) {
+            helper.fail("a block two off the straight line was refused", SWUNG_INTO);
+        }
+        helper.setBlock(SWUNG_INTO, Blocks.AIR);
+        string(helper, B, C);
+        placeOnTop(helper, player, under);
         if (!helper.getBlockState(SWUNG_INTO).isAir()) {
             helper.fail("a block went where a car swings out on the bend", SWUNG_INTO);
         }
-        if (player.getMainHandItem().getCount() != 4) {
+        if (player.getMainHandItem().getCount() != 3) {
             helper.fail("a refused block was spent", SWUNG_INTO);
         }
         helper.succeed();
+    }
+
+    private static void placeOnTop(GameTestHelper helper, ServerPlayer player, BlockPos on) {
+        BlockPos absolute = helper.absolutePos(on);
+        player.gameMode.useItemOn(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(absolute).relative(Direction.UP, 0.5), Direction.UP, absolute, false));
     }
 
     /**

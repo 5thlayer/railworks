@@ -97,6 +97,7 @@ public final class Clearance {
                 }
             }
             double reach = BODY_LENGTH / 2.0 + curve.length() / steps;
+            // The yaw turned, the short way round across the heading's wrap at a half turn.
             addCar(cells, poses[i], reach * Math.min(yaw, 2 * Math.PI - yaw), reach * pitch);
         }
         cells.removeIf(cell -> underArm(cell, curve.a()) || underArm(cell, curve.b()));
