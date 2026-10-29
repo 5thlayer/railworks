@@ -42,8 +42,6 @@ import org.jspecify.annotations.Nullable;
  */
 public final class LevelClearance {
 
-    /** How far a Span's curve may swing out past the box of its two Arms, with a car's height on top. */
-    private static final int REACH = 4 + (int) Math.ceil(CarBody.HEIGHT);
 
     private LevelClearance() {
     }
@@ -100,12 +98,12 @@ public final class LevelClearance {
 
     /** Whether {@code pos} is within reach of {@code span}'s Clearance at all: a cheap test before the sweep. */
     private static boolean near(Span span, BlockPos pos) {
-        return pos.getX() >= Math.min(span.a().x(), span.b().x()) - REACH
-                && pos.getX() <= Math.max(span.a().x(), span.b().x()) + REACH
-                && pos.getY() >= Math.min(span.a().y(), span.b().y()) - REACH
-                && pos.getY() <= Math.max(span.a().y(), span.b().y()) + REACH
-                && pos.getZ() >= Math.min(span.a().z(), span.b().z()) - REACH
-                && pos.getZ() <= Math.max(span.a().z(), span.b().z()) + REACH;
+        return pos.getX() >= Math.min(span.a().x(), span.b().x()) - Clearance.REACH
+                && pos.getX() <= Math.max(span.a().x(), span.b().x()) + Clearance.REACH
+                && pos.getY() >= Math.min(span.a().y(), span.b().y()) - Clearance.REACH
+                && pos.getY() <= Math.max(span.a().y(), span.b().y()) + Clearance.REACH
+                && pos.getZ() >= Math.min(span.a().z(), span.b().z()) - Clearance.REACH
+                && pos.getZ() <= Math.max(span.a().z(), span.b().z()) + Clearance.REACH;
     }
 
     /** A block placed into a strung Span's Clearance is refused, the placer told why. */

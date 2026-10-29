@@ -93,6 +93,7 @@ public final class RailworksGameTests {
         AutoStringTests.register(tests);
         StationTests.register(tests);
         CurveTests.register(tests);
+        BendTests.register(tests);
         CargoAccessTests.register(tests);
         CarRecordTests.register(tests);
         CarSoundTests.register(tests);
