@@ -3,7 +3,12 @@
 
 package io.github._5thlayer.railworks;
 
+import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.FluidCar;
+import io.github._5thlayer.railworks.rail.Train;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -13,6 +18,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.access.ItemAccess;
 import org.jspecify.annotations.Nullable;
 
@@ -25,8 +31,17 @@ import org.jspecify.annotations.Nullable;
  * in, and with an empty one it takes one out, the fluid permitting; what goes in by hand is a
  * leftover, as hand-loaded items are. Nobody rides it and it opens no menu; coupling and the rest are
  * {@link CarEntity}'s.
+ *
+ * <p>It mirrors its tank, the fluid, its amount and the tank's capacity, into synched data, as a
+ * Locomotive mirrors its fuel, so every player tracking it sees them in its Sight glasses; the record
+ * stays the one truth.
  */
 public final class FluidCarEntity extends CarEntity {
+
+    private static final EntityDataAccessor<FluidStack> DATA_TANK =
+            SynchedEntityData.defineId(FluidCarEntity.class, RailworksRegistries.FLUID_STACK);
+    private static final EntityDataAccessor<Integer> DATA_TANK_CAPACITY =
+            SynchedEntityData.defineId(FluidCarEntity.class, EntityDataSerializers.INT);
 
     private static volatile int tankBuckets = FluidCar.DEFAULT_TANK_BUCKETS;
 
@@ -54,10 +69,41 @@ public final class FluidCarEntity extends CarEntity {
 
     /**
      * Its tank, on the server: a window onto its car's record in the level's {@link CarRecords}, which
-     * buckets fill and empty and Jade reads; null on a client, which knows nothing of it.
+     * buckets fill and empty and Jade reads; null on a client, which sees it only as {@link #tankSeen()}.
      */
     public @Nullable Tank tank() {
         return level() instanceof ServerLevel && record() instanceof CarRecords.Contents record ? record.tank() : null;
+    }
+
+    /** What its tank holds, as the server last synced it: a copy, empty for none. */
+    public FluidStack tankSeen() {
+        return entityData.get(DATA_TANK).copy();
+    }
+
+    /** How many millibuckets its tank holds when full, as the server last synced it. */
+    public int tankCapacitySeen() {
+        return entityData.get(DATA_TANK_CAPACITY);
+    }
+
+    @Override
+    protected void syncCar(ServerLevel level, Train train, Car car) {
+        Tank tank = tank();
+        if (tank == null) {
+            return;
+        }
+        FluidStack held = tank.held();
+        // A stack equals only itself, so the same tank set again would sync every tick.
+        if (!FluidStack.matches(entityData.get(DATA_TANK), held)) {
+            entityData.set(DATA_TANK, held);
+        }
+        entityData.set(DATA_TANK_CAPACITY, tank.capacity());
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder entityData) {
+        super.defineSynchedData(entityData);
+        entityData.define(DATA_TANK, FluidStack.EMPTY);
+        entityData.define(DATA_TANK_CAPACITY, 0);
     }
 
     /** Nobody rides a Fluid car. */

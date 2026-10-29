@@ -53,6 +53,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
@@ -157,6 +158,10 @@ final class FluidTests {
         tests.testOnItsOwn("fluid_a_provider_fluid_hatch_fuels_no_locomotive", 200, FluidTests::fuelsNone);
         // It sets the server config's tank for every Fluid car made meanwhile.
         tests.testOnItsOwn("fluid_car_tank_holds_the_buckets_the_server_config_sets", 20, FluidTests::configuredTank);
+        tests.test("fluid_car_sight_glass_shows_a_bucket_poured_in_and_one_taken_out", 20, FluidTests::sightGlassByHand);
+        tests.testOnItsOwn("fluid_car_sight_glass_shows_a_fluid_hatchs_trade_at_a_station", 1_200, FluidTests::sightGlassTrade);
+        tests.test("fluid_car_sight_glass_shows_the_tank_its_record_holds_when_its_view_is_made_again", 20,
+                FluidTests::sightGlassMadeAgain);
     }
 
     // ---- crafting ----
@@ -410,6 +415,76 @@ final class FluidTests {
             helper.fail("a Fluid car made with 12 buckets set holds " + fluid.tank().capacity(), LocomotiveTests.STAND);
         }
         helper.succeed();
+    }
+
+    // ---- the sight glass ----
+
+    private static void sightGlassByHand(GameTestHelper helper) {
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        FluidCarEntity fluid = placeBeside(helper, locomotive);
+        expectSeen(helper, fluid, Fluids.EMPTY, 0, "a Fluid car placed");
+        ServerPlayer player = LogisticsTests.near(helper, LocomotiveTests.STAND);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+        fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+        helper.startSequence()
+                .thenWaitUntil(() -> expectSeen(helper, fluid, Fluids.WATER, BUCKET, "a water bucket poured in"))
+                .thenExecute(() -> {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.BUCKET));
+                    fluid.interact(player, InteractionHand.MAIN_HAND, Vec3.ZERO);
+                })
+                .thenWaitUntil(() -> expectSeen(helper, fluid, Fluids.EMPTY, 0, "an empty bucket filled"))
+                .thenSucceed();
+    }
+
+    /** The {@link #job}'s Fluid car, seen to fill at the Quarry's provider and to empty at the Depot's requester. */
+    private static void sightGlassTrade(GameTestHelper helper) {
+        line(helper);
+        fluidHatch(helper, QUARRY_0, HatchMode.PROVIDER, Fluids.WATER, 20);
+        fluidHatch(helper, DEPOT_0, HatchMode.REQUESTER, null, 0);
+        record(helper, DEPOT_0).ask(Fluids.WATER);
+        Running running = running(helper, FluidCar.create());
+        FluidCarEntity fluid = (FluidCarEntity) running.views().get(1);
+        helper.startSequence()
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.to_unload"))
+                .thenWaitUntil(() -> expectSeen(helper, fluid, Fluids.WATER, 8 * BUCKET, "the Fluid car left the Quarry"))
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.waiting"))
+                .thenWaitUntil(() -> expectSeen(helper, fluid, Fluids.EMPTY, 0, "the Fluid car unloaded"))
+                .thenExecute(() -> clearAway(helper, running.train()))
+                .thenSucceed();
+    }
+
+    /**
+     * A Fluid car's view goes with its chunk and is made again from its Train, as the level makes the
+     * views of a world loaded from a save: the new view shows the lava its record kept.
+     */
+    private static void sightGlassMadeAgain(GameTestHelper helper) {
+        LocomotiveEntity locomotive = LocomotiveTests.placed(helper);
+        FluidCarEntity fluid = placeBeside(helper, locomotive);
+        fill(fluid.tank(), Fluids.LAVA, 7 * BUCKET);
+        Train train = fluid.train();
+        Car car = fluid.car();
+        fluid.remove(Entity.RemovalReason.UNLOADED_TO_CHUNK);
+        FluidCarEntity again = RailworksRegistries.FLUID_CAR_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.LOAD);
+        again.setCar(train, car);
+        helper.getLevel().addFreshEntity(again);
+        expectSeen(helper, again, Fluids.LAVA, 7 * BUCKET, "the view made again");
+        helper.succeed();
+    }
+
+    /**
+     * What {@code car}'s sight glass shows, as synced to every player tracking it: {@code amount} of
+     * {@code fluid}, none for 0, and its record's tank, its capacity too.
+     */
+    static void expectSeen(GameTestHelper helper, FluidCarEntity car, Fluid fluid, int amount, String what) {
+        FluidStack seen = car.tankSeen();
+        Tank tank = car.tank();
+        boolean matches = (amount == 0 ? seen.isEmpty() : seen.is(fluid) && seen.getAmount() == amount)
+                && tank != null && FluidStack.matches(seen, tank.held()) && car.tankCapacitySeen() == tank.capacity();
+        if (!matches) {
+            throw helper.assertionException(LONE, Component.literal(what + ", the sight glass shows " + seen.getAmount() + " of "
+                    + seen.getFluid() + " in " + car.tankCapacitySeen() + ", not " + amount + " of " + fluid + ", and the record holds "
+                    + (tank == null ? "nothing" : tank.held().getAmount() + " in " + tank.capacity())));
+        }
     }
 
     // ---- the row ----

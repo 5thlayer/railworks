@@ -8,7 +8,8 @@ import java.util.List;
 
 /**
  * The boxes a car is drawn from: a boxy car straddling the Rail, its shell riding on top with
- * skirts down both sides of the web, the chests set into a Cargo car's sides, and a Fluid car's tank. Coordinates are
+ * skirts down both sides of the web, the chests set into a Cargo car's sides, and a Fluid car's tank
+ * with a Sight glass along each side. Coordinates are
  * the car's own: x across, y up from the floor's underside on the flange's top, z along the car with
  * +z the end it faces, the car's middle block from -0.5 to 0.5. Placeholder art, so {@code CarRenderer} only paints these and nothing else
  * decides their sizes. It also holds the car's size and where the Locomotive's Driver sits in it and
@@ -20,7 +21,7 @@ import java.util.List;
  *
  * <p>Pure: no Minecraft types.
  */
-public record CarBody(double length, List<Part> parts, List<Box> chests) {
+public record CarBody(double length, List<Part> parts, List<Box> chests, List<SightGlass> sightGlasses) {
 
     /** A car's box across: two blocks, centred on the Rail (ADR 0010). */
     public static final double WIDTH = 2.0;
@@ -48,7 +49,9 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         /** The Electric Locomotive's nose band, copper. */
         COPPER(0.78F, 0.45F, 0.28F),
         /** A Fluid car's tank, a paler rust than the shell. */
-        TANK(0.72F, 0.42F, 0.33F);
+        TANK(0.72F, 0.42F, 0.33F),
+        /** A Sight glass above the fluid it shows, dark. */
+        GLASS(0.05F, 0.06F, 0.07F);
 
         public final float red;
         public final float green;
@@ -92,6 +95,27 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
 
         Part turned() {
             return new Part(paint, box.turned());
+        }
+    }
+
+    /**
+     * A Sight glass along one side of a Fluid car's tank: its pane, painted dark among the body's
+     * parts, which the fluid fills from the bottom as far as the tank is full, on its outer face.
+     */
+    public record SightGlass(Box pane) {
+
+        /** Which side of the car it looks out of: 1 for +x, -1 for -x. */
+        public double side() {
+            return Math.signum(pane.minX() + pane.maxX());
+        }
+
+        /**
+         * How high the fluid stands in it for a tank holding {@code amount} of {@code capacity}: from
+         * the pane's bottom, empty, to its top, full, in proportion between, not in steps.
+         */
+        public double surface(long amount, long capacity) {
+            double full = capacity <= 0 ? 0.0 : Math.clamp((double) amount / capacity, 0.0, 1.0);
+            return pane.minY() + (pane.maxY() - pane.minY()) * full;
         }
     }
 
@@ -222,7 +246,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         parts.add(new Part(Paint.SHELL, -0.95, 0.69, -half + 0.01, 0.95, BAY_WALL_TOP - 0.01, -half + 0.07));
         sides(parts, new Part(Paint.TRIM, 0.91, BAY_WALL_TOP - 0.005, -half, 1.0, BAY_WALL_TOP + 0.08, BAY_FRONT + 0.03));
         parts.add(new Part(Paint.TRIM, -0.995, BAY_WALL_TOP - 0.015, -half + 0.005, 0.995, BAY_WALL_TOP + 0.075, -half + 0.065));
-        return new CarBody(LOCOMOTIVE_LENGTH, List.copyOf(parts), List.of());
+        return new CarBody(LOCOMOTIVE_LENGTH, List.copyOf(parts), List.of(), List.of());
     }
 
     /** The Electric Locomotive: the Burner's body, its nose band copper rather than deep red. Placeholder. */
@@ -231,7 +255,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         for (Part part : LOCOMOTIVE.parts()) {
             parts.add(part.paint() == Paint.DEEP_RED ? new Part(Paint.COPPER, part.box()) : part);
         }
-        return new CarBody(LOCOMOTIVE.length(), List.copyOf(parts), List.of());
+        return new CarBody(LOCOMOTIVE.length(), List.copyOf(parts), List.of(), List.of());
     }
 
     /**
@@ -267,12 +291,14 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
             chests.add(chest);
             chests.add(chest.mirrored());
         }
-        return new CarBody(length, List.copyOf(parts), List.copyOf(chests));
+        return new CarBody(length, List.copyOf(parts), List.copyOf(chests), List.of());
     }
 
     /**
      * The Fluid car: an open floor carrying a tank along it, rounded by a wide box crossing a tall one,
-     * on a saddle at each end, a band round it near each end and a dome on top.
+     * on a saddle at each end, a band round it near each end and a dome on top. Along each side of the
+     * wide box, between the bands, a Sight glass: a dark pane standing just proud of a frame a little
+     * larger, which shows round it as a rim.
      */
     private static CarBody fluid() {
         double length = FluidCar.LENGTH - GAP;
@@ -283,7 +309,12 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         parts.add(new Part(Paint.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
         ends(parts, new Part(Paint.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
         ends(parts, new Part(Paint.DARK_RUST, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
-        return new CarBody(length, List.copyOf(parts), List.of());
+        double glassEnd = half - 0.6;
+        sides(parts, new Part(Paint.TRIM, 0.94, 1.08, -glassEnd - 0.04, 0.96, 2.22, glassEnd + 0.04));
+        Box pane = new Box(0.945, 1.12, -glassEnd, 0.965, 2.18, glassEnd);
+        sides(parts, new Part(Paint.GLASS, pane));
+        List<SightGlass> glasses = List.of(new SightGlass(pane), new SightGlass(pane.mirrored()));
+        return new CarBody(length, List.copyOf(parts), List.of(), glasses);
     }
 
     /** The part and its mirror across the car. */

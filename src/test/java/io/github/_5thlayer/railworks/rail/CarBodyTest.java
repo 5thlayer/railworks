@@ -257,4 +257,44 @@ class CarBodyTest {
             }
         }
     }
+
+    @Test
+    void theFluidCarHasASightGlassAlongEachSideOfItsTankBetweenItsEndTrims() {
+        List<CarBody.SightGlass> glasses = CarBody.FLUID.sightGlasses();
+        assertEquals(2, glasses.size(), "a sight glass a side");
+        for (double side : new double[] {1.0, -1.0}) {
+            assertEquals(1, glasses.stream().filter(glass -> glass.side() == side).count(), "a sight glass on side " + side);
+        }
+        // The tank's wide box runs from 1.0 to 2.3 up, and its end trims stand 0.44 to 0.5 in from its ends.
+        double trims = CarBody.FLUID.length() / 2.0 - 0.5;
+        for (CarBody.SightGlass glass : glasses) {
+            CarBody.Box pane = glass.pane();
+            assertTrue(pane.minZ() > -trims && pane.maxZ() < trims, pane + " reaches past the end trims");
+            assertTrue(pane.maxZ() - pane.minZ() > 3.0, pane + " is not across most of the tank's length");
+            assertTrue(pane.minY() > 1.0 && pane.maxY() < 2.3 && pane.maxY() - pane.minY() > 0.9,
+                    pane + " is not across most of the tank's height");
+            // Looking at the car square on from beside it, at the pane's middle, the pane is the first thing seen.
+            double[] from = {glass.side(), (pane.minY() + pane.maxY()) / 2.0, 0.0};
+            assertEquals(pane, firstHit(boxes(CarBody.FLUID), from, new double[] {-glass.side(), 0.0, 0.0}), "the pane is hidden");
+        }
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO)) {
+            assertTrue(body.sightGlasses().isEmpty(), "a car that is no Fluid car has a sight glass");
+        }
+    }
+
+    @Test
+    void aSightGlassIsFilledFromItsBottomAsFarAsTheTankIsFull() {
+        CarBody.SightGlass glass = CarBody.FLUID.sightGlasses().getFirst();
+        double bottom = glass.pane().minY();
+        double top = glass.pane().maxY();
+        assertEquals(bottom, glass.surface(0, 160_000), 1e-9, "an empty tank");
+        assertEquals(top, glass.surface(160_000, 160_000), 1e-9, "a full tank");
+        assertEquals((bottom + top) / 2.0, glass.surface(80_000, 160_000), 1e-9, "a half-full tank");
+        assertEquals(bottom + (top - bottom) / 4.0, glass.surface(3, 12), 1e-9, "a quarter-full tank");
+        // Smooth, not in steps: a millibucket in shows, and a millibucket short of full is short of the top.
+        assertTrue(glass.surface(1, 160_000) > bottom, "a millibucket shows nothing");
+        assertTrue(glass.surface(159_999, 160_000) < top, "a millibucket short of full shows full");
+        assertEquals(top, glass.surface(200_000, 160_000), 1e-9, "past full");
+        assertEquals(bottom, glass.surface(0, 0), 1e-9, "a tank of no capacity");
+    }
 }

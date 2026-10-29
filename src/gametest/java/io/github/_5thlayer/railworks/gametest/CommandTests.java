@@ -6,16 +6,19 @@ package io.github._5thlayer.railworks.gametest;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github._5thlayer.libworks.testkit.GalleryCheck;
 import io.github._5thlayer.railworks.CarEntity;
+import io.github._5thlayer.railworks.FluidCarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.material.Fluids;
 
 /**
  * The {@code /railworks} commands a Gallery pack scene builds with: {@code span} strings a Span for
@@ -56,6 +59,9 @@ final class CommandTests {
         tests.test("gallery_command_car_sets_a_car_on_the_rail_as_a_train_of_its_own", 1, CommandTests::carSets);
         tests.test("gallery_command_car_beside_a_train_at_rest_couples_into_it", 1, CommandTests::carCouples);
         tests.test("gallery_command_car_refuses_where_the_item_would", 1, CommandTests::carRefused);
+        // It sets the server config's tank for every Fluid car made meanwhile.
+        tests.testOnItsOwn("fluid_car_sight_glass_shows_the_empty_tank_of_a_fluid_car_the_command_sets", 1,
+                CommandTests::fluidCarSeen);
     }
 
     private static void spanStrings(GameTestHelper helper) {
@@ -118,6 +124,23 @@ final class CommandTests {
         helper.assertTrue(cars.size() == 1, "the command set " + cars.size() + " cars, not one");
         Train train = cars.getFirst().train();
         helper.assertTrue(train != null && train.cars().size() == 1, "the car is in no Train of its own: " + train);
+        helper.succeed();
+    }
+
+    /** A Fluid car the command sets shows its empty tank, of the buckets the server config sets. */
+    private static void fluidCarSeen(GameTestHelper helper) {
+        strung(helper);
+        FluidCarEntity.configure(12);
+        try {
+            run(helper, "railworks car fluid_car %s " + EAST_YAW, ON_RAIL);
+        } finally {
+            FluidCarEntity.configure(FluidCar.DEFAULT_TANK_BUCKETS);
+        }
+        var cars = helper.getLevel().getEntitiesOfClass(FluidCarEntity.class, helper.getBounds());
+        helper.assertTrue(cars.size() == 1, "the command set " + cars.size() + " Fluid cars, not one");
+        FluidTests.expectSeen(helper, cars.getFirst(), Fluids.EMPTY, 0, "a Fluid car the command set");
+        helper.assertTrue(cars.getFirst().tankCapacitySeen() == 12_000, "its sight glass shows a tank of "
+                + cars.getFirst().tankCapacitySeen() + ", not of 12 buckets");
         helper.succeed();
     }
 

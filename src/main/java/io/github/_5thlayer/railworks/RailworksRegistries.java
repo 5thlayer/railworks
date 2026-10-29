@@ -8,6 +8,9 @@ import io.github._5thlayer.railworks.rail.Goods;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.flag.FeatureFlags;
@@ -18,14 +21,17 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
 
 /**
- * The Module's blocks, items, entity and block entity types, the held Span end, the hatch's and the
+ * The Module's blocks, items, entity and block entity types, the held Span end, the synched data of a
+ * Fluid car's tank, the hatch's and the
  * Burner Generator's item handlers, the Fluid hatch's fluid handler, and the energy handlers of the
  * Charger, the Burner Generator and the Electric Locomotive.
  */
@@ -39,6 +45,28 @@ public final class RailworksRegistries {
     private static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, Railworks.MOD_ID);
     private static final DeferredRegister<DataComponentType<?>> DATA_COMPONENTS =
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, Railworks.MOD_ID);
+    private static final DeferredRegister<EntityDataSerializer<?>> ENTITY_DATA_SERIALIZERS =
+            DeferredRegister.create(NeoForgeRegistries.Keys.ENTITY_DATA_SERIALIZERS, Railworks.MOD_ID);
+
+    /**
+     * A fluid and its amount as synched entity data, which vanilla has no serializer for: a Fluid car's
+     * tank, for its Sight glasses. A copy each time, as a stack is mutable.
+     */
+    public static final EntityDataSerializer<FluidStack> FLUID_STACK = new EntityDataSerializer<>() {
+        @Override
+        public StreamCodec<? super RegistryFriendlyByteBuf, FluidStack> codec() {
+            return FluidStack.OPTIONAL_STREAM_CODEC;
+        }
+
+        @Override
+        public FluidStack copy(FluidStack value) {
+            return value.copy();
+        }
+    };
+
+    static {
+        ENTITY_DATA_SERIALIZERS.register("fluid_stack", () -> FLUID_STACK);
+    }
 
     /** One segment of a Pylon column. */
     public static final DeferredBlock<PylonBlock> PYLON = BLOCKS.registerBlock(PylonBlock.BLOCK_NAME, PylonBlock::new);
@@ -175,6 +203,7 @@ public final class RailworksRegistries {
         MENUS.register(modBus);
         BLOCK_ENTITIES.register(modBus);
         DATA_COMPONENTS.register(modBus);
+        ENTITY_DATA_SERIALIZERS.register(modBus);
         modBus.addListener(RailworksRegistries::registerCapabilities);
     }
 
