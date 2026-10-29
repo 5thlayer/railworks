@@ -76,7 +76,7 @@
   "tooltip.railworks.hatch.jade.station": "Station: %s, car spot %s",
   "tooltip.railworks.hatch.jade.station_leading": "Station: %s, leading car",
   "tooltip.railworks.hatch.jade.no_station": "Joined to no Station: a plain container",
-  "tooltip.railworks.hatch.jade.engine_room": "Beside a Locomotive's Engine room: a provider here fuels the one standing there",
+  "tooltip.railworks.hatch.jade.engine_room": "Beside a Locomotive's Engine room: a provider of items here fuels the one standing there",
   "tooltip.railworks.station.jade.hatches": "Hatches: %s",
   "config.jade.plugin_railworks.hatch": "Hatch",
   "config.jade.plugin_railworks.station_hatches": "Station hatches",

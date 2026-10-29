@@ -63,13 +63,13 @@ final class EngineRoomTests {
         LogisticsTests.insert(LogisticsTests.record(helper, ENGINE_ROOM), new ItemStack(Items.COAL, 64));
         LogisticsTests.insert(LogisticsTests.record(helper, BAY), new ItemStack(Items.CHARCOAL, 64));
         Locomotive east = Locomotive.burner();
-        CargoCar wagon = CargoCar.create();
+        CargoCar cargoCar = CargoCar.create();
         Locomotive west = Locomotive.burner();
         // The leading Locomotive's middle on the lead mark, two short of the line's east end.
-        Train train = Train.of(new Place(last, last.b(), 2.0), List.of(east, wagon))
+        Train train = Train.of(new Place(last, last.b(), 2.0), List.of(east, cargoCar))
                 .coupled(LevelRails.of(helper.getLevel()).network(), Train.End.BACK, west, true);
         LocomotiveEntity leading = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, east);
-        LogisticsTests.spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, wagon);
+        LogisticsTests.spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, cargoCar);
         LocomotiveEntity back = LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, west);
         train.setAutomatic(true);
         ItemStack none = ItemStack.EMPTY;
