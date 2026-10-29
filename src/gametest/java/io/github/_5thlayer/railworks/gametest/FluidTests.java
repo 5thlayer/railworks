@@ -419,7 +419,7 @@ final class FluidTests {
      * at a Cargo car's chests' height and in the old row, one off at a car's floor, the Placement
      * Preview's plan is refused {@code refusal} and a click places nothing; in the row, two blocks off
      * at the chests' height, it plans and places {@code block}, joining the first car spot. Shared with
-     * {@code ElectricTests}.
+     * {@code HatchTests} and {@code ElectricTests}.
      */
     static void placesOnlyInTheRow(GameTestHelper helper, Item item, Block block, RailworksRefusal refusal) {
         for (BlockPos end : List.of(ROW_WEST, ROW_EAST)) {
