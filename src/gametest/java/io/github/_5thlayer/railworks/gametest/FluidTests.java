@@ -51,6 +51,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
@@ -67,6 +68,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -78,10 +80,10 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 /**
  * The Fluid car and the Fluid hatch in a real level (#10): their recipes, the car placed and coupled
  * into a Train and weighing a Cargo car's 1000 kg, buckets by hand on the car and on both kinds of
- * Fluid hatch, a pipe through the hatch's fluid capability, the bucket on its sides, the tanks kept
- * through a save, and automatic Trains carrying fluid between Fluid hatches: a job, a leftover in a
- * Fluid car, a Train mixing a Cargo car and a Fluid car, and a provider Fluid hatch beside a
- * Locomotive that fuels none. Stations and Fluid hatches stand in the row two blocks off the Rail at a
+ * Fluid hatch, a pipe through the hatch's fluid capability, its Sight glasses and a requester's
+ * bucket, the tanks kept through a save, and automatic Trains carrying fluid between Fluid
+ * hatches: a job, a leftover in a Fluid car, a Train mixing a Cargo car and a Fluid car, and a
+ * provider Fluid hatch beside a Locomotive that fuels none. Stations and Fluid hatches stand in the row two blocks off the Rail at a
  * Cargo car's chests' height (#72), and a Fluid hatch places nowhere nearer. How fluid is planned, claimed and moved is {@code LogisticsTest}'s; a
  * Train carrying fluid out of view is {@code FarAwayTests}'. These tests share the {@code fluid_}
  * prefix.
@@ -144,7 +146,8 @@ final class FluidTests {
         tests.test("fluid_hatch_a_filled_bucket_sets_a_requesters_request_and_stays_full", 20, FluidTests::requesterByHand);
         tests.test("fluid_hatch_buckets_by_hand_fill_and_empty_a_provider", 20, FluidTests::providerByHand);
         tests.test("fluid_hatch_a_pipe_fills_and_empties_it_through_its_fluid_capability", 20, FluidTests::pipe);
-        tests.test("fluid_hatch_shows_its_fluid_as_a_filled_bucket", 40, FluidTests::shows);
+        tests.test("fluid_hatch_sight_glass_a_provider_draws_no_bucket_and_a_requester_the_bucket_it_asks_for", 40,
+                FluidTests::shows);
         tests.test("fluid_tanks_are_kept_through_a_save", 20, FluidTests::saved);
         tests.test("fluid_command_fluid_hatch_fills_a_provider_and_sets_a_requesters_request", 1, FluidTests::command);
         tests.test("fluid_hatch_row_places_two_blocks_off_the_rail_at_a_cargo_cars_chests_height_and_nowhere_nearer", 20,
@@ -162,6 +165,10 @@ final class FluidTests {
         tests.testOnItsOwn("fluid_car_sight_glass_shows_a_fluid_hatchs_trade_at_a_station", 1_200, FluidTests::sightGlassTrade);
         tests.test("fluid_car_sight_glass_shows_the_tank_its_record_holds_when_its_view_is_made_again", 20,
                 FluidTests::sightGlassMadeAgain);
+        tests.test("fluid_hatch_sight_glass_its_watchers_see_its_tank_after_a_bucket_a_pipe_and_the_command", 40,
+                FluidTests::hatchSightGlass);
+        tests.testOnItsOwn("fluid_hatch_sight_glass_its_watchers_see_its_tank_after_a_trade_with_a_fluid_car", 1_200,
+                FluidTests::hatchSightGlassTrade);
     }
 
     // ---- crafting ----
@@ -331,17 +338,25 @@ final class FluidTests {
         helper.succeed();
     }
 
+    /**
+     * A requester draws the filled bucket of what it asks for in front of its Sight glass, whatever its
+     * tank holds; a provider draws none, its Sight glass showing its fluid.
+     */
     private static void shows(GameTestHelper helper) {
         helper.setBlock(LONE, fluidHatch(HatchMode.REQUESTER));
         record(helper, LONE).ask(Fluids.WATER);
+        fill(record(helper, LONE).tank(), Fluids.WATER, BUCKET);
         helper.setBlock(LONE.east(2), fluidHatch(HatchMode.PROVIDER));
         fill(record(helper, LONE.east(2)).tank(), Fluids.LAVA, BUCKET);
         helper.startSequence()
+                .thenWaitUntil(() -> expectWatched(helper, LONE.east(2), Fluids.LAVA, BUCKET, "lava poured into the provider"))
                 .thenWaitUntil(() -> {
                     ItemStack asked = helper.getBlockEntity(LONE, HatchBlockEntity.class).shown();
+                    helper.assertTrue(asked.is(Items.WATER_BUCKET), "the requester shows " + asked + ", not a water bucket");
+                })
+                .thenExecute(() -> {
                     ItemStack held = helper.getBlockEntity(LONE.east(2), HatchBlockEntity.class).shown();
-                    helper.assertTrue(asked.is(Items.WATER_BUCKET) && held.is(Items.LAVA_BUCKET),
-                            "the requester shows " + asked + " and the provider " + held + ", not their fluids' buckets");
+                    helper.assertTrue(held.isEmpty(), "the provider shows " + held + ", not nothing");
                 })
                 .thenSucceed();
     }
@@ -469,6 +484,83 @@ final class FluidTests {
         helper.getLevel().addFreshEntity(again);
         expectSeen(helper, again, Fluids.LAVA, 7 * BUCKET, "the view made again");
         helper.succeed();
+    }
+
+    /**
+     * A provider's Sight glass, as its watchers see it from its update tag: a bucket poured in, a pipe
+     * filling and draining it, the command pouring more in, and emptied.
+     */
+    private static void hatchSightGlass(GameTestHelper helper) {
+        helper.setBlock(LONE, fluidHatch(HatchMode.PROVIDER));
+        ServerPlayer player = LogisticsTests.near(helper, LONE.north());
+        BlockPos at = helper.absolutePos(LONE);
+        helper.startSequence()
+                .thenWaitUntil(() -> expectWatched(helper, LONE, Fluids.EMPTY, 0, "a Fluid hatch placed"))
+                .thenExecute(() -> {
+                    player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+                    use(helper, player, LONE);
+                })
+                .thenWaitUntil(() -> expectWatched(helper, LONE, Fluids.WATER, BUCKET, "a water bucket poured in"))
+                .thenExecute(() -> pourByPipe(helper, at, 4 * BUCKET))
+                .thenWaitUntil(() -> expectWatched(helper, LONE, Fluids.WATER, 5 * BUCKET, "a pipe filled it"))
+                .thenExecute(() -> pourByPipe(helper, at, -2 * BUCKET))
+                .thenWaitUntil(() -> expectWatched(helper, LONE, Fluids.WATER, 3 * BUCKET, "a pipe drained it"))
+                .thenExecute(() -> CommandTests.run(helper, "railworks fluid_hatch %s provider minecraft:water 2", LONE))
+                .thenWaitUntil(() -> expectWatched(helper, LONE, Fluids.WATER, 5 * BUCKET, "the command poured water in"))
+                .thenExecute(() -> pourByPipe(helper, at, -5 * BUCKET))
+                .thenWaitUntil(() -> expectWatched(helper, LONE, Fluids.EMPTY, 0, "a pipe emptied it"))
+                .thenSucceed();
+    }
+
+    /** Water through the Fluid hatch's capability at {@code at}: in for a positive {@code amount}, out for a negative one. */
+    private static void pourByPipe(GameTestHelper helper, BlockPos at, int amount) {
+        var handler = helper.getLevel().getCapability(Capabilities.Fluid.BLOCK, at, Direction.WEST);
+        try (var transaction = Transaction.openRoot()) {
+            if (amount > 0) {
+                handler.insert(FluidResource.of(Fluids.WATER), amount, transaction);
+            } else {
+                handler.extract(FluidResource.of(Fluids.WATER), -amount, transaction);
+            }
+            transaction.commit();
+        }
+    }
+
+    /** The {@link #job}'s Fluid hatches, seen to empty at the Quarry's provider and to fill at the Depot's requester. */
+    private static void hatchSightGlassTrade(GameTestHelper helper) {
+        line(helper);
+        fluidHatch(helper, QUARRY_0, HatchMode.PROVIDER, Fluids.WATER, 20);
+        fluidHatch(helper, DEPOT_0, HatchMode.REQUESTER, null, 0);
+        record(helper, DEPOT_0).ask(Fluids.WATER);
+        Running running = running(helper, FluidCar.create());
+        helper.startSequence()
+                .thenWaitUntil(() -> expectWatched(helper, QUARRY_0, Fluids.WATER, 20 * BUCKET, "the Quarry's provider filled"))
+                .thenWaitUntil(() -> expectWatched(helper, DEPOT_0, Fluids.EMPTY, 0, "the Depot's requester placed"))
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.to_unload"))
+                .thenWaitUntil(() -> expectWatched(helper, QUARRY_0, Fluids.WATER, 12 * BUCKET, "the Fluid car loaded at the Quarry"))
+                .thenWaitUntil(() -> LogisticsTests.expectStatus(helper, running.locomotive(), "status.railworks.train.waiting"))
+                .thenWaitUntil(() -> expectWatched(helper, DEPOT_0, Fluids.WATER, 8 * BUCKET, "the Fluid car unloaded at the Depot"))
+                .thenExecute(() -> clearAway(helper, running.train()))
+                .thenSucceed();
+    }
+
+    /**
+     * What the Fluid hatch at {@code pos}'s Sight glasses show, as a watcher reads them from its update
+     * tag: {@code amount} of {@code fluid}, none for 0, and its record's tank, its capacity too.
+     */
+    private static void expectWatched(GameTestHelper helper, BlockPos pos, Fluid fluid, int amount, String what) {
+        var entity = helper.getBlockEntity(pos, HatchBlockEntity.class);
+        var registries = helper.getLevel().registryAccess();
+        var watcher = new HatchBlockEntity(entity.getBlockPos(), entity.getBlockState());
+        watcher.handleUpdateTag(TagValueInput.create(ProblemReporter.DISCARDING, registries, entity.getUpdateTag(registries)));
+        FluidStack seen = watcher.tankSeen();
+        Tank tank = record(helper, pos).tank();
+        boolean matches = (amount == 0 ? seen.isEmpty() : seen.is(fluid) && seen.getAmount() == amount)
+                && FluidStack.matches(seen, tank.held()) && watcher.tankCapacitySeen() == tank.capacity();
+        if (!matches) {
+            throw helper.assertionException(pos, Component.literal(what + ", its watchers see " + seen.getAmount() + " of "
+                    + seen.getFluid() + " in " + watcher.tankCapacitySeen() + ", not " + amount + " of " + fluid
+                    + ", and the record holds " + tank.held().getAmount() + " in " + tank.capacity()));
+        }
     }
 
     /**

@@ -114,8 +114,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
          * the pane's bottom, empty, to its top, full, in proportion between, not in steps.
          */
         public double surface(long amount, long capacity) {
-            double full = capacity <= 0 ? 0.0 : Math.clamp((double) amount / capacity, 0.0, 1.0);
-            return pane.minY() + (pane.maxY() - pane.minY()) * full;
+            return SightGlassFill.surface(pane.minY(), pane.maxY(), amount, capacity);
         }
     }
 

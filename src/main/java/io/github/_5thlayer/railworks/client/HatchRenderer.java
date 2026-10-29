@@ -3,6 +3,7 @@
 
 package io.github._5thlayer.railworks.client;
 
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -15,6 +16,7 @@ import io.github._5thlayer.railworks.HatchBlockEntity;
 import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.Goods;
+import io.github._5thlayer.railworks.rail.SightGlassFill;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -35,9 +37,14 @@ import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The item a hatch shows ({@link HatchBlockEntity#shown}), a requester's request or a provider's
- * first stack, flat on each of its four sides, as an item frame holds one, each lit as the block in
- * front of that side is. A hatch has no facing, so it reads from any side of the Rail.
+ * The item a hatch shows ({@link HatchBlockEntity#shown}), a requester's request or a provider of
+ * items' first stack, flat on each of its four sides, as an item frame holds one, each lit as the
+ * block in front of that side is. A hatch has no facing, so it reads from any side of the Rail.
+ *
+ * <p>Each side of a Fluid hatch is a Sight glass: its round window, dark glass in its texture, is
+ * filled from the bottom as far as the tank is full ({@link SightGlassFill#roundWindow}) with the
+ * tank's fluid as the server last sent it ({@link SightGlassFluid}), just proud of the face, on all
+ * four sides, the one facing a car too. A requester's bucket is drawn in front of it.
  *
  * <p>While a car of its kind stands at its spot in a Train stopped at its Station
  * ({@link PlatformsNear#facingCar}), a hatch of items draws its Bellows, an accordion sleeve,
@@ -70,6 +77,8 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     private static final float INTO_FACING = 0.02F;
     /** How far into the Fluid car's tank, which stands 0.05 inside the car's side, the Loading arm reaches. */
     private static final float INTO_TANK = 0.06F;
+    /** A side's pixels, as its texture's, across and up. */
+    private static final float PIXELS = 16.0F;
     /** How often whether a car stands at the hatch's spot is worked out again, in ticks. */
     private static final int REFRESH_TICKS = 10;
 
@@ -115,6 +124,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         BlockEntityRenderer.super.extractRenderState(hatch, state, partialTicks, cameraPosition, breakProgress);
         state.item = null;
         state.toCar = null;
+        state.fluid = null;
         var level = hatch.getLevel();
         if (level == null) {
             return;
@@ -125,6 +135,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         for (Direction side : Direction.Plane.HORIZONTAL) {
             state.light[side.get2DDataValue()] = LevelRenderer.getLightCoords(level, hatch.getBlockPos().relative(side));
         }
+        var tank = hatch.tankSeen();
+        state.fluid = SightGlassFluid.of(tank);
+        state.fill = SightGlassFill.roundWindow(tank.getAmount(), hatch.tankCapacitySeen());
         var shown = hatch.shown();
         if (shown.isEmpty()) {
             return;
@@ -157,6 +170,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         if (state.toCar != null) {
             submitToCar(state, poseStack, collector);
         }
+        if (state.fluid != null) {
+            submitFill(state, state.fluid, poseStack, collector);
+        }
         if (state.item == null) {
             return;
         }
@@ -170,6 +186,40 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
             poseStack.translate(0, 0, -(0.5F + OFF_FACE));
             poseStack.scale(SCALE, SCALE, SCALE);
             state.item.submit(poseStack, collector, state.light[side.get2DDataValue()], OverlayTexture.NO_OVERLAY, 0);
+            poseStack.popPose();
+        }
+    }
+
+    /**
+     * The fluid in each side's round window, in that side's frame, as {@link #submitToCar}'s: its
+     * pixels across from the left as seen facing it, at +x, and up from its bottom, the sprite laid
+     * on them as on a block's face.
+     */
+    private static void submitFill(RenderState state, SightGlassFluid fluid, PoseStack poseStack, SubmitNodeCollector collector) {
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            int light = fluid.light(state.light[side.get2DDataValue()]);
+            poseStack.pushPose();
+            poseStack.translate(0.5, 0.5, 0.5);
+            poseStack.mulPose(Axis.YP.rotationDegrees(180 - side.toYRot()));
+            collector.submitCustomGeometry(poseStack, fluid.renderType(), (pose, buffer) -> {
+                float z = -0.5F - SightGlassFluid.PROUD;
+                for (SightGlassFill.Rect rect : state.fill) {
+                    float left = 0.5F - (float) rect.left() / PIXELS;
+                    float right = 0.5F - (float) rect.right() / PIXELS;
+                    float bottom = (float) rect.bottom() / PIXELS - 0.5F;
+                    float top = (float) rect.top() / PIXELS - 0.5F;
+                    float uLeft = (float) rect.left() / PIXELS;
+                    float uRight = (float) rect.right() / PIXELS;
+                    // The sprite's top is v 0.
+                    float vBottom = 1.0F - (float) rect.bottom() / PIXELS;
+                    float vTop = 1.0F - (float) rect.top() / PIXELS;
+                    // Counter-clockwise as seen from in front of the side, from the bottom left.
+                    fluid.vertex(pose, buffer, left, bottom, z, uLeft, vBottom, light, 0.0F, 0.0F, -1.0F);
+                    fluid.vertex(pose, buffer, right, bottom, z, uRight, vBottom, light, 0.0F, 0.0F, -1.0F);
+                    fluid.vertex(pose, buffer, right, top, z, uRight, vTop, light, 0.0F, 0.0F, -1.0F);
+                    fluid.vertex(pose, buffer, left, top, z, uLeft, vTop, light, 0.0F, 0.0F, -1.0F);
+                }
+            });
             poseStack.popPose();
         }
     }
@@ -278,6 +328,10 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         private @Nullable Direction toCar;
         /** The kind of car the hatch serves, which says whether it draws its Bellows or its Loading arm. */
         private CarKind serves = CarKind.CARGO;
+        /** A Fluid hatch's fluid; null for none, or a hatch of items. */
+        private @Nullable SightGlassFluid fluid;
+        /** How much of each side's round window the fluid fills. */
+        private List<SightGlassFill.Rect> fill = List.of();
         /** Each side's light, by its {@link Direction#get2DDataValue()}. */
         private final int[] light = new int[Direction.Plane.HORIZONTAL.length()];
     }

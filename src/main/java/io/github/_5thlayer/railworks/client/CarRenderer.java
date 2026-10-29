@@ -9,11 +9,9 @@ import com.mojang.math.Axis;
 import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.FluidCarEntity;
 import io.github._5thlayer.railworks.rail.CarBody;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.model.object.chest.ChestModel;
 import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -21,12 +19,9 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.sprite.SpriteGetter;
-import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.properties.ChestType;
-import net.neoforged.neoforge.client.fluid.FluidTintSource;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
@@ -38,21 +33,16 @@ import org.jspecify.annotations.Nullable;
  * so the strips the pipeline joins in one buffer leave no triangles between them.
  *
  * <p>A Fluid car's Sight glasses are filled, on their panes' outer faces, with its tank's fluid as
- * the server last synced it: the fluid's own still texture and tint, from its fluid model as the world
- * draws it, tiled a block to a tile from the pane's bottom, so the surface only crops the top tile.
- * A fluid that gives off light is drawn at its own light level.
+ * the server last synced it ({@link SightGlassFluid}), tiled a block to a tile from the pane's bottom,
+ * so the surface only crops the top tile.
  */
 public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, CarRenderer.State> {
 
     public static final class State extends EntityRenderState {
         float yRot;
         float xRot;
-        /** A Fluid car's fluid's still texture; null for none, or another car. */
-        @Nullable TextureAtlasSprite fluidSprite;
-        /** The fluid's tint, ARGB. */
-        int fluidTint;
-        /** The fluid's own light level, 0 for none. */
-        int fluidLight;
+        /** A Fluid car's fluid; null for none, or another car. */
+        @Nullable SightGlassFluid fluid;
         /** How full the tank is: its amount and capacity, in millibuckets. */
         int amount;
         int capacity;
@@ -60,9 +50,6 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
 
     /** The six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
-    /** Just off a pane's outer face, so the fluid and the dark glass never share a plane. */
-    private static final float FLUID_PROUD = 0.002F;
-
     private final CarBody body;
     private final ChestModel chest;
     private final SpriteGetter sprites;
@@ -101,20 +88,12 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         super.extractRenderState(car, state, partialTicks);
         state.yRot = Mth.rotLerp(partialTicks, car.yRotO, car.getYRot());
         state.xRot = Mth.lerp(partialTicks, car.xRotO, car.getXRot());
-        state.fluidSprite = null;
+        state.fluid = null;
         if (car instanceof FluidCarEntity fluidCar) {
             FluidStack tank = fluidCar.tankSeen();
-            if (!tank.isEmpty()) {
-                FluidModel model = Minecraft.getInstance().getModelManager().getFluidStateModelSet()
-                        .get(tank.getFluid().defaultFluidState());
-                FluidTintSource tint = model.fluidTintSource();
-                state.fluidSprite = model.stillMaterial().sprite();
-                // Opaque, as the world draws a fluid's tint: the sprite's own alpha is its translucency.
-                state.fluidTint = tint == null ? -1 : 0xFF000000 | tint.colorAsStack(tank);
-                state.fluidLight = tank.getFluidType().getLightLevel(tank);
-                state.amount = tank.getAmount();
-                state.capacity = fluidCar.tankCapacitySeen();
-            }
+            state.fluid = SightGlassFluid.of(tank);
+            state.amount = tank.getAmount();
+            state.capacity = fluidCar.tankCapacitySeen();
         }
     }
 
@@ -137,12 +116,12 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         for (CarBody.Box chest : body.chests()) {
             submitChest(chest, poseStack, collector, light);
         }
-        TextureAtlasSprite fluid = state.fluidSprite;
+        SightGlassFluid fluid = state.fluid;
         if (fluid != null) {
-            int fluidLight = LightCoordsUtil.lightCoordsWithEmission(light, state.fluidLight);
-            collector.submitCustomGeometry(poseStack, RenderTypes.entityTranslucent(fluid.atlasLocation()), (pose, buffer) -> {
+            int fluidLight = fluid.light(light);
+            collector.submitCustomGeometry(poseStack, fluid.renderType(), (pose, buffer) -> {
                 for (CarBody.SightGlass glass : body.sightGlasses()) {
-                    fill(pose, buffer, glass, (float) glass.surface(state.amount, state.capacity), fluid, state.fluidTint, fluidLight);
+                    fill(pose, buffer, glass, (float) glass.surface(state.amount, state.capacity), fluid, fluidLight);
                 }
             });
         }
@@ -155,10 +134,10 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
      * last column at the pane's front end, each showing as much of the sprite as it covers.
      */
     private static void fill(PoseStack.Pose pose, VertexConsumer buffer, CarBody.SightGlass glass, float surface,
-                             TextureAtlasSprite sprite, int tint, int light) {
+                             SightGlassFluid fluid, int light) {
         CarBody.Box pane = glass.pane();
         float side = (float) glass.side();
-        float x = side > 0 ? (float) pane.maxX() + FLUID_PROUD : (float) pane.minX() - FLUID_PROUD;
+        float x = side > 0 ? (float) pane.maxX() + SightGlassFluid.PROUD : (float) pane.minX() - SightGlassFluid.PROUD;
         float bottom = (float) pane.minY();
         float back = (float) pane.minZ();
         for (float y0 = bottom; y0 < surface; y0 += 1.0F) {
@@ -167,29 +146,23 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
                 float z1 = Math.min(z0 + 1.0F, (float) pane.maxZ());
                 // The sprite runs along z from the tile's back end on both sides, so a cropped tile
                 // still meets the next at the sprite's edge.
-                float uBack = sprite.getU0();
-                float uFront = sprite.getU(z1 - z0);
-                // The sprite's top is v0: a cropped row shows its lower part, as a block's fluid shows its top cut off.
-                float v1 = sprite.getV1();
-                float v0 = sprite.getV(1.0F - (y1 - y0));
+                float uBack = 0.0F;
+                float uFront = z1 - z0;
+                // The sprite's top is v 0: a cropped row shows its lower part, as a block's fluid shows its top cut off.
+                float v1 = 1.0F;
+                float v0 = 1.0F - (y1 - y0);
                 // Counter-clockwise as seen from the side it faces, from the bottom left, which is
                 // the tile's front end on the +x side and its back end on the -x side.
                 float left = side > 0 ? z1 : z0;
                 float right = side > 0 ? z0 : z1;
                 float uLeft = side > 0 ? uFront : uBack;
                 float uRight = side > 0 ? uBack : uFront;
-                fluidVertex(pose, buffer, x, y0, left, uLeft, v1, tint, light, side);
-                fluidVertex(pose, buffer, x, y0, right, uRight, v1, tint, light, side);
-                fluidVertex(pose, buffer, x, y1, right, uRight, v0, tint, light, side);
-                fluidVertex(pose, buffer, x, y1, left, uLeft, v0, tint, light, side);
+                fluid.vertex(pose, buffer, x, y0, left, uLeft, v1, light, side, 0.0F, 0.0F);
+                fluid.vertex(pose, buffer, x, y0, right, uRight, v1, light, side, 0.0F, 0.0F);
+                fluid.vertex(pose, buffer, x, y1, right, uRight, v0, light, side, 0.0F, 0.0F);
+                fluid.vertex(pose, buffer, x, y1, left, uLeft, v0, light, side, 0.0F, 0.0F);
             }
         }
-    }
-
-    private static void fluidVertex(PoseStack.Pose pose, VertexConsumer buffer, float x, float y, float z, float u, float v,
-                                    int tint, int light, float side) {
-        buffer.addVertex(pose, x, y, z).setColor(tint).setUv(u, v).setOverlay(OverlayTexture.NO_OVERLAY).setLight(light)
-                .setNormal(pose, side, 0.0F, 0.0F);
     }
 
     /** A closed chest filling the cube as it would a block, its front out of the car's nearer side. */

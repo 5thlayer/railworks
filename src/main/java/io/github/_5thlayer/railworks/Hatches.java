@@ -221,16 +221,16 @@ public final class Hatches {
 
         /**
          * What it shows on its sides: a requester its request's item, or its fluid's filled bucket, a
-         * provider its first stack, or the filled bucket of the fluid it holds; {@link ItemResource#EMPTY}
-         * for a requester asking for nothing and a provider holding nothing.
+         * provider of items its first stack; {@link ItemResource#EMPTY} for a requester asking for
+         * nothing, a provider holding nothing, and a provider Fluid hatch, whose Sight glasses show
+         * its fluid.
          */
         public ItemResource shown() {
             if (mode == HatchMode.REQUESTER) {
                 return request().map(asked -> ItemResource.of(asked.goods().icon(1))).orElse(ItemResource.EMPTY);
             }
             if (holds == Goods.Kind.FLUID) {
-                return tank.fluid().isEmpty() ? ItemResource.EMPTY
-                        : ItemResource.of(Ware.of(tank.fluid().getFluid()).icon(1));
+                return ItemResource.EMPTY;
             }
             for (int slot = 0; slot < contents.size(); slot++) {
                 ItemResource resource = contents.getResource(slot);
