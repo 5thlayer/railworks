@@ -220,10 +220,10 @@ public final class Hatches {
         }
 
         /**
-         * What it shows on its sides: a requester its request's item, or its fluid's filled bucket, a
-         * provider of items its first stack; {@link ItemResource#EMPTY} for a requester asking for
-         * nothing, a provider holding nothing, and a provider Fluid hatch, whose Sight glasses show
-         * its fluid.
+         * What it shows, on a hatch of items' sides or a Fluid hatch's top: a requester its request's
+         * item, or its fluid's filled bucket, a provider of items its first stack;
+         * {@link ItemResource#EMPTY} for a requester asking for nothing, a provider holding nothing,
+         * and a provider Fluid hatch, whose Sight glasses show its fluid.
          */
         public ItemResource shown() {
             if (mode == HatchMode.REQUESTER) {

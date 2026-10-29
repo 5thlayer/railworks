@@ -37,14 +37,16 @@ import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The item a hatch shows ({@link HatchBlockEntity#shown}), a requester's request or a provider of
- * items' first stack, flat on each of its four sides, as an item frame holds one, each lit as the
+ * The item a hatch of items shows ({@link HatchBlockEntity#shown}), a requester's request or a
+ * provider's first stack, flat on each of its four sides, as an item frame holds one, each lit as the
  * block in front of that side is. A hatch has no facing, so it reads from any side of the Rail.
  *
  * <p>Each side of a Fluid hatch is a Sight glass: its round window, dark glass in its texture, is
  * filled from the bottom as far as the tank is full ({@link SightGlassFill#roundWindow}) with the
  * tank's fluid as the server last sent it ({@link SightGlassFluid}), just proud of the face, on all
- * four sides, the one facing a car too. A requester's bucket is drawn in front of it.
+ * four sides, the one facing a car too, with nothing in front of it. A requester's bucket, the filled
+ * bucket of what it asks for, lies flat on its top instead, as an item rests on a shelf, lit as the
+ * block above is.
  *
  * <p>While a car of its kind stands at its spot in a Train stopped at its Station
  * ({@link PlatformsNear#facingCar}), a hatch of items draws its Bellows, an accordion sleeve,
@@ -57,6 +59,11 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
 
     /** How far out from a side its middle stands, as an item frame's stands off its wall. */
     private static final float OFF_FACE = 1 / 16F;
+    /**
+     * How far above a Fluid hatch's top a requester's bucket lies: a flat item's whole depth at
+     * {@link #SCALE}, so it floats just clear of the casing.
+     */
+    private static final float ON_TOP = 1 / 32F;
     /** Its size, against an item's own: an item frame's. */
     private static final float SCALE = 0.5F;
     /** How big vanilla's block model draws a block item held {@code FIXED}, as in a frame: half a block. */
@@ -135,6 +142,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         for (Direction side : Direction.Plane.HORIZONTAL) {
             state.light[side.get2DDataValue()] = LevelRenderer.getLightCoords(level, hatch.getBlockPos().relative(side));
         }
+        state.topLight = LevelRenderer.getLightCoords(level, hatch.getBlockPos().above());
         var tank = hatch.tankSeen();
         state.fluid = SightGlassFluid.of(tank);
         state.fill = SightGlassFill.roundWindow(tank.getAmount(), hatch.tankCapacitySeen());
@@ -176,6 +184,10 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         if (state.item == null) {
             return;
         }
+        if (state.serves == CarKind.FLUID) {
+            submitOnTop(state.item, state.topLight, poseStack, collector);
+            return;
+        }
         for (Direction side : Direction.Plane.HORIZONTAL) {
             if (side == state.toCar) {
                 continue;
@@ -188,6 +200,20 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
             state.item.submit(poseStack, collector, state.light[side.get2DDataValue()], OverlayTexture.NO_OVERLAY, 0);
             poseStack.popPose();
         }
+    }
+
+    /**
+     * {@code item} lying flat on the top, its front up, {@link #ON_TOP} above it, the right way up to a
+     * player north of the hatch.
+     */
+    private static void submitOnTop(ItemStackRenderState item, int light, PoseStack poseStack, SubmitNodeCollector collector) {
+        poseStack.pushPose();
+        poseStack.translate(0.5, 1.0 + ON_TOP, 0.5);
+        // An item faces -z in its frame, as on a north side; turned about x, it faces up.
+        poseStack.mulPose(Axis.XP.rotationDegrees(90));
+        poseStack.scale(SCALE, SCALE, SCALE);
+        item.submit(poseStack, collector, light, OverlayTexture.NO_OVERLAY, 0);
+        poseStack.popPose();
     }
 
     /**
@@ -313,13 +339,14 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     }
 
     /**
-     * The block and as far past its sides as an item can reach or the Bellows or Loading arm to the
-     * car beside it, so none is culled while it is still in view.
+     * The block and as far past its sides and its top as an item can reach, or the Bellows or Loading
+     * arm to the car beside it, so none is culled while it is still in view.
      */
     @Override
     public AABB getRenderBoundingBox(HatchBlockEntity hatch) {
         double reach = Math.max(REACH, ACROSS + INTO_TANK);
-        return new AABB(hatch.getBlockPos()).inflate(reach, 0, reach);
+        // A bucket on the top reaches no further above it than an item on a side reaches out of it.
+        return new AABB(hatch.getBlockPos()).inflate(reach, 0, reach).expandTowards(0, REACH, 0);
     }
 
     static final class RenderState extends BlockEntityRenderState {
@@ -332,6 +359,8 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         private @Nullable SightGlassFluid fluid;
         /** How much of each side's round window the fluid fills. */
         private List<SightGlassFill.Rect> fill = List.of();
+        /** The light above its top, where a requester Fluid hatch's bucket lies. */
+        private int topLight;
         /** Each side's light, by its {@link Direction#get2DDataValue()}. */
         private final int[] light = new int[Direction.Plane.HORIZONTAL.length()];
     }

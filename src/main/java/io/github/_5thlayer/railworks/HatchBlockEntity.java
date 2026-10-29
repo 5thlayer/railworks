@@ -36,11 +36,11 @@ import org.jspecify.annotations.Nullable;
  * tank, the same on every side; neither has the other. A hatch placed with no player, as by a command,
  * puts itself there, holding nothing, as it loads, as its block's kind and mode say.
  *
- * <p>Its watchers draw one item on its sides ({@link #shown}): a requester's request, a fluid drawn as
- * its filled bucket, or the first stack a provider of items holds. A Fluid hatch's watchers also see its
- * tank, the fluid, its amount and the tank's capacity, in the Sight glass on each side
- * ({@link #tankSeen}). The server works both out from the record each tick and sends them to the
- * watchers as they change; the record stays the one truth.
+ * <p>Its watchers draw one item ({@link #shown}) on a hatch of items' sides or a Fluid hatch's top: a
+ * requester's request, a fluid drawn as its filled bucket, or the first stack a provider of items
+ * holds. A Fluid hatch's watchers also see its tank, the fluid, its amount and the tank's capacity,
+ * in the Sight glass on each side ({@link #tankSeen}). The server works both out from the record
+ * each tick and sends them to the watchers as they change; the record stays the one truth.
  */
 public final class HatchBlockEntity extends BlockEntity {
 
@@ -102,9 +102,10 @@ public final class HatchBlockEntity extends BlockEntity {
     }
 
     /**
-     * The item drawn on its sides, one of it: a requester's request, or the first stack a provider of
-     * items holds; empty for a requester asking for nothing, a provider holding nothing, and a provider
-     * Fluid hatch, whose Sight glasses show its fluid.
+     * The item drawn on a hatch of items' sides or a requester Fluid hatch's top, one of it: a
+     * requester's request, or the first stack a provider of items holds; empty for a requester asking
+     * for nothing, a provider holding nothing, and a provider Fluid hatch, whose Sight glasses show
+     * its fluid.
      */
     public ItemStack shown() {
         return shown;

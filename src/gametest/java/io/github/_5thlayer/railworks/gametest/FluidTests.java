@@ -339,8 +339,8 @@ final class FluidTests {
     }
 
     /**
-     * A requester draws the filled bucket of what it asks for in front of its Sight glass, whatever its
-     * tank holds; a provider draws none, its Sight glass showing its fluid.
+     * A requester shows the filled bucket of what it asks for, whatever its tank holds, which its
+     * renderer lays on its top; a provider shows none. Both show their fluid in their Sight glasses.
      */
     private static void shows(GameTestHelper helper) {
         helper.setBlock(LONE, fluidHatch(HatchMode.REQUESTER));
