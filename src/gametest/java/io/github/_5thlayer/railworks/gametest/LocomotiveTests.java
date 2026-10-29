@@ -100,7 +100,9 @@ final class LocomotiveTests {
         tests.test("locomotive_stops_when_its_fuel_runs_out", 20, LocomotiveTests::stopsWhenFuelRunsOut);
         tests.test("locomotive_with_no_fuel_does_not_move_under_a_driver", 20, LocomotiveTests::noFuelNoMovement);
         tests.test("locomotive_comes_off_the_rail_when_its_span_is_cut", 20, LocomotiveTests::derails);
-        tests.test("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
+        // On its own: its line reaches past its structure, and the raised Span's Clearance with it, where a
+        // car standing at the line's end hangs its pitched tail into the block at the Arm's height.
+        tests.testOnItsOwn("locomotive_stays_on_its_span_when_a_segment_is_stacked_on_its_column", 20, LocomotiveTests::staysWhenStacked);
         tests.test("locomotive_is_saved_with_its_place_speed_and_fuel", 20, LocomotiveTests::saves);
         tests.test("refuel_the_fuel_slots_keep_their_order_across_a_save", 20, LocomotiveTests::savesSlotOrder);
         tests.test("refuel_a_cab_saved_with_one_fuel_slot_loads_into_the_first", 20, LocomotiveTests::loadsOneSlotSave);

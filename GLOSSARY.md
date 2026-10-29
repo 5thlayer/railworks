@@ -43,7 +43,7 @@ Spans joined Arm to Arm that a Train can run along without leaving the Rail. A l
 _Avoid_: route, track
 
 **Clearance**:
-The space above a Span, and down both sides of the Rail, that a car straddling it passes through, three blocks across, which no block may fill.
+The space above a Span, and down both sides of the Rail, that a car straddling it passes through, which no block may fill: the blocks a car's rigid body reaches into, turned with the line, as its middle runs the Span. Three blocks across on the straight, wider on a bend, where a car's ends swing out and its middle cuts in.
 _Avoid_: loading gauge, hitbox
 
 ### Trains
