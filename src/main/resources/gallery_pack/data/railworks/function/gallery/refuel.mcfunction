@@ -1,9 +1,10 @@
 # Refuelling at a Station: the logistics scene's line, Stations and hatches, its Train standing at
 # Mine with nothing in either Locomotive's fuel slots. Provider hatches holding coal stand beside
 # Mine's leading car's place, where the Locomotive facing west stands, and beside its second car
-# spot, where the one facing east stands, each on a pillar in the row by the Locomotive's middle
-# block. Mine fuels both before the Train takes its first job, and again each time it comes back for
-# ore, so the shuttle runs with nobody near it until Mine runs dry.
+# spot, where the one facing east stands, each on a pillar in the row by the Locomotive's Engine
+# room, its middle block, the one block a provider fuels it from. Mine fuels both before the Train
+# takes its first job, and again each time it comes back for ore, so the shuttle runs with nobody
+# near it until Mine runs dry.
 function railworks:gallery/clear
 function railworks:gallery/sign {scene:"refuel"}
 function railworks:gallery/shuttle {south:"Mine",north:"Smelter"}

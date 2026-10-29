@@ -34,6 +34,11 @@ public final class Platform {
     public static final double SPOT = CargoCar.LENGTH;
     /** How long the leading car's place is along the Line, in blocks: a car's length, as a spot is. */
     public static final double LEAD = Locomotive.LENGTH;
+    /**
+     * How long a Locomotive's Engine room is along the Line, in blocks: the middle block of the place
+     * it stands at, the leading car's or a car spot, where a provider fuels it and a Charger charges it.
+     */
+    public static final double ENGINE_ROOM = 1.0;
     /** The index a block beside the leading car's place has in place of a car spot's, one before the first spot's. */
     public static final int LEADING = -1;
     /** How far a block beside a platform's car spots may be from its Station along x, y or z, in blocks: the leading car and the spots, and the Rail's width across. */
@@ -49,8 +54,11 @@ public final class Platform {
     public record CarSpot(int index, Place middle) {
     }
 
-    /** A hatch's place: the Station whose platform it stands beside, and the car spot it is beside. */
-    public record Joined(Station station, int spot) {
+    /**
+     * A hatch's place: the Station whose platform it stands beside, the car spot it is beside, and
+     * whether it is beside the spot's middle block, a Locomotive's Engine room where one stands there.
+     */
+    public record Joined(Station station, int spot, boolean engineRoom) {
     }
 
     /**
@@ -101,17 +109,20 @@ public final class Platform {
     private final List<Piece> leadPieces;
     /** Each spot's pieces of the Line, by index. */
     private final List<List<Piece>> spotPieces;
+    /** The middle block of the leading car's place and of each spot, where a Locomotive's Engine room stands. */
+    private final List<Piece> enginePieces;
     /** What it covers of the Line: its spots, or at least the Station's own block's length. */
     private final List<Piece> covered;
 
     private Platform(Station station, Place front, Place leadMark, List<CarSpot> spots, List<Piece> leadPieces,
-                     List<List<Piece>> spotPieces, List<Piece> covered) {
+                     List<List<Piece>> spotPieces, List<Piece> enginePieces, List<Piece> covered) {
         this.station = station;
         this.front = front;
         this.leadMark = leadMark;
         this.spots = spots;
         this.leadPieces = leadPieces;
         this.spotPieces = spotPieces;
+        this.enginePieces = enginePieces;
         this.covered = covered;
     }
 
@@ -154,6 +165,7 @@ public final class Platform {
         boolean leads = !leadBack.stopped() && StraightLeg.under(network, leadMark, LEAD);
         List<Piece> leadPieces = leads ? cover(network, leadBack.place().turned(), LEAD) : List.of();
         List<Piece> covered = new ArrayList<>(leads ? leadPieces : cover(network, front.place(), 1.0));
+        List<Piece> enginePieces = new ArrayList<>(leads ? engineRoom(network, at, FRONT - LEAD / 2.0) : List.of());
         List<CarSpot> spots = new ArrayList<>();
         List<List<Piece>> spotPieces = new ArrayList<>();
         for (int i = 0; leads && i < cars; i++) {
@@ -165,9 +177,15 @@ public final class Platform {
             spots.add(new CarSpot(i, middle));
             spotPieces.add(cover(network, back.place().turned(), SPOT));
             covered.addAll(spotPieces.getLast());
+            enginePieces.addAll(engineRoom(network, at, FRONT - LEAD - SPOT * (i + 0.5)));
         }
         return Optional.of(new Platform(station, front.place(), leadMark, List.copyOf(spots), leadPieces,
-                List.copyOf(spotPieces), List.copyOf(covered)));
+                List.copyOf(spotPieces), List.copyOf(enginePieces), List.copyOf(covered)));
+    }
+
+    /** The pieces of the Line of the Engine room's block of a car whose middle is {@code middle} on from {@code at}. */
+    private static List<Piece> engineRoom(RailNetwork network, Place at, double middle) {
+        return cover(network, at.move(network, middle - ENGINE_ROOM / 2.0).place().turned(), ENGINE_ROOM);
     }
 
     public Station station() {
@@ -234,6 +252,16 @@ public final class Platform {
             }
         }
         return OptionalInt.empty();
+    }
+
+    /**
+     * Whether the block at {@code x}, {@code y}, {@code z} is beside the middle block of the leading
+     * car's place or of a car spot, on either side of the Rail: beside the Engine room of a Locomotive
+     * standing there, the one block from which a provider fuels it and a Charger charges it. The other
+     * four blocks beside a place serve only a Cargo or Fluid car standing there.
+     */
+    public boolean besideEngineRoom(int x, int y, int z) {
+        return besidePieces(new Station(x, y, z, station.name()), enginePieces);
     }
 
     /** Whether {@code probe} stands beside one of {@code pieces}. */
@@ -327,7 +355,7 @@ public final class Platform {
             if (platform.isPresent()) {
                 OptionalInt spot = platform.get().spotBeside(x, y, z);
                 if (spot.isPresent()) {
-                    return Optional.of(new Joined(station, spot.getAsInt()));
+                    return Optional.of(new Joined(station, spot.getAsInt(), platform.get().besideEngineRoom(x, y, z)));
                 }
             }
         }
