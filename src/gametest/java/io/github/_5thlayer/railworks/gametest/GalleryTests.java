@@ -63,6 +63,8 @@ final class GalleryTests {
     private static final Layout ROWS = new Layout(1, 16);
     /** A scene's plot, along its row from {@link GalleryCheck#FIRST_PLOT_EAST} east of where it is run, as {@code gallery/clear} clears it. */
     private static final int PLOT_WIDTH = 40;
+    /** How far a car reaches east of its plot, on a Span ending at the plot's east end: half a car's length, and a block. */
+    private static final int PAST_PLOT = 4;
     /** A scene's plot, from its sign's row at the origin's z to 14 blocks north. */
     private static final int PLOT_DEPTH = 15;
 
@@ -353,10 +355,12 @@ final class GalleryTests {
 
     /**
      * libworks' {@link GalleryCheck#withPack} over the first {@code plots} plots, as {@code build} lays
-     * them, with the parts of each plot its own narrower plot leaves out loaded before and cleared
-     * after: it force-loads, and sets to air, only the {@link GalleryCheck#PLOT_WIDTH} by
-     * {@link GalleryCheck#PLOT_DEPTH} of each plot by the scene's origin. The runner lets the chunks
-     * go once the batch ends.
+     * them, with the parts of each plot its own narrower plot leaves out loaded and cleared before and
+     * cleared after: it force-loads, and sets to air, only the {@link GalleryCheck#PLOT_WIDTH} by
+     * {@link GalleryCheck#PLOT_DEPTH} of each plot by the scene's origin. Before, it also clears
+     * {@link #PAST_PLOT} east of each plot, where a Train on a Span ending at the plot's east end
+     * stands: the test grid's neighbouring tests, five blocks off, may have left blocks in either.
+     * The runner lets the chunks go once the batch ends.
      */
     private static GameTestSequence withPack(GameTestHelper helper, int plots, BiConsumer<CommandSourceStack, GameTestSequence> steps) {
         var at = helper.absolutePos(ORIGIN);
@@ -366,6 +370,9 @@ final class GalleryTests {
                 level.getChunk(chunk.x(), chunk.z());
                 level.setChunkForced(chunk.x(), chunk.z(), true);
             });
+            BoundingBox plot = plot(ROWS.sceneOrigin(at, index));
+            StructureUtils.clearSpaceForStructure(new BoundingBox(plot.minX(), plot.minY(), plot.minZ(),
+                    plot.maxX() + PAST_PLOT, plot.maxY(), plot.maxZ()), level);
         }
         return GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, plots, steps).thenExecute(() -> {
             for (int index = 0; index < plots; index++) {
