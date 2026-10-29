@@ -41,6 +41,15 @@ public final class Clearance {
      */
     public static final int REACH = 4 + (int) Math.ceil(Math.hypot(BODY_LENGTH / 2.0, CarBody.WIDTH / 2.0))
             + (int) Math.ceil(CarBody.HEIGHT);
+    /**
+     * The shortest bent Span a Straight leg may run on into, in line, with its row two off the Rail
+     * at a Cargo car's chests' height, where hatches, Stations and Chargers stand, left clear: on a
+     * shorter one, bending at the bend limit at its far Arm, a car's body swings into that row beside
+     * the leg's last blocks. Measured by {@code ClearanceTest} at the default bend limit, 45 degrees:
+     * a bent Span 3 long reaches one row block, 2 long two, 1 long three each side, and from 4 on
+     * none, whichever way it bends and however long the Span beyond.
+     */
+    public static final int SWING_CLEAR_LENGTH = 4;
     /** Slack for a block that only touches the car's box, so the floating point never tips a touch into an overlap. */
     private static final double TOUCH = 1e-6;
 

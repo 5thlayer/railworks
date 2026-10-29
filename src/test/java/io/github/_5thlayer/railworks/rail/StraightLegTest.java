@@ -51,6 +51,26 @@ class StraightLegTest {
     }
 
     @Test
+    void aSpanRunningOnIntoABentSpanShorterThanTheSwingClearLengthIsNoStraightLeg() {
+        // A car's body swinging round the bend at its far end reaches the row beside the leg's end.
+        Span ab = string(A, B);
+        Arm short3 = new Arm(10 + Clearance.SWING_CLEAR_LENGTH - 1, 5, 0);
+        string(B, short3);
+        string(short3, new Arm(short3.x() + 5, 5, 5));
+        assertTrue(StraightLeg.straight(network, ab));
+        assertFalse(StraightLeg.is(network, ab));
+    }
+
+    @Test
+    void aSpanRunningOnIntoABentSpanOfTheSwingClearLengthIsAStraightLeg() {
+        Span ab = string(A, B);
+        Arm four = new Arm(10 + Clearance.SWING_CLEAR_LENGTH, 5, 0);
+        string(B, four);
+        string(four, new Arm(four.x() + 5, 5, 5));
+        assertTrue(StraightLeg.is(network, ab));
+    }
+
+    @Test
     void aBendTwoArmsAwayLeavesASpanStraight() {
         Span ab = string(A, B);
         string(B, IN_LINE);
