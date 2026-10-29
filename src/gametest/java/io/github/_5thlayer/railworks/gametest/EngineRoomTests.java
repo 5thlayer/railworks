@@ -15,6 +15,7 @@ import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
+import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Train;
@@ -98,6 +99,16 @@ final class EngineRoomTests {
         for (int x : PYLONS) {
             helper.setBlock(new BlockPos(x, 1, Z), RailworksRegistries.PYLON.get().defaultBlockState());
         }
+        // An earlier test's Spans left across this line's ground, such as LogisticsTests' line along
+        // the same z, are taken up first.
+        RailNetwork network = LevelRails.of(helper.getLevel()).network();
+        BlockPos from = helper.absolutePos(new BlockPos(PYLONS[0] - 4, 0, Z - 6));
+        BlockPos to = helper.absolutePos(new BlockPos(PYLONS[PYLONS.length - 1] + 4, 0, Z + 6));
+        for (Span left : List.copyOf(network.all())) {
+            if (within(left.a(), from, to) || within(left.b(), from, to)) {
+                network.remove(left.a(), left.b());
+            }
+        }
         Span span = null;
         for (int i = 0; i + 1 < PYLONS.length; i++) {
             Arm one = PylonColumn.arm(helper.absolutePos(new BlockPos(PYLONS[i], 1, Z)));
@@ -106,6 +117,12 @@ final class EngineRoomTests {
             LevelRails.of(helper.getLevel()).network().add(span);
         }
         return span;
+    }
+
+    /** Whether {@code arm} stands over the ground from {@code from} to {@code to}, seen from above. */
+    private static boolean within(Arm arm, BlockPos from, BlockPos to) {
+        return arm.x() >= Math.min(from.getX(), to.getX()) && arm.x() <= Math.max(from.getX(), to.getX())
+                && arm.z() >= Math.min(from.getZ(), to.getZ()) && arm.z() <= Math.max(from.getZ(), to.getZ());
     }
 
     /** Forces the chunks under the line loaded, or lets them go. */

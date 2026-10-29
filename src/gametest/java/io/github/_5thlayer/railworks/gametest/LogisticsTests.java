@@ -24,11 +24,14 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.StationBlockEntity;
 import io.github._5thlayer.railworks.StationPlacement;
+import io.github._5thlayer.railworks.rail.Arm;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
+import io.github._5thlayer.railworks.rail.Clearance;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.Platform;
+import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
 import io.github._5thlayer.railworks.rail.SpanRules;
 import io.github._5thlayer.railworks.rail.Train;
@@ -77,25 +80,27 @@ final class LogisticsTests {
     /**
      * A line out of the plot east past the structure: west along z 3, a 45-degree jog south-east, and
      * on east along z 5, each Straight leg ten blocks, so each ends a platform after one five-block car
-     * spot and the two never overlap. A Span bends all along when either Arm does, so a short Span
-     * each side of the jog takes the bend.
+     * spot and the two never overlap. A Span bends all along when either Arm does, so the Span each
+     * side of the jog takes the bend, and is {@link Clearance#SWING_CLEAR_LENGTH} long, so a car
+     * swinging round the jog leaves the legs' rows clear.
      */
-    private static final BlockPos[] LINE = {new BlockPos(-1, 1, 3), new BlockPos(9, 1, 3), new BlockPos(10, 1, 3),
-            new BlockPos(12, 1, 5), new BlockPos(13, 1, 5), new BlockPos(23, 1, 5)};
-    /** How far east the {@link #LINE} runs. */
+    private static final BlockPos[] LINE = {new BlockPos(-7, 1, 3), new BlockPos(3, 1, 3), new BlockPos(7, 1, 3),
+            new BlockPos(9, 1, 5), new BlockPos(13, 1, 5), new BlockPos(23, 1, 5)};
+    /** How far west and east the {@link #LINE} runs. */
+    private static final int WEST = -7;
     private static final int EAST = 23;
     /**
      * North of the west leg at the line's end, serving Trains heading west: the leading car's place
-     * beside x -1 to 3 and its first car spot beside x 4 to 8.
+     * beside x -7 to -3 and its first car spot beside x -2 to 2.
      */
-    private static final BlockPos MINE = new BlockPos(-1, 3, 1);
+    private static final BlockPos MINE = new BlockPos(WEST, 3, 1);
     /**
      * South of the east leg at the line's end, serving Trains heading east: the leading car's place
      * beside x 19 to 23 and its first car spot beside x 14 to 18.
      */
     static final BlockPos DEPOT = new BlockPos(EAST, 3, 7);
     /** Beside the Mine's first car spot, at its fourth block. */
-    private static final BlockPos PROVIDER = new BlockPos(7, 3, 1);
+    private static final BlockPos PROVIDER = new BlockPos(1, 3, 1);
     /** Beside the Depot's first car spot, at its middle block. */
     private static final BlockPos REQUESTER = new BlockPos(16, 3, 7);
 
@@ -569,9 +574,19 @@ final class LogisticsTests {
         for (BlockPos pylon : LINE) {
             helper.setBlock(pylon, RailworksRegistries.PYLON.get().defaultBlockState());
         }
-        for (int x = -1; x <= EAST + 1; x++) {
+        for (int x = WEST; x <= EAST + 1; x++) {
             for (int z = 1; z <= 7; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
+            }
+        }
+        // An earlier test's Spans left across this line's ground, whose Clearance or a bend could reach
+        // its Stations' row, are taken up first.
+        RailNetwork network = LevelRails.of(helper.getLevel()).network();
+        BlockPos from = helper.absolutePos(new BlockPos(WEST - 4, 0, -2));
+        BlockPos to = helper.absolutePos(new BlockPos(EAST + 4, 0, 10));
+        for (Span left : List.copyOf(network.all())) {
+            if (within(left.a(), from, to) || within(left.b(), from, to)) {
+                network.remove(left.a(), left.b());
             }
         }
         Span span = null;
@@ -584,12 +599,18 @@ final class LogisticsTests {
         return span;
     }
 
+    /** Whether {@code arm} stands over the ground from {@code from} to {@code to}, seen from above. */
+    private static boolean within(Arm arm, BlockPos from, BlockPos to) {
+        return arm.x() >= Math.min(from.getX(), to.getX()) && arm.x() <= Math.max(from.getX(), to.getX())
+                && arm.z() >= Math.min(from.getZ(), to.getZ()) && arm.z() <= Math.max(from.getZ(), to.getZ());
+    }
+
     /**
      * Forces the chunks under the {@link #LINE} loaded, or lets them go. A chunk forced only starts to
      * tick a little later, so a car set there loses its view and is shown again: {@link #view}.
      */
     static void forceLoad(GameTestHelper helper, boolean forced) {
-        BlockPos west = helper.absolutePos(new BlockPos(-1, 1, 1));
+        BlockPos west = helper.absolutePos(new BlockPos(WEST, 1, 1));
         BlockPos east = helper.absolutePos(new BlockPos(EAST + 1, 1, 7));
         for (int cx = Math.min(west.getX(), east.getX()) >> 4; cx <= Math.max(west.getX(), east.getX()) >> 4; cx++) {
             for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
