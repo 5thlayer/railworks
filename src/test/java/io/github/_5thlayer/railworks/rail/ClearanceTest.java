@@ -68,6 +68,16 @@ class ClearanceTest {
     }
 
     @Test
+    void theRowTwoOffAStraightLegAtTheChestsHeightIsClear() {
+        // Where Stations, hatches and Chargers stand (ADR 0010): two off the line, the second block above the Rail.
+        var cells = Clearance.along(RailCurve.between(network, A, B));
+        for (int x = 0; x <= 4; x++) {
+            assertFalse(cells.contains(new Clearance.Cell(x, 7, 2)), "south at " + x);
+            assertFalse(cells.contains(new Clearance.Cell(x, 7, -2)), "north at " + x);
+        }
+    }
+
+    @Test
     void aCarFillsTheThreeBlocksAboveTheRailWhereItStands() {
         assertEquals(Set.of(new Clearance.Cell(2, 6, 0), new Clearance.Cell(2, 7, 0), new Clearance.Cell(2, 8, 0)),
                 Set.copyOf(Clearance.car(new Place.Point(2.0, 5.0, 0.0))));

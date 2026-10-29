@@ -7,20 +7,22 @@
 function railworks:gallery/clear
 function railworks:gallery/sign {scene:"two_loads"}
 function railworks:gallery/shuttle {south:"Diggings",north:"Foundry"}
-fill ~11 ~ ~-1 ~11 ~1 ~-1 minecraft:stone_bricks
-setblock ~11 ~2 ~-1 railworks:hatch[mode=provider]
-railworks hatch ~11 ~2 ~-1 provider minecraft:raw_copper 4
-fill ~16 ~ ~-1 ~16 ~1 ~-1 minecraft:stone_bricks
-setblock ~16 ~2 ~-1 railworks:hatch[mode=provider]
-railworks hatch ~16 ~2 ~-1 provider minecraft:raw_gold 4
-setblock ~16 ~ ~-12 minecraft:chest[facing=south]
-setblock ~16 ~1 ~-12 minecraft:hopper[facing=down]
-setblock ~16 ~2 ~-12 railworks:hatch[mode=requester]
-railworks hatch ~16 ~2 ~-12 requester minecraft:raw_copper 1
-setblock ~11 ~ ~-12 minecraft:chest[facing=south]
-setblock ~11 ~1 ~-12 minecraft:hopper[facing=down]
-setblock ~11 ~2 ~-12 railworks:hatch[mode=requester]
-railworks hatch ~11 ~2 ~-12 requester minecraft:raw_gold 1
+fill ~11 ~ ~ ~11 ~2 ~ minecraft:stone_bricks
+setblock ~11 ~3 ~ railworks:hatch[mode=provider]
+railworks hatch ~11 ~3 ~ provider minecraft:raw_copper 4
+fill ~16 ~ ~ ~16 ~2 ~ minecraft:stone_bricks
+setblock ~16 ~3 ~ railworks:hatch[mode=provider]
+railworks hatch ~16 ~3 ~ provider minecraft:raw_gold 4
+setblock ~16 ~ ~-10 minecraft:stone_bricks
+setblock ~16 ~1 ~-10 minecraft:chest[facing=south]
+setblock ~16 ~2 ~-10 minecraft:hopper[facing=down]
+setblock ~16 ~3 ~-10 railworks:hatch[mode=requester]
+railworks hatch ~16 ~3 ~-10 requester minecraft:raw_copper 1
+setblock ~11 ~ ~-10 minecraft:stone_bricks
+setblock ~11 ~1 ~-10 minecraft:chest[facing=south]
+setblock ~11 ~2 ~-10 minecraft:hopper[facing=down]
+setblock ~11 ~3 ~-10 railworks:hatch[mode=requester]
+railworks hatch ~11 ~3 ~-10 requester minecraft:raw_gold 1
 # The first car set over an Arm so it stands on its middle, each next coupled five on.
 railworks car cargo_car ~16 ~2 ~-2 -90
 railworks car cargo_car ~11 ~2 ~-2 90

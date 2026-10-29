@@ -21,8 +21,8 @@ import net.minecraft.world.level.block.Block;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Station in the hand: placed as a block is, but only beside the Rail, by a Straight leg, out of
- * its Clearance and clear of other Stations' platforms ({@link StationPlacement}), so the Placement
+ * A Station in the hand: placed as a block is, but only in the row beside the Rail, by a Straight
+ * leg, and clear of other Stations' platforms ({@link StationPlacement}), so the Placement
  * Preview and the click ask one rule. A refused click tells the player why on the action bar, naming
  * the other Station for an overlap. The server asks the level's Stations; the client, which has
  * only the blocks it was sent, the Station blocks loaded near the one it would place.
@@ -71,9 +71,7 @@ public final class StationItem extends BlockItem implements PlansPlacement {
     public static String messageKey(RailworksRefusal refusal) {
         return switch (refusal) {
             case STATION_OFF_RAIL -> "message.railworks.station_off_rail";
-            case STATION_UNDER_RAIL -> "message.railworks.station_under_rail";
             case STATION_OVERLAPS -> "message.railworks.station_overlaps";
-            case STATION_IN_CLEARANCE -> "message.railworks.station_in_clearance";
             case STATION_NOT_STRAIGHT -> "message.railworks.station_not_straight";
             default -> throw new IllegalArgumentException(refusal + " does not refuse a Station");
         };

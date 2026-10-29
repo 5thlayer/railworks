@@ -7,12 +7,12 @@
 function railworks:gallery/clear
 function railworks:gallery/sign {scene:"fluid"}
 function railworks:gallery/shuttle {south:"Mine",north:"Smelter"}
-fill ~11 ~ ~-1 ~11 ~1 ~-1 minecraft:stone_bricks
-setblock ~11 ~2 ~-1 railworks:fluid_hatch[mode=provider]
-railworks fluid_hatch ~11 ~2 ~-1 provider minecraft:lava 32
-fill ~11 ~ ~-12 ~11 ~1 ~-12 minecraft:stone_bricks
-setblock ~11 ~2 ~-12 railworks:fluid_hatch[mode=requester]
-railworks fluid_hatch ~11 ~2 ~-12 requester minecraft:lava 16
+fill ~11 ~ ~ ~11 ~2 ~ minecraft:stone_bricks
+setblock ~11 ~3 ~ railworks:fluid_hatch[mode=provider]
+railworks fluid_hatch ~11 ~3 ~ provider minecraft:lava 32
+fill ~11 ~ ~-10 ~11 ~2 ~-10 minecraft:stone_bricks
+setblock ~11 ~3 ~-10 railworks:fluid_hatch[mode=requester]
+railworks fluid_hatch ~11 ~3 ~-10 requester minecraft:lava 16
 # Set from the east, the first car over an Arm so it stands on its middle, each next coupled five on.
 railworks car locomotive ~16 ~2 ~-2 -90
 railworks car fluid_car ~11 ~2 ~-2 90

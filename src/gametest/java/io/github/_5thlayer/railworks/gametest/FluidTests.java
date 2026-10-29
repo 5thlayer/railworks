@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.mojang.serialization.DynamicOps;
+import io.github._5thlayer.groundworks.PlacementPlan;
+import io.github._5thlayer.groundworks.Placements;
 import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.CarRecords;
 import io.github._5thlayer.railworks.CargoCarEntity;
@@ -22,6 +24,7 @@ import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.PylonColumn;
+import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.Tank;
 import io.github._5thlayer.railworks.Ware;
@@ -55,8 +58,10 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
@@ -75,7 +80,8 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * Fluid hatch, a pipe through the hatch's fluid capability, the bucket on its sides, the tanks kept
  * through a save, and automatic Trains carrying fluid between Fluid hatches: a job, a leftover in a
  * Fluid car, a Train mixing a Cargo car and a Fluid car, and a provider Fluid hatch beside a
- * Locomotive that fuels none. How fluid is planned, claimed and moved is {@code LogisticsTest}'s; a
+ * Locomotive that fuels none. Stations and Fluid hatches stand in the row two blocks off the Rail at a
+ * Cargo car's chests' height (#72), and a Fluid hatch places nowhere nearer. How fluid is planned, claimed and moved is {@code LogisticsTest}'s; a
  * Train carrying fluid out of view is {@code FarAwayTests}'. These tests share the {@code fluid_}
  * prefix.
  */
@@ -90,22 +96,39 @@ final class FluidTests {
      */
     private static final int[] PYLONS = {-11, -1, 8, 19, 29, 37};
     private static final int Z = 3;
-    /** South of the line, serving Trains heading east: its leading car's place beside x 7 to 11, its car spots back west from 2 to 6. */
-    private static final BlockPos QUARRY = new BlockPos(11, 1, 4);
-    /** South of the line at its east end, serving Trains heading east: its leading car's place beside x 33 to 37, its car spots back west from 28 to 32. */
-    private static final BlockPos DEPOT = new BlockPos(37, 1, 4);
-    /** Two blocks beside each of a Station's first two car spots, at a car's floor: each spot's first and last. */
-    private static final BlockPos QUARRY_0 = new BlockPos(6, 2, 4);
-    private static final BlockPos QUARRY_0_OTHER = new BlockPos(2, 2, 4);
-    private static final BlockPos QUARRY_1 = new BlockPos(1, 2, 4);
-    private static final BlockPos QUARRY_1_OTHER = new BlockPos(-3, 2, 4);
-    private static final BlockPos QUARRY_LEADING = new BlockPos(9, 2, 4);
-    private static final BlockPos DEPOT_0 = new BlockPos(32, 2, 4);
-    private static final BlockPos DEPOT_0_OTHER = new BlockPos(28, 2, 4);
-    private static final BlockPos DEPOT_1 = new BlockPos(27, 2, 4);
-    private static final BlockPos DEPOT_1_OTHER = new BlockPos(23, 2, 4);
+    /**
+     * South of the line in its row, two blocks off the Rail at a Cargo car's chests' height, serving
+     * Trains heading east: its leading car's place beside x 7 to 11, its car spots back west from 2 to 6.
+     */
+    private static final BlockPos QUARRY = new BlockPos(11, 3, 5);
+    /** South of the line at its east end in its row, serving Trains heading east: its leading car's place beside x 33 to 37, its car spots back west from 28 to 32. */
+    private static final BlockPos DEPOT = new BlockPos(37, 3, 5);
+    /** Two blocks in the row beside each of a Station's first two car spots: each spot's first and last. */
+    private static final BlockPos QUARRY_0 = new BlockPos(6, 3, 5);
+    private static final BlockPos QUARRY_0_OTHER = new BlockPos(2, 3, 5);
+    private static final BlockPos QUARRY_1 = new BlockPos(1, 3, 5);
+    private static final BlockPos QUARRY_1_OTHER = new BlockPos(-3, 3, 5);
+    private static final BlockPos QUARRY_LEADING = new BlockPos(9, 3, 5);
+    private static final BlockPos DEPOT_0 = new BlockPos(32, 3, 5);
+    private static final BlockPos DEPOT_0_OTHER = new BlockPos(28, 3, 5);
+    private static final BlockPos DEPOT_1 = new BlockPos(27, 3, 5);
+    private static final BlockPos DEPOT_1_OTHER = new BlockPos(23, 3, 5);
     /** A hatch inside the structure, joining no Station: only a tank. */
     private static final BlockPos LONE = new BlockPos(4, 2, 6);
+
+    /**
+     * The row tests' Rail, a Span along z 3 inside the plot from x -1 to 11, and a Station south of
+     * it in its row at its east end, serving Trains heading east: its first car spot beside x 2 to 6.
+     */
+    private static final BlockPos ROW_WEST = new BlockPos(-1, 1, 3);
+    private static final BlockPos ROW_EAST = new BlockPos(11, 1, 3);
+    private static final BlockPos ROW_STATION = new BlockPos(11, 3, 5);
+    /** Beside the first car spot's first block in the row: two blocks off the Rail at a Cargo car's chests' height. */
+    private static final BlockPos IN_ROW = new BlockPos(6, 3, 5);
+    /** One block off the Rail at the chests' height, between the row and the Rail. */
+    private static final BlockPos ONE_OFF = new BlockPos(6, 3, 4);
+    /** The old row (#70): one block off the Rail at a car's floor. */
+    private static final BlockPos OLD_ROW = new BlockPos(6, 2, 4);
 
     private static final int BUCKET = (int) Logistics.MILLIBUCKETS_PER_BUCKET;
 
@@ -123,6 +146,9 @@ final class FluidTests {
         tests.test("fluid_hatch_shows_its_fluid_as_a_filled_bucket", 40, FluidTests::shows);
         tests.test("fluid_tanks_are_kept_through_a_save", 20, FluidTests::saved);
         tests.test("fluid_command_fluid_hatch_fills_a_provider_and_sets_a_requesters_request", 1, FluidTests::command);
+        tests.test("fluid_hatch_row_places_two_blocks_off_the_rail_at_a_cargo_cars_chests_height_and_nowhere_nearer", 20,
+                helper -> placesOnlyInTheRow(helper, RailworksRegistries.FLUID_HATCH_ITEM.get(),
+                        RailworksRegistries.FLUID_HATCH.get(), RailworksRefusal.HATCH_OFF_PLATFORM));
         // Each runs its line out past the structure.
         tests.testOnItsOwn("fluid_a_job_carries_fluid_from_a_provider_fluid_hatch_to_a_requester_one", 1_200, FluidTests::job);
         tests.testOnItsOwn("fluid_a_leftover_poured_in_by_hand_is_delivered_once_a_requester_asks_for_it", 1_200,
@@ -386,6 +412,63 @@ final class FluidTests {
         helper.succeed();
     }
 
+    // ---- the row ----
+
+    /**
+     * {@code item}, a hatch's or a Charger's, beside a Station's first car spot: one block off the Rail
+     * at a Cargo car's chests' height and in the old row, one off at a car's floor, the Placement
+     * Preview's plan is refused {@code refusal} and a click places nothing; in the row, two blocks off
+     * at the chests' height, it plans and places {@code block}, joining the first car spot. Shared with
+     * {@code ElectricTests}.
+     */
+    static void placesOnlyInTheRow(GameTestHelper helper, Item item, Block block, RailworksRefusal refusal) {
+        for (BlockPos end : List.of(ROW_WEST, ROW_EAST)) {
+            helper.setBlock(end, RailworksRegistries.PYLON.get().defaultBlockState());
+        }
+        var west = PylonColumn.arm(helper.absolutePos(ROW_WEST));
+        var east = PylonColumn.arm(helper.absolutePos(ROW_EAST));
+        LevelRails.of(helper.getLevel()).network().add(Span.of(west, east, SpanRules.cost(west, east)));
+        LogisticsTests.station(helper, ROW_STATION);
+        ServerPlayer player = LogisticsTests.near(helper, new BlockPos(6, 1, 7));
+        for (BlockPos wrong : List.of(ONE_OFF, OLD_ROW)) {
+            player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(item, 2));
+            PlacementPlan plan = Placements.planFor(item, inTheBlock(helper, player, wrong));
+            if (plan == null || !plan.isRefused() || plan.refusal() != refusal) {
+                helper.fail(item + " off the row planned " + plan + ", not refused " + refusal, wrong);
+                return;
+            }
+            if (player.getMainHandItem().useOn(inTheBlock(helper, player, wrong)).consumesAction()
+                    || !helper.getBlockState(wrong).isAir() || player.getMainHandItem().getCount() != 2) {
+                helper.fail(item + " off the row was placed or spent", wrong);
+                return;
+            }
+        }
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(item));
+        PlacementPlan plan = Placements.planFor(item, inTheBlock(helper, player, IN_ROW));
+        if (plan == null || plan.isRefused()) {
+            helper.fail(item + " in the row planned " + plan, IN_ROW);
+            return;
+        }
+        if (!player.getMainHandItem().useOn(inTheBlock(helper, player, IN_ROW)).consumesAction()
+                || !helper.getBlockState(IN_ROW).is(block)) {
+            helper.fail(item + " in the row was refused", IN_ROW);
+            return;
+        }
+        var joined = PlatformsNear.joined(helper.getLevel(), helper.absolutePos(IN_ROW));
+        if (joined.isEmpty() || joined.get().spot() != 0) {
+            helper.fail("in the row it joins " + joined + ", not the first car spot", IN_ROW);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** A click placing the held item at {@code pos}, standing in the air: the click lands in the block itself. */
+    private static BlockPlaceContext inTheBlock(GameTestHelper helper, ServerPlayer player, BlockPos pos) {
+        BlockPos at = helper.absolutePos(pos);
+        return new BlockPlaceContext(player, InteractionHand.MAIN_HAND, player.getMainHandItem(),
+                new BlockHitResult(Vec3.atCenterOf(at), Direction.UP, at, false));
+    }
+
     // ---- automatic Trains ----
 
     private static void job(GameTestHelper helper) {
@@ -596,6 +679,9 @@ final class FluidTests {
         for (int x : PYLONS) {
             blocks.add(new BlockPos(x, 1, Z));
         }
+        // What each Station was clicked onto.
+        blocks.add(QUARRY.below());
+        blocks.add(DEPOT.below());
         for (BlockPos pos : blocks) {
             if (!helper.getBlockState(pos).isAir()) {
                 helper.destroyBlock(pos);

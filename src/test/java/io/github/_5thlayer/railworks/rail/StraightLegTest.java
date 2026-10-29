@@ -100,22 +100,22 @@ class StraightLegTest {
         assertFalse(StraightLeg.under(network, new Place(last, end, 0.0), 2.4));
     }
 
-    /** A Station beside the Rail at ride height, {@code x} blocks along it, on the side z is 1. */
+    /** A Station in the row beside the Rail, {@code x} blocks along it, on the side z is 2. */
     private static Station beside(int x, int y) {
-        return new Station(x, y, 1, "Mine");
+        return new Station(x, y, 2, "Mine");
     }
 
     @Test
     void aStationByAStraightLegIsAtOne() {
         string(A, B);
-        assertTrue(StraightLeg.at(network, beside(5, 6)));
+        assertTrue(StraightLeg.at(network, beside(5, 7)));
     }
 
     @Test
     void aStationByASpanBentThroughAnArmIsNot() {
         string(A, B);
         string(B, OFF_LINE);
-        assertFalse(StraightLeg.at(network, beside(5, 6)));
+        assertFalse(StraightLeg.at(network, beside(5, 7)));
     }
 
     @Test
@@ -125,15 +125,16 @@ class StraightLegTest {
         string(B, IN_LINE);
         string(IN_LINE, new Arm(26, 5, 6));
         // By B the stretch reaches a block on over it; a block short, it ends at B.
-        assertFalse(StraightLeg.at(network, beside(10, 6)));
-        assertTrue(StraightLeg.at(network, beside(9, 6)));
+        assertFalse(StraightLeg.at(network, beside(10, 7)));
+        assertTrue(StraightLeg.at(network, beside(9, 7)));
     }
 
     @Test
     void aStationByADiagonalIsNot() {
+        // No block's centre is a whole two off a diagonal, so none is in its row, by it at all.
         Span diagonal = string(A, new Arm(8, 5, 8));
-        Station station = new Station(4, 6, 3, "Mine");
-        assertTrue(station.foot(network).isPresent());
+        Station station = new Station(4, 7, 2, "Mine");
+        assertTrue(station.foot(network).isEmpty());
         assertFalse(StraightLeg.at(network, station));
         assertTrue(StraightLeg.straight(network, diagonal));
     }
@@ -141,11 +142,12 @@ class StraightLegTest {
     @Test
     void aStationByAClimbingLegIsAtOne() {
         string(A, new Arm(10, 7, 0));
-        assertTrue(StraightLeg.at(network, beside(5, 7)));
+        // Halfway up the Rail is a block higher, so the row is too.
+        assertTrue(StraightLeg.at(network, beside(5, 8)));
     }
 
     @Test
     void aStationByNoRailIsNot() {
-        assertFalse(StraightLeg.at(network, beside(5, 6)));
+        assertFalse(StraightLeg.at(network, beside(5, 7)));
     }
 }

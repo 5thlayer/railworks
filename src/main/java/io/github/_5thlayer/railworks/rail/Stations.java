@@ -85,7 +85,7 @@ public final class Stations {
     /** How near its mark a Train is settled, in blocks: closer than the floating point can tell apart. */
     private static final double SETTLED = 1e-9;
     /** How far from a Station block its leading car may stand and still be within its stretch, along x or z, in blocks. */
-    private static final double NEAR = Station.STRETCH + Station.REACH + 1.0;
+    private static final double NEAR = Station.STRETCH + Station.ROW_OFF + 1.0;
 
     /**
      * One tick of {@code train} settling at a Station it is stopped at: while it is at rest, its

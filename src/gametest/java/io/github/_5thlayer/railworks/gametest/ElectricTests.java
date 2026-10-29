@@ -10,6 +10,7 @@ import io.github._5thlayer.railworks.CarRecords;
 import io.github._5thlayer.railworks.LevelCarRecords;
 import io.github._5thlayer.railworks.LevelChargers;
 import io.github._5thlayer.railworks.LocomotiveEntity;
+import io.github._5thlayer.railworks.RailworksRefusal;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.ChargeSpec;
@@ -41,7 +42,8 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 /**
  * The Electric Locomotive, the Charger and the Burner Generator in a world (#9): their recipes, the
  * energy handlers each shows Jade, a Charger taking FE in and filling a Locomotive beside it, the
- * Creative Charger filling one at once, and a Burner Generator fed by a hopper charging a Charger set
+ * Creative Charger filling one at once, a Charger placing only in the row two blocks off the Rail
+ * at a Cargo car's chests' height (#72), and a Burner Generator fed by a hopper charging a Charger set
  * against it. Which Trains a Charger serves and when a Train waits on it are {@code LogisticsTest}'s,
  * in the model. Prefixed {@code electric_}.
  */
@@ -57,6 +59,9 @@ final class ElectricTests {
         tests.test("electric_recipes_make_the_locomotive_the_charger_and_the_burner_generator_and_none_the_creative_charger", 1,
                 ElectricTests::crafts);
         tests.test("electric_charger_takes_fe_in_up_to_its_rate_a_tick_and_gives_none_out", 20, ElectricTests::chargerTakesFe);
+        tests.test("electric_charger_row_places_two_blocks_off_the_rail_at_a_cargo_cars_chests_height_and_nowhere_nearer", 20,
+                helper -> FluidTests.placesOnlyInTheRow(helper, RailworksRegistries.CHARGER_ITEM.get(),
+                        RailworksRegistries.CHARGER.get(), RailworksRefusal.CHARGER_OFF_PLATFORM));
         tests.test("electric_burner_generator_fed_coal_by_a_hopper_makes_300_fe_a_tick_into_a_charger_against_it", 200,
                 ElectricTests::burnerGeneratorCharges);
         tests.test("electric_burner_generator_takes_no_fuel_that_leaves_something_behind", 60, ElectricTests::burnerGeneratorRefusesLava);
@@ -119,13 +124,18 @@ final class ElectricTests {
     }
 
     /**
-     * The Depot, a Charger of {@code block} beside its leading car's place, and a manual Electric
+     * The Depot, a Charger of {@code block} in the row beside its leading car's place, at the Depot's
+     * own height, and a manual Electric
      * Locomotive, a Cargo car behind it, standing there empty. The Locomotive.
      */
     private static LocomotiveEntity atTheDepot(GameTestHelper helper, Block block) {
         Span last = LogisticsTests.line(helper);
         LogisticsTests.station(helper, LogisticsTests.DEPOT);
-        helper.setBlock(LogisticsTests.besideTheLeadingCar(helper, LogisticsTests.DEPOT), block);
+        BlockPos charger = LogisticsTests.besideTheLeadingCar(helper, LogisticsTests.DEPOT);
+        if (charger.getY() != LogisticsTests.DEPOT.getY()) {
+            throw helper.assertionException(charger, Component.literal("the block beside the leading car is not in the Depot's row"));
+        }
+        helper.setBlock(charger, block);
         Locomotive east = Locomotive.electric();
         CargoCar wagon = CargoCar.create();
         // Its middle where the Depot's leading Locomotive stands.

@@ -32,7 +32,7 @@ class StationsTest {
      * Beside the Rail twenty blocks from A, on its south side: on the right of a Train heading for B.
      * Its leading car's mark is at 18, a Locomotive's middle, its front at the Station block's front edge.
      */
-    private final Station mine = new Station(20, 6, 1, "Mine");
+    private final Station mine = new Station(20, 7, 2, "Mine");
 
     @BeforeEach
     void line() {
@@ -71,7 +71,7 @@ class StationsTest {
     @Test
     void aTrainBackedInWithItsLastCarLeadingIsStoppedAtAStationServingThatWay() {
         // On the north side: it serves Trains heading for A, and this one's last car leads that way.
-        Station yard = new Station(20, 6, -1, "Yard");
+        Station yard = new Station(20, 7, -2, "Yard");
         stations.put(yard);
         assertEquals(List.of(yard), stations.stoppedAt(network, train(22.0 + LAST)));
     }
@@ -104,7 +104,7 @@ class StationsTest {
     @Test
     void aTrainBetweenTwoStationsIsStoppedAtBoth() {
         // The Smelter on the north side by its last car, which leads toward A: its mark at 9.
-        Station smelter = new Station(7, 6, -1, "Smelter");
+        Station smelter = new Station(7, 7, -2, "Smelter");
         stations.put(smelter);
         assertEquals(List.of(mine, smelter), stations.stoppedAt(network, train(18.5)));
     }
@@ -156,7 +156,7 @@ class StationsTest {
 
     @Test
     void aTrainBackedInEasesItsLeadingLastCarOntoTheMark() {
-        Station yard = new Station(20, 6, -1, "Yard");
+        Station yard = new Station(20, 7, -2, "Yard");
         stations.remove(mine.x(), mine.y(), mine.z());
         stations.put(yard);
         // Its last car leads toward A: at rest at 21.5, it eases to the Yard's mark at 22.
@@ -180,7 +180,7 @@ class StationsTest {
     void aTrainBetweenTwoStationsSettlesAtOneAndStays() {
         // Its Locomotive 0.6 past the Mine's mark, its last car 0.4 past the Smelter's at 9: it
         // settles at the Smelter, the nearer, and its Locomotive is still within the Mine's stretch.
-        Station smelter = new Station(7, 6, -1, "Smelter");
+        Station smelter = new Station(7, 7, -2, "Smelter");
         stations.put(smelter);
         Train train = train(18.6);
         int ticks = settled(train);
@@ -206,7 +206,7 @@ class StationsTest {
         Arm c = new Arm(50, 5, 0);
         Span bc = Span.of(B, c, 10);
         network.add(bc);
-        Station end = new Station(40, 6, 1, "End");
+        Station end = new Station(40, 7, 2, "End");
         stations.put(end);
         Train train = train(37.0);
         int ticks = settled(train, span -> span.equals(bc));
