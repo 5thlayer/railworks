@@ -3,7 +3,7 @@
   "textures": {
     "particle": "railworks:block/hatch_casing",
     "down": "railworks:block/hatch_casing",
-    "up": "railworks:block/fluid_hatch_top",
+    "up": "railworks:block/hatch_casing",
     "north": "railworks:block/fluid_hatch_requester",
     "east": "railworks:block/fluid_hatch_requester",
     "south": "railworks:block/fluid_hatch_requester",
