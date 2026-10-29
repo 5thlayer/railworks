@@ -80,6 +80,10 @@ _Avoid_: wagon, freight car
 A car that carries one fluid in its tank, filled and emptied by the Fluid hatch beside its car spot while its automatic Train stands at a Station on a job, or by hand a bucket at a time. Nobody rides one.
 _Avoid_: tank car, tanker, fluid wagon
 
+**Sight glass**:
+The window along each side of a Fluid car's tank that shows the fluid it holds, filled from the bottom as far as the tank is full, and dark above, so its fluid and how full it is are seen from the platform.
+_Avoid_: gauge, fill window, level indicator
+
 **View**:
 A car's entity in a loaded chunk, showing where its Train puts it and what it holds. The Train, the car and its cargo and fuel are the level's; the view only shows them, and a car out of view has none.
 _Avoid_: car entity (for the car itself)
