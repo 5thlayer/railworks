@@ -36,8 +36,9 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Stations through the item, the block and a real player: placing one by the Rail, refused off it,
- * in its Clearance and by a bend or a diagonal, with the line it says why, naming it, and the
+ * Stations through the item, the block and a real player: placing one in the row beside the Rail,
+ * two blocks off it at a Cargo car's chests' height (ADR 0010), refused off it, in the old row one
+ * off it, in its Clearance and by a bend or a diagonal, with the line it says why, naming it, and the
  * level's Stations following the blocks. Which stretch of a Span a Station serves is
  * {@code StationTest}'s, and where Rail is a Straight leg {@code StraightLegTest}'s; what only a
  * server shows is that the click asks the level's Spans and that the name survives a save. All of these tests share the {@code station_}
@@ -48,16 +49,18 @@ final class StationTests {
     /** Eight apart, one segment tall, with a Span strung between the tops at y 1. */
     private static final BlockPos A = new BlockPos(1, 1, 3);
     private static final BlockPos B = new BlockPos(9, 1, 3);
-    /** Beside the Rail, a block down from the car: where a Station goes and leaves the car's side free for a hatch. */
-    private static final BlockPos BESIDE = new BlockPos(5, 1, 2);
+    /** In the row beside the Rail, two blocks off it at the height of a Cargo car's chests: where a Station goes. */
+    private static final BlockPos BESIDE = new BlockPos(5, 3, 1);
     /** Under the Rail, between the Pylons, where a Station is refused, but a block can be clicked. */
     private static final BlockPos UNDER = new BlockPos(5, 1, 3);
-    /** Beside the Rail on its other side, far enough along for its platform to clear {@link #BESIDE}'s. */
-    private static final BlockPos ACROSS = new BlockPos(2, 1, 4);
+    /** In the row on the Rail's other side, far enough along for its platform to clear {@link #BESIDE}'s. */
+    private static final BlockPos ACROSS = new BlockPos(2, 3, 5);
     /** In the Rail's own block, where a car passes. */
     private static final BlockPos IN_CLEARANCE = new BlockPos(5, 2, 3);
-    /** Three blocks off the Rail. */
-    private static final BlockPos OFF = new BlockPos(5, 1, 0);
+    /** Three blocks off the Rail, at the row's height. */
+    private static final BlockPos OFF = new BlockPos(5, 3, 6);
+    /** Where a player stands, clear of the row's blocks and the supports under them. */
+    private static final BlockPos STAND = new BlockPos(3, 1, 0);
 
     private StationTests() {
     }
@@ -76,6 +79,7 @@ final class StationTests {
         tests.test("station_names_may_be_shared", 20, StationTests::sharedNames);
         tests.test("station_breaking_takes_it_out_of_the_level", 20, StationTests::breaking);
         tests.test("station_serves_the_stretch_of_its_span_beside_it", 20, StationTests::serves);
+        tests.test("station_row_is_two_off_the_rail_at_a_cars_chests_and_nowhere_nearer", 20, StationTests::onlyTheRow);
     }
 
     private static void placesByTheRail(GameTestHelper helper) {
@@ -104,10 +108,29 @@ final class StationTests {
         refused(helper, OFF, RailworksRefusal.STATION_OFF_RAIL);
     }
 
+    /**
+     * The row is the only place by the Rail (#72): one block off it, at a car's floor where the old
+     * row was or at the chests' height, a Station is off the Rail, and two off at the chests' height
+     * it places.
+     */
+    private static void onlyTheRow(GameTestHelper helper) {
+        ServerPlayer player = player(helper);
+        BlockPos oldRow = new BlockPos(3, 2, 2);
+        BlockPos oneOff = new BlockPos(7, 3, 2);
+        helper.setBlock(oldRow.below(), Blocks.STONE);
+        helper.setBlock(oneOff.below(), Blocks.STONE);
+        assertRefused(helper, player, oldRow, RailworksRefusal.STATION_OFF_RAIL);
+        assertRefused(helper, player, oneOff, RailworksRefusal.STATION_OFF_RAIL);
+        if (!place(helper, player, BESIDE).consumesAction() || !helper.getBlockState(BESIDE).is(RailworksRegistries.STATION.get())) {
+            helper.fail("a Station in the row two off the Rail did not place", BESIDE);
+        }
+        helper.succeed();
+    }
+
     private static void refusedInClearance(GameTestHelper helper) {
         // Something under the Rail to click the top of.
         helper.setBlock(UNDER, Blocks.STONE);
-        refused(helper, IN_CLEARANCE, RailworksRefusal.STATION_IN_CLEARANCE);
+        refused(helper, IN_CLEARANCE, RailworksRefusal.STATION_OFF_RAIL);
     }
 
     private static void refusedBesideBend(GameTestHelper helper) {
@@ -121,7 +144,10 @@ final class StationTests {
         ServerPlayer player = player(helper);
         network(helper).remove(arm(helper, A), arm(helper, B));
         network(helper).add(Span.of(arm(helper, new BlockPos(1, 1, 1)), arm(helper, new BlockPos(7, 1, 7)), 9));
-        refused(helper, player, new BlockPos(4, 1, 3), RailworksRefusal.STATION_NOT_STRAIGHT);
+        // No block's centre is two off a diagonal: this one, at the row's height, is about 2.1 off it.
+        BlockPos by = new BlockPos(5, 3, 2);
+        helper.setBlock(by.below(), Blocks.STONE);
+        refused(helper, player, by, RailworksRefusal.STATION_OFF_RAIL);
     }
 
     private static void refusedNearBendBeyond(GameTestHelper helper) {
@@ -131,15 +157,16 @@ final class StationTests {
         network(helper).add(Span.of(arm(helper, B), arm(helper, c), 4));
         network(helper).add(Span.of(arm(helper, c), arm(helper, new BlockPos(17, 1, 7)), 6));
         // By B, the stretch reaches over it onto B to C; two blocks short of it, it stays on A to B.
-        BlockPos byPylon = new BlockPos(9, 1, 2);
-        // Past the platform's edge: ground to click the top of.
+        BlockPos byPylon = new BlockPos(9, 3, 1);
+        // Something to click the top of.
         helper.setBlock(byPylon.below(), Blocks.STONE);
         PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, byPylon));
         if (plan == null || !plan.isRefused() || plan.refusal() != RailworksRefusal.STATION_NOT_STRAIGHT) {
             helper.fail("a Station by B planned " + plan + ", not refused for the bend beyond B", byPylon);
             return;
         }
-        BlockPos shortOfPylon = new BlockPos(7, 1, 2);
+        BlockPos shortOfPylon = new BlockPos(7, 3, 1);
+        helper.setBlock(shortOfPylon.below(), Blocks.STONE);
         if (!place(helper, player, shortOfPylon).consumesAction()
                 || !helper.getBlockState(shortOfPylon).is(RailworksRegistries.STATION.get())) {
             helper.fail("a Station two blocks short of B, by straight Rail, was refused", shortOfPylon);
@@ -151,10 +178,12 @@ final class StationTests {
         ServerPlayer player = player(helper);
         network(helper).remove(arm(helper, A), arm(helper, B));
         network(helper).add(Span.of(arm(helper, A), arm(helper, B.above()), 9));
-        // Halfway up, the Rail is half a block higher: the block beside it at the car's floor, on
-        // something to click the top of.
-        BlockPos beside = BESIDE.above();
-        helper.setBlock(BESIDE, Blocks.STONE);
+        // Three quarters of the way up, the Rail is three quarters of a block higher, so the row is a
+        // block higher there than by a level Rail: in the structure's roof, cleared, on something to
+        // click the top of.
+        BlockPos beside = new BlockPos(7, 4, 1);
+        helper.setBlock(beside, Blocks.AIR);
+        helper.setBlock(beside.below(), Blocks.STONE);
         if (!place(helper, player, beside).consumesAction() || !helper.getBlockState(beside).is(RailworksRegistries.STATION.get())) {
             helper.fail("a Station beside a straight climbing leg did not place: "
                     + Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, beside)), beside);
@@ -167,6 +196,13 @@ final class StationTests {
     }
 
     private static void refused(GameTestHelper helper, ServerPlayer player, BlockPos pos, RailworksRefusal expected) {
+        assertRefused(helper, player, pos, expected);
+        helper.succeed();
+    }
+
+    /** That a Station at {@code pos} is refused {@code expected}, with its line, placing and spending nothing. */
+    private static void assertRefused(GameTestHelper helper, ServerPlayer player, BlockPos pos, RailworksRefusal expected) {
+        int held = player.getMainHandItem().getCount();
         PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, pos));
         if (plan == null || !plan.isRefused() || plan.refusal() != expected) {
             helper.fail("a Station at " + pos + " planned " + plan + ", not refused " + expected, pos);
@@ -176,10 +212,9 @@ final class StationTests {
             helper.fail("a Station refused for " + expected + " says " + StationItem.messageKey(expected), pos);
         }
         if (place(helper, player, pos).consumesAction()
-                || !helper.getBlockState(pos).isAir() || player.getMainHandItem().getCount() != 4) {
+                || !helper.getBlockState(pos).isAir() || player.getMainHandItem().getCount() != held) {
             helper.fail("a refused Station was placed or spent", pos);
         }
-        helper.succeed();
     }
 
     private static void named(GameTestHelper helper) {
@@ -269,16 +304,22 @@ final class StationTests {
 
     // ---- setup ----
 
-    /** The Pylons and their Span, and a survival player beside it holding four Stations. */
+    /**
+     * The Pylons and their Span, something to click the top of under {@link #BESIDE}, {@link #ACROSS}
+     * and {@link #OFF}, and a survival player beside it holding four Stations.
+     */
     private static ServerPlayer player(GameTestHelper helper) {
         if (!helper.getBlockState(A).is(RailworksRegistries.PYLON.get())) {
             helper.setBlock(A, RailworksRegistries.PYLON.get().defaultBlockState());
             helper.setBlock(B, RailworksRegistries.PYLON.get().defaultBlockState());
             LevelRails.of(helper.getLevel()).network().add(span(helper));
+            for (BlockPos pos : new BlockPos[] {BESIDE, ACROSS, OFF}) {
+                helper.setBlock(pos.below(), Blocks.STONE);
+            }
         }
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
-        BlockPos stand = helper.absolutePos(new BlockPos(5, 1, 1));
+        BlockPos stand = helper.absolutePos(STAND);
         player.snapTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, 0.0F, 30.0F);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.STATION_ITEM.get(), 4));
         return player;

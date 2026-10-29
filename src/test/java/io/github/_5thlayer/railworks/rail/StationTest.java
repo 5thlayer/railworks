@@ -28,9 +28,9 @@ class StationTest {
         network.add(AB);
     }
 
-    /** At ride height, one block to the side of the Rail: where a hatch beside a stopped car will be. */
+    /** In the row two blocks off the Rail, at the height of a Cargo car's chests, where hatches stand too (ADR 0010). */
     private static Station beside(int x) {
-        return new Station(x, 6, 1, "Mine");
+        return new Station(x, 7, 2, "Mine");
     }
 
     /** {@code fromA} blocks along the Span from A, heading for B. */
@@ -46,8 +46,12 @@ class StationTest {
     }
 
     @Test
-    void aStationUnderTheRailServesItsSpan() {
-        assertTrue(new Station(4, 5, 0, "Mine").foot(network).isPresent());
+    void aStationWithinTheOldReachOfTheRailServesNoSpan() {
+        assertTrue(new Station(4, 6, 1, "Mine").foot(network).isEmpty(), "one off at a car's floor");
+        assertTrue(new Station(4, 5, 1, "Mine").foot(network).isEmpty(), "one off, a block lower");
+        assertTrue(new Station(4, 5, 0, "Mine").foot(network).isEmpty(), "under the Rail");
+        assertTrue(new Station(4, 7, 1, "Mine").foot(network).isEmpty(), "one off at the chests' height");
+        assertTrue(new Station(4, 6, 2, "Mine").foot(network).isEmpty(), "two off at a car's floor");
     }
 
     @Test
@@ -55,12 +59,10 @@ class StationTest {
         try {
             // South of a Rail along x: the right of a Train heading east, for B; north, of one heading for A.
             assertEquals(Optional.of(B), beside(4).servingEnd(network));
-            assertEquals(Optional.of(A), new Station(4, 6, -1, "Mine").servingEnd(network));
-            // A block lower beside the Rail is still on that side.
-            assertEquals(Optional.of(B), new Station(4, 5, 1, "Mine").servingEnd(network));
+            assertEquals(Optional.of(A), new Station(4, 7, -2, "Mine").servingEnd(network));
             DriveSide.configure(DriveSide.LEFT);
             assertEquals(Optional.of(A), beside(4).servingEnd(network));
-            assertEquals(Optional.of(B), new Station(4, 6, -1, "Mine").servingEnd(network));
+            assertEquals(Optional.of(B), new Station(4, 7, -2, "Mine").servingEnd(network));
         } finally {
             DriveSide.configure(DriveSide.DEFAULT);
         }
@@ -73,21 +75,22 @@ class StationTest {
         Arm south = new Arm(0, 5, 10);
         alongZ.add(Span.of(north, south, 10));
         // East of a Rail along z: the right of a Train heading north.
-        assertEquals(Optional.of(north), new Station(1, 6, 4, "Mine").servingEnd(alongZ));
-        assertEquals(Optional.of(south), new Station(-1, 6, 4, "Mine").servingEnd(alongZ));
+        assertEquals(Optional.of(north), new Station(2, 7, 4, "Mine").servingEnd(alongZ));
+        assertEquals(Optional.of(south), new Station(-2, 7, 4, "Mine").servingEnd(alongZ));
     }
 
     @Test
     void aStationUnderTheRailOrByNoneServesNeitherWay() {
         assertEquals(Optional.empty(), new Station(4, 5, 0, "Mine").servingEnd(network));
-        assertEquals(Optional.empty(), new Station(4, 6, 5, "Mine").servingEnd(network));
+        assertEquals(Optional.empty(), new Station(4, 7, 5, "Mine").servingEnd(network));
     }
 
     @Test
-    void aStationTwoBlocksOffOrAboveTheRailIsByNoRail() {
-        assertTrue(new Station(4, 6, 2, "Mine").foot(network).isEmpty());
-        assertTrue(new Station(4, 7, 0, "Mine").foot(network).isEmpty());
-        assertTrue(new Station(4, 3, 0, "Mine").foot(network).isEmpty());
+    void aStationOffTheRowIsByNoRail() {
+        assertTrue(new Station(4, 7, 3, "Mine").foot(network).isEmpty(), "three off");
+        assertTrue(new Station(4, 8, 2, "Mine").foot(network).isEmpty(), "above the chests' height");
+        assertTrue(new Station(4, 7, 0, "Mine").foot(network).isEmpty(), "over the Rail");
+        assertTrue(new Station(4, 3, 0, "Mine").foot(network).isEmpty(), "far under the Rail");
     }
 
     @Test
@@ -119,8 +122,9 @@ class StationTest {
         RailNetwork sloped = new RailNetwork();
         Span climb = Span.of(new Arm(0, 5, 0), new Arm(8, 7, 0), 9);
         sloped.add(climb);
-        // Halfway up, the Rail is at y 6 in Arm coordinates: a block beside it at that height serves it.
-        Station station = new Station(4, 7, 1, "Hill");
+        // Halfway up, the Rail is at y 6 in Arm coordinates: the block two off it at the chests' height
+        // there, measured square to it seen from above, serves it.
+        Station station = new Station(4, 8, 2, "Hill");
         Station.Foot stop = station.foot(sloped).orElseThrow();
         assertEquals(climb, stop.span());
         assertTrue(station.serves(sloped, along(climb, stop.fromA())));
@@ -135,19 +139,19 @@ class StationTest {
     }
 
     @Test
-    void ofTwoLinesInReachItServesTheNearer() {
-        // A second line alongside, one block over: the Station under it is nearer it than AB.
-        Span near = Span.of(new Arm(0, 5, 1), new Arm(10, 5, 1), 10);
+    void ofTwoLinesItServesTheOneItIsInTheRowOf() {
+        // A second line alongside, a block over from the Station, nearer it than AB but not two off.
+        Span near = Span.of(new Arm(0, 5, 3), new Arm(10, 5, 3), 10);
         network.add(near);
-        Station station = new Station(4, 5, 1, "Mine");
-        assertEquals(near, station.foot(network).orElseThrow().span());
-        assertTrue(station.serves(network, along(near, 4.5)));
-        assertFalse(station.serves(network, along(AB, 4.5)));
+        Station station = beside(4);
+        assertEquals(AB, station.foot(network).orElseThrow().span());
+        assertTrue(station.serves(network, along(AB, 4.5)));
+        assertFalse(station.serves(network, along(near, 4.5)));
     }
 
     @Test
     void betweenTwoLinesAsNearItServesTheOneWhoseEndsSortFirst() {
-        Span other = Span.of(new Arm(0, 5, 2), new Arm(10, 5, 2), 10);
+        Span other = Span.of(new Arm(0, 5, 4), new Arm(10, 5, 4), 10);
         network.add(other);
         RailNetwork reversed = new RailNetwork();
         reversed.add(other);
@@ -180,7 +184,7 @@ class StationTest {
         Station second = beside(8);
         stations.put(first);
         stations.put(second);
-        stations.put(new Station(5, 6, -1, "Depot"));
+        stations.put(new Station(5, 7, -2, "Depot"));
         assertEquals(List.of(first, second), stations.named("Mine"));
         assertEquals(List.of(second), stations.at(network, along(AB, 8.5)));
         assertEquals(List.of(), stations.at(network, along(AB, 6.5)));
@@ -192,9 +196,9 @@ class StationTest {
         stations.put(beside(4));
         stations.put(beside(4).withName("Smelter"));
         assertEquals(1, stations.all().size());
-        assertEquals("Smelter", stations.get(4, 6, 1).name());
-        stations.remove(4, 6, 1);
-        assertNull(stations.get(4, 6, 1));
+        assertEquals("Smelter", stations.get(4, 7, 2).name());
+        stations.remove(4, 7, 2);
+        assertNull(stations.get(4, 7, 2));
     }
 
     @Test

@@ -15,6 +15,7 @@ import io.github._5thlayer.railworks.LevelChargers;
 import io.github._5thlayer.railworks.LevelHatches;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LevelStations;
+import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.RailworksRegistries;
@@ -70,31 +71,31 @@ final class GalleryTests {
     /** Where a scene's sign stands, from where the scene is run. */
     private static final BlockPos SIGN = new BlockPos(21, 0, 0);
     /** The Stations scene's two Stations, from where it is run, and what it names them. */
-    private static final BlockPos QUARRY = new BlockPos(4, 2, -7);
-    private static final BlockPos SMELTER = new BlockPos(41, 2, -8);
+    private static final BlockPos QUARRY = new BlockPos(4, 3, -8);
+    private static final BlockPos SMELTER = new BlockPos(41, 3, -7);
 
     /**
      * The logistics scenes' first provider hatch, beside the first car spot of the Station on the
      * shuttle line's south leg, and the chests under the requesters beside the first and second car
      * spots of the one on its north leg, from where each is run.
      */
-    private static final BlockPos PROVIDER = new BlockPos(11, 2, -1);
-    private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(11, 0, -12);
-    private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(16, 0, -12);
+    private static final BlockPos PROVIDER = new BlockPos(11, 3, 0);
+    private static final BlockPos FIRST_SPOT_CHEST = new BlockPos(11, 1, -10);
+    private static final BlockPos SECOND_SPOT_CHEST = new BlockPos(16, 1, -10);
     /** The Fluid car scene's requester Fluid hatch beside Smelter's first car spot, from where it is run. */
-    private static final BlockPos FLUID_REQUESTER = new BlockPos(11, 2, -12);
+    private static final BlockPos FLUID_REQUESTER = new BlockPos(11, 3, -10);
     /** The buckets of lava the Fluid car scene's requester asks for, half what its provider holds once built. */
     private static final int FLUID_BUCKETS = 16;
     private static final int BUCKET = (int) Logistics.MILLIBUCKETS_PER_BUCKET;
     /** The refuel scene's provider of coal beside Mine's leading car's place, from where it is run. */
-    private static final BlockPos LEADING_FUEL = new BlockPos(6, 2, -1);
+    private static final BlockPos LEADING_FUEL = new BlockPos(6, 3, 0);
     /** The charge scene's Creative Charger beside Mine's leading car's place, and the Charger by Smelter fed by its Burner Generator, from where it is run. */
-    private static final BlockPos CREATIVE_CHARGER = new BlockPos(6, 2, -1);
-    private static final BlockPos SMELTER_CHARGER = new BlockPos(6, 2, -12);
+    private static final BlockPos CREATIVE_CHARGER = new BlockPos(6, 3, 0);
+    private static final BlockPos SMELTER_CHARGER = new BlockPos(6, 3, -10);
     /** The far-away scene's Mine, at its line's far end, and Smelter's requester by its plot and the chest under it, from where it is run. */
-    private static final BlockPos FAR_MINE = new BlockPos(260, 2, -5);
-    private static final BlockPos NEAR_REQUESTER = new BlockPos(11, 2, -5);
-    private static final BlockPos NEAR_CHEST = new BlockPos(11, 0, -5);
+    private static final BlockPos FAR_MINE = new BlockPos(260, 3, -4);
+    private static final BlockPos NEAR_REQUESTER = new BlockPos(11, 3, -4);
+    private static final BlockPos NEAR_CHEST = new BlockPos(11, 1, -4);
     /** The ends of the strip its line runs along, out past its plot, from where it is run. */
     private static final BlockPos FAR_WEST = new BlockPos(22, 0, -8);
     private static final BlockPos FAR_EAST = new BlockPos(262, 0, -4);
@@ -155,8 +156,8 @@ final class GalleryTests {
 
     /**
      * libworks' build check, written out to add what no key block shows: the Stations scene's
-     * Stations, registered by name, and the flyover's two lines, each strung and neither joined to
-     * the other.
+     * Stations, registered by name, the flyover's two lines, each strung and neither joined to the
+     * other, and every scene's Stations, hatches and Chargers in the row beside the Rail.
      */
     private static void builds(GameTestHelper helper) {
         var scenes = scenes();
@@ -189,6 +190,9 @@ final class GalleryTests {
                             "a Station of the Stations scene has no platform");
                     helper.assertTrue(Platform.overlapping(network, quarry, List.of(smelter)).isEmpty(),
                             "the Stations scene's two platforms overlap");
+                    for (int index = 0; index < scenes.size(); index++) {
+                        inRow(helper, scenes.get(index).name(), plot(ROWS.sceneOrigin(at, index)));
+                    }
                 })).thenSucceed();
     }
 
@@ -397,6 +401,30 @@ final class GalleryTests {
             for (var span : network.spansAt(arm)) {
                 helper.assertTrue(!other.contains(span.a()) && !other.contains(span.b()),
                         "the flyover's lines are joined by " + span);
+            }
+        }
+    }
+
+    /**
+     * Asserts each Station on {@code plot} serves a Span and has a platform, and each hatch, Fluid
+     * hatch and Charger on it joins a Station's platform: every one of them stands in the row beside
+     * the Rail, two blocks off its line at a Cargo car's chests' height, where nothing else counts.
+     */
+    private static void inRow(GameTestHelper helper, String scene, BoundingBox plot) {
+        var level = helper.getLevel();
+        var network = LevelRails.of(level).network();
+        var stations = LevelStations.of(level).stations();
+        var joining = Set.of(RailworksRegistries.HATCH.get(), RailworksRegistries.FLUID_HATCH.get(),
+                RailworksRegistries.CHARGER.get(), RailworksRegistries.CREATIVE_CHARGER.get());
+        for (var pos : BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ())) {
+            var block = level.getBlockState(pos).getBlock();
+            if (block == RailworksRegistries.STATION.get()) {
+                var station = stations.get(pos.getX(), pos.getY(), pos.getZ());
+                helper.assertTrue(station != null && station.foot(network).isPresent() && Platform.of(network, station).isPresent(),
+                        "the " + scene + " scene's Station at " + pos.toShortString() + " serves no Span");
+            } else if (joining.contains(block)) {
+                helper.assertTrue(PlatformsNear.joined(level, pos).isPresent(),
+                        "the " + scene + " scene's " + block.getName().getString() + " at " + pos.toShortString() + " joins no Station");
             }
         }
     }

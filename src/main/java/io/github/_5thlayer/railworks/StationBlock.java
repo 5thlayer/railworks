@@ -65,8 +65,7 @@ public final class StationBlock extends Block implements EntityBlock {
     }
 
     /**
-     * The way a Station at {@code pos} serves, as the way the Trains it serves head: empty by no Rail
-     * or under it.
+     * The way a Station at {@code pos} serves, as the way the Trains it serves head: empty by no Rail.
      */
     public static Optional<Direction> serving(RailNetwork network, BlockPos pos) {
         Station station = new Station(pos.getX(), pos.getY(), pos.getZ(), Station.DEFAULT_NAME);

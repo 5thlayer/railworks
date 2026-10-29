@@ -85,16 +85,16 @@ final class LogisticsTests {
      * North of the west leg at the line's end, serving Trains heading west: the leading car's place
      * beside x -1 to 3 and its first car spot beside x 4 to 8.
      */
-    private static final BlockPos MINE = new BlockPos(-1, 1, 2);
+    private static final BlockPos MINE = new BlockPos(-1, 3, 1);
     /**
      * South of the east leg at the line's end, serving Trains heading east: the leading car's place
      * beside x 19 to 23 and its first car spot beside x 14 to 18.
      */
-    static final BlockPos DEPOT = new BlockPos(EAST, 1, 6);
+    static final BlockPos DEPOT = new BlockPos(EAST, 3, 7);
     /** Beside the Mine's first car spot, at its fourth block. */
-    private static final BlockPos PROVIDER = new BlockPos(7, 2, 2);
+    private static final BlockPos PROVIDER = new BlockPos(7, 3, 1);
     /** Beside the Depot's first car spot, at its middle block. */
-    private static final BlockPos REQUESTER = new BlockPos(16, 2, 6);
+    private static final BlockPos REQUESTER = new BlockPos(16, 3, 7);
 
     /**
      * How far short of the {@link #LINE}'s east end a car's middle is where the Depot's leading
@@ -550,7 +550,7 @@ final class LogisticsTests {
             helper.setBlock(pylon, RailworksRegistries.PYLON.get().defaultBlockState());
         }
         for (int x = -1; x <= EAST + 1; x++) {
-            for (int z = 2; z <= 6; z++) {
+            for (int z = 1; z <= 7; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), Blocks.AIR);
             }
         }
@@ -569,8 +569,8 @@ final class LogisticsTests {
      * tick a little later, so a car set there loses its view and is shown again: {@link #view}.
      */
     static void forceLoad(GameTestHelper helper, boolean forced) {
-        BlockPos west = helper.absolutePos(new BlockPos(-1, 1, 2));
-        BlockPos east = helper.absolutePos(new BlockPos(EAST + 1, 1, 6));
+        BlockPos west = helper.absolutePos(new BlockPos(-1, 1, 1));
+        BlockPos east = helper.absolutePos(new BlockPos(EAST + 1, 1, 7));
         for (int cx = Math.min(west.getX(), east.getX()) >> 4; cx <= Math.max(west.getX(), east.getX()) >> 4; cx++) {
             for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
                 helper.getLevel().setChunkForced(cx, cz, forced);
@@ -580,7 +580,7 @@ final class LogisticsTests {
 
     /** Places a Station at {@code pos}, which must go, by a player beside it. */
     static void station(GameTestHelper helper, BlockPos pos) {
-        // Past the structure's floor there is nothing to click on.
+        // In the row, a Cargo car's chests' height up, there is nothing to click on.
         helper.setBlock(pos.below(), Blocks.STONE);
         ServerPlayer player = near(helper, pos.north(2));
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.STATION_ITEM.get()));

@@ -10,11 +10,12 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
- * A Station: a named block beside the Rail (ADR 0007). It serves the one Span it is nearest, and is
+ * A Station: a named block beside the Rail (ADR 0007), in the {@link #inRow row} two blocks off its
+ * line at the height of a Cargo car's chests, where hatches and Chargers stand too (ADR 0010). It
+ * serves the one Span it is nearest of those it is in the row of, and is
  * reached from {@link #STRETCH} blocks either way of its foot, the point of the Span nearest it: a
  * car whose Place is in that stretch is at the Station. It serves only the Trains that have it on
- * their {@link DriveSide}, those heading for its {@link #servingEnd} (ADR 0008); one under the Rail
- * has no side and serves neither way. Nothing about it is stored but its block and its name, so a
+ * their {@link DriveSide}, those heading for its {@link #servingEnd} (ADR 0008). Nothing about it is stored but its block and its name, so a
  * Span strung, cut or moved after it was placed is asked about afresh.
  *
  * <p>Pure: no Minecraft types.
@@ -23,8 +24,12 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  */
 public record Station(int x, int y, int z, String name) {
 
-    /** How far the Station block's centre may be from the Rail and still serve it, in blocks. */
-    public static final double REACH = 1.25;
+    /**
+     * How far off the Rail's line, seen from above, the row beside it is, in blocks: a two-wide car
+     * reaches halfway into the blocks either side of the Rail's, so the row is the next blocks out
+     * (ADR 0010).
+     */
+    public static final double ROW_OFF = 2.0;
     /** How far along the Span either way of its foot a car is still at the Station, in blocks. */
     public static final double STRETCH = 1.0;
     /** The longest name a Station takes. */
@@ -56,11 +61,8 @@ public record Station(int x, int y, int z, String name) {
         }
     }
 
-    /**
-     * How far off the Rail's line a Station's centre may be, seen from above, and still count as under
-     * it: a block under the Rail is right under its line, and one beside it a whole block off.
-     */
-    static final double UNDER_REACH = 0.5;
+    /** Slack for the floating point in {@link #inRow}. */
+    private static final double EPSILON = 1e-6;
 
     /**
      * What a typed name becomes: trimmed, with formatting codes and control characters taken out and
@@ -93,14 +95,25 @@ public record Station(int x, int y, int z, String name) {
     }
 
     /**
-     * The Span this Station serves: of the Spans within {@link #REACH} of it, the nearest, and between
+     * Whether a block {@code off} its foot, as {@link #fromFoot} says, is in the row beside the Rail
+     * where Stations, hatches and Chargers stand (ADR 0010): {@link #ROW_OFF} off the line seen from
+     * above, and in the block a Cargo car's chests sit in, whose bottom is a block above the
+     * flange's underside, the line from Arm to Arm.
+     */
+    static boolean inRow(Place.Point off) {
+        return Math.abs(Math.sqrt(off.x() * off.x() + off.z() * off.z()) - ROW_OFF) < EPSILON
+                && off.y() >= 1.0 && off.y() < 2.0;
+    }
+
+    /**
+     * The Span this Station serves: of the Spans it is in the {@link #inRow row} of, the nearest, and between
      * two as near, the one whose ends sort first, so every caller picks the same. Empty when the Station
      * is by no Rail.
      */
     public Optional<Foot> foot(RailNetwork network) {
         return network.all().stream()
                 .map(this::footOn)
-                .filter(s -> s.distance() <= REACH)
+                .filter(s -> inRow(fromFoot(s)))
                 .min(Comparator.comparingDouble(Foot::distance)
                         .thenComparing(s -> s.span().a())
                         .thenComparing(s -> s.span().b()));
@@ -108,8 +121,7 @@ public record Station(int x, int y, int z, String name) {
 
     /**
      * The end of its Span that a Train it serves heads for: the one that puts the Station on the
-     * Train's {@link DriveSide#current() drive side}. Empty under the Rail, where it has no side, and
-     * by no Rail.
+     * Train's {@link DriveSide#current() drive side}. Empty by no Rail.
      */
     public Optional<Arm> servingEnd(RailNetwork network) {
         return foot(network).flatMap(foot -> servingEnd(foot, DriveSide.current()));
@@ -131,9 +143,6 @@ public record Station(int x, int y, int z, String name) {
         // How far to the right of a Train heading for b the Station stands: right of (hx, hz) is (-hz, hx),
         // x running east and z south.
         double right = (sz * hx - sx * hz) / run;
-        if (Math.abs(right) < UNDER_REACH) {
-            return Optional.empty();
-        }
         return Optional.of((right > 0.0) == (side == DriveSide.RIGHT) ? b : a);
     }
 
@@ -153,15 +162,19 @@ public record Station(int x, int y, int z, String name) {
 
     /** Whether a car at {@code place} is at this Station: on the Span it serves, within its stretch. */
     public boolean serves(RailNetwork network, Place place) {
-        // Cheap first: a Station out of reach of this Span cannot serve it, whatever else is near.
+        // Cheap first: a Station out of the row of this Span cannot serve it, whatever else is near.
         Foot here = footOn(place.span());
-        if (here.distance() > REACH || Math.abs(fromA(place) - here.fromA()) > STRETCH) {
+        if (!inRow(fromFoot(here)) || Math.abs(fromA(place) - here.fromA()) > STRETCH) {
             return false;
         }
         return foot(network).map(s -> sameSpan(s.span(), place.span())).orElse(false);
     }
 
-    /** The foot of this Station on {@code span}: the point of the Span nearest the block's centre. */
+    /**
+     * The foot of this Station on {@code span}: the point of the Span nearest the block's centre seen
+     * from above, so a block beside a slope is measured square to it; nearest in space for a Span
+     * with no run.
+     */
     Foot footOn(Span span) {
         // The block's centre in Arm coordinates, where the line from Arm to Arm is the flange's underside.
         double cx = x + 0.5 - RailGeometry.ATTACH_X;
@@ -172,13 +185,15 @@ public record Station(int x, int y, int z, String name) {
         double dx = b.x() - a.x();
         double dy = b.y() - a.y();
         double dz = b.z() - a.z();
-        double length = span.length();
-        double t = ((cx - a.x()) * dx + (cy - a.y()) * dy + (cz - a.z()) * dz) / (length * length);
+        double run = dx * dx + dz * dz;
+        double t = run > 0.0
+                ? ((cx - a.x()) * dx + (cz - a.z()) * dz) / run
+                : ((cx - a.x()) * dx + (cy - a.y()) * dy + (cz - a.z()) * dz) / (dx * dx + dy * dy + dz * dz);
         t = Math.max(0.0, Math.min(1.0, t));
         double px = a.x() + dx * t - cx;
         double py = a.y() + dy * t - cy;
         double pz = a.z() + dz * t - cz;
-        return new Foot(span, t * length, Math.sqrt(px * px + py * py + pz * pz));
+        return new Foot(span, t * span.length(), Math.sqrt(px * px + py * py + pz * pz));
     }
 
     /** How far {@code place} is along its Span from the Span's first end. */

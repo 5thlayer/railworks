@@ -27,8 +27,8 @@ class DriverTest {
      * Beside the Rail five blocks from A, on its north side, so it serves Trains heading for A, and
      * five short of C on its south side, serving Trains heading for C: each a Train's right.
      */
-    private static final Station MINE = new Station(5, 6, -1, "Mine");
-    private static final Station DEPOT = new Station(35, 6, 1, "Depot");
+    private static final Station MINE = new Station(5, 7, -2, "Mine");
+    private static final Station DEPOT = new Station(35, 7, 2, "Depot");
     /** Far enough for any run here. */
     private static final int BUDGET = 2_000;
 
@@ -209,7 +209,7 @@ class DriverTest {
         line();
         Train train = lone(5.0);
         // On the north side by C: it serves Trains heading for A, and this one can only head for C.
-        Driver driver = new Driver(new Station(35, 6, -1, "Yard"));
+        Driver driver = new Driver(new Station(35, 7, -2, "Yard"));
         runFor(driver, train, 200);
         assertTrue(train.atRest());
         assertFalse(tick(driver, train));
@@ -224,7 +224,7 @@ class DriverTest {
         Driver toDepot = new Driver(DEPOT);
         runFor(toDepot, train, 200);
         assertFalse(tick(toDepot, train), "the Depot is on its right: " + train);
-        Station yard = new Station(35, 6, -1, "Yard");
+        Station yard = new Station(35, 7, -2, "Yard");
         stations.put(yard);
         drive(new Driver(yard), train);
         assertEquals(33.0, alongLine(train, train.cars().getFirst()), Driver.ARRIVE);
@@ -236,7 +236,7 @@ class DriverTest {
         line();
         Train train = lone(10.0);
         // Beside no Rail at all.
-        Driver driver = new Driver(new Station(10, 6, 40, "Nowhere"));
+        Driver driver = new Driver(new Station(10, 7, 40, "Nowhere"));
         runFor(driver, train, 50);
         assertTrue(train.atRest());
         assertEquals(10.0, alongLine(train, train.cars().getFirst()), 1e-9);
@@ -281,8 +281,8 @@ class DriverTest {
         }
     }
 
-    private static final Station SOUTH = new Station(15, 6, 1, "South");
-    private static final Station NORTH = new Station(15, 6, 29, "North");
+    private static final Station SOUTH = new Station(15, 7, 2, "South");
+    private static final Station NORTH = new Station(15, 7, 28, "North");
 
     /** One Locomotive on the south side at x {@code x}, heading east. */
     private Train eastbound(double x) {

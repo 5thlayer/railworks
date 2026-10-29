@@ -36,7 +36,7 @@ public final class Platform {
     public static final double LEAD = Locomotive.LENGTH;
     /** The index a block beside the leading car's place has in place of a car spot's, one before the first spot's. */
     public static final int LEADING = -1;
-    /** How far a block beside a platform's car spots may be from its Station along x, y or z, in blocks: the leading car and the spots, and a block or two across. */
+    /** How far a block beside a platform's car spots may be from its Station along x, y or z, in blocks: the leading car and the spots, and the Rail's width across. */
     public static final double REACH = LEAD + MAX_CARS * SPOT + 3.0;
     /** How far the Station block's front edge is ahead of its centre along the Line, in blocks. */
     private static final double FRONT = 0.5;
@@ -61,8 +61,8 @@ public final class Platform {
     }
 
     /**
-     * The blocks beside one car spot, or the leading car's place, on one side of the Rail, the two,
-     * or the leading car's three, a hatch may stand in there, and whether the Line runs along x
+     * The blocks beside one car spot, or the leading car's place, on one side of the Rail, the five
+     * a hatch may stand in there, and whether the Line runs along x
      * there, rather than z.
      */
     public record Side(List<Beside> blocks, boolean alongX) {
@@ -219,9 +219,9 @@ public final class Platform {
 
     /**
      * Which car spot the block at {@code x}, {@code y}, {@code z} is beside, or {@link #LEADING} for
-     * the leading car's place: a block square beside the Rail, a whole block off its line, at a car's
-     * floor, the block the Rail's underside runs through, and along the Line within the spot. Empty
-     * for a block beside neither.
+     * the leading car's place: a block in the row beside the Rail where a Station stands, two off
+     * its line at the height of a Cargo car's chests ({@link Station#inRow}), and along the Line
+     * within the spot. Empty for a block beside neither.
      */
     public OptionalInt spotBeside(int x, int y, int z) {
         Station probe = new Station(x, y, z, station.name());
@@ -249,8 +249,8 @@ public final class Platform {
 
     /**
      * Every block beside the leading car's place or one of its car spots, where a hatch may stand:
-     * three each side of the Rail for the leading car's place, the Station's own block among them,
-     * then two each side for each spot, spot by spot.
+     * five each side of the Rail for the leading car's place, the Station's own block among them,
+     * then five each side for each spot, spot by spot.
      */
     public List<Beside> besideBlocks(RailNetwork network) {
         List<Beside> beside = new ArrayList<>();
@@ -260,13 +260,14 @@ public final class Platform {
         }
         places.addAll(spots);
         for (CarSpot spot : places) {
-            // The middle of the spot as a block position; the blocks beside it are within two of it.
+            // The middle of the spot as a block position, in the block the Rail's underside runs
+            // through: the blocks beside it are within two of it across and along, a block up.
             Place.Point middle = spot.middle().point(network);
             int mx = (int) Math.floor(middle.x() + RailGeometry.ATTACH_X);
             int my = (int) Math.floor(middle.y() + RailGeometry.ATTACH_Y);
             int mz = (int) Math.floor(middle.z() + RailGeometry.ATTACH_Z);
             for (int x = mx - 2; x <= mx + 2; x++) {
-                for (int y = my - 1; y <= my + 1; y++) {
+                for (int y = my; y <= my + 2; y++) {
                     for (int z = mz - 2; z <= mz + 2; z++) {
                         if (spotBeside(x, y, z).equals(OptionalInt.of(spot.index()))) {
                             beside.add(new Beside(spot.index(), x, y, z));
@@ -333,12 +334,9 @@ public final class Platform {
         return Optional.empty();
     }
 
-    /** Whether {@code block}, footed at {@code foot}, stands a block to the side of the Rail at a car's floor. */
+    /** Whether {@code block}, footed at {@code foot}, stands in the row beside the Rail. */
     private static boolean beside(Station block, Station.Foot foot) {
-        Place.Point off = block.fromFoot(foot);
-        // A whole block off the line seen from above, and the Rail's underside within the block's height.
-        return Math.abs(Math.sqrt(off.x() * off.x() + off.z() * off.z()) - 1.0) < EPSILON
-                && off.y() >= 0.0 && off.y() < 1.0;
+        return Station.inRow(block.fromFoot(foot));
     }
 
     /**

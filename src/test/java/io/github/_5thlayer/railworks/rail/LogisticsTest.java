@@ -31,13 +31,13 @@ class LogisticsTest {
     private static final Arm B = new Arm(50, 5, 0);
     private static final Arm C = new Arm(100, 5, 0);
     /** North of the line, serving Trains heading for A: the leading car at 7, its spots back east from 12. */
-    private static final Station MINE = new Station(5, 6, -1, "Mine");
+    private static final Station MINE = new Station(5, 7, -2, "Mine");
     /** South of the line, serving Trains heading for C: the leading car at 93, its spots back west from 88. */
-    private static final Station DEPOT = new Station(95, 6, 1, "Depot");
+    private static final Station DEPOT = new Station(95, 7, 2, "Depot");
     /** South of the line, serving Trains heading for C: the leading car at 23, its spots back west from 18. */
-    private static final Station QUARRY = new Station(25, 6, 1, "Quarry");
+    private static final Station QUARRY = new Station(25, 7, 2, "Quarry");
     /** North of the line, serving Trains heading for A, nearer the Depot than the Mine is: the leading car at 32. */
-    private static final Station PIT = new Station(30, 6, -1, "Pit");
+    private static final Station PIT = new Station(30, 7, -2, "Pit");
     /** Far enough for any run here. */
     private static final int BUDGET = 3_000;
 
@@ -335,9 +335,9 @@ class LogisticsTest {
     private static final Arm[] LOOP = {new Arm(10, 5, 0), new Arm(20, 5, 0), new Arm(30, 5, 10), new Arm(30, 5, 20),
             new Arm(20, 5, 30), new Arm(10, 5, 30), new Arm(0, 5, 20), new Arm(0, 5, 10)};
     /** Inside the loop on its south side, serving Trains heading east; one car spot. */
-    private static final Station SOUTH = new Station(15, 6, 1, "South");
+    private static final Station SOUTH = new Station(15, 7, 2, "South");
     /** Inside the loop on its north side, serving Trains heading west; one car spot. */
-    private static final Station NORTH = new Station(15, 6, 29, "North");
+    private static final Station NORTH = new Station(15, 7, 28, "North");
 
     /** A Locomotive and a Cargo car round the loop, the Locomotive on the Span from {@code from} to {@code to}, {@code toFront} short of {@code to}. */
     private Train onLoop(Arm from, Arm to, double toFront) {
@@ -379,7 +379,7 @@ class LogisticsTest {
         loop();
         Logistics.Hatch<String> north = provider(NORTH, 0, "iron", 64);
         requester(SOUTH, 0, "iron", 1);
-        Station east = new Station(29, 6, 15, "East");
+        Station east = new Station(28, 7, 15, "East");
         requester(east, 0, "iron", 1);
         Train one = onLoop(LOOP[2], LOOP[3], 4.0);
         Train other = onLoop(LOOP[6], LOOP[7], 4.0);
@@ -393,7 +393,7 @@ class LogisticsTest {
     void requestersAreServedInTheOrderTheyWerePlaced() {
         loop();
         provider(NORTH, 0, "iron", 64);
-        Station east = new Station(29, 6, 15, "East");
+        Station east = new Station(28, 7, 15, "East");
         Logistics.Hatch<String> first = requester(SOUTH, 0, "iron", 1);
         Logistics.Hatch<String> second = requester(east, 0, "iron", 1);
         onLoop(LOOP[2], LOOP[3], 4.0);
@@ -736,7 +736,7 @@ class LogisticsTest {
     void aTrainOnItsWayHeldAtAnotherStationTakesNoFuelThere() {
         line();
         // South of the line, serving Trains heading for C: the leading car at 47, three blocks short of B.
-        Station siding = new Station(49, 6, 1, "Siding");
+        Station siding = new Station(49, 7, 2, "Siding");
         provider(siding, Platform.LEADING, "coal", 64);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
         Train train = eastbound(15.0, 1);
@@ -813,7 +813,7 @@ class LogisticsTest {
     void aTrainOnItsWayHeldAtAnotherStationTakesNoChargeThere() {
         line();
         // South of the line, serving Trains heading for C: the leading car at 47, three blocks short of B.
-        Station siding = new Station(49, 6, 1, "Siding");
+        Station siding = new Station(49, 7, 2, "Siding");
         charger(siding, Platform.LEADING, 1_000_000L);
         Logistics.Hatch<String> depot = requester(DEPOT, 0, "iron", 1);
         Train train = electricEastbound(15.0, 1, 1_000_000L);
@@ -1100,7 +1100,7 @@ class LogisticsTest {
         Logistics.Hatch<String> far = requester(DEPOT, 0, "iron", 1);
         Logistics.Hatch<String> near = requester(QUARRY, 0, "iron", 1);
         // At the nearest Station of all, but asking for another item.
-        Logistics.Hatch<String> other = requester(new Station(18, 6, 1, "Siding"), 0, "copper", 1);
+        Logistics.Hatch<String> other = requester(new Station(18, 7, 2, "Siding"), 0, "copper", 1);
         Train train = eastbound(12.0, 1);
         train.setAutomatic(false);
         goods.put(cargo(train, 1), "iron", 40);

@@ -81,11 +81,11 @@ final class FarAwayTests {
     private static final int FAR = 239;
     private static final int Z = 3;
     /** North of the line's west end, serving Trains heading west: its first car spot beside x 5 to 9. */
-    private static final BlockPos MINE = new BlockPos(0, 1, 2);
+    private static final BlockPos MINE = new BlockPos(0, 3, 1);
     /** South of the line's far end, serving Trains heading east: its first car spot beside x 230 to 234. */
-    private static final BlockPos DEPOT = new BlockPos(FAR, 1, 4);
-    private static final BlockPos PROVIDER = new BlockPos(7, 2, 2);
-    private static final BlockPos REQUESTER = new BlockPos(FAR - 7, 2, 4);
+    private static final BlockPos DEPOT = new BlockPos(FAR, 3, 5);
+    private static final BlockPos PROVIDER = new BlockPos(7, 3, 1);
+    private static final BlockPos REQUESTER = new BlockPos(FAR - 7, 3, 5);
     /** How far east of the structure the line's near stretch runs, which the shuttle stands on as it starts. */
     private static final int NEAR = 22;
     /** On the far stretch, out of every chunk the runner loads: where a Train stands still for a test. */
@@ -684,7 +684,7 @@ final class FarAwayTests {
             network.add(Span.of(one, other, SpanRules.cost(one, other)));
         }
         for (int x = WEST; x <= NEAR; x++) {
-            for (int z = 2; z <= 4; z++) {
+            for (int z = 1; z <= 5; z++) {
                 helper.setBlock(new BlockPos(x, 4, z), net.minecraft.world.level.block.Blocks.AIR);
             }
         }
@@ -770,8 +770,8 @@ final class FarAwayTests {
 
     /** Forces the chunks under the line's near stretch, by the structure, loaded, or lets them go. */
     private static void forceLoad(GameTestHelper helper, boolean forced) {
-        BlockPos west = helper.absolutePos(new BlockPos(WEST, 1, 2));
-        BlockPos east = helper.absolutePos(new BlockPos(NEAR, 1, 4));
+        BlockPos west = helper.absolutePos(new BlockPos(WEST, 1, 1));
+        BlockPos east = helper.absolutePos(new BlockPos(NEAR, 1, 5));
         for (int cx = west.getX() >> 4; cx <= east.getX() >> 4; cx++) {
             for (int cz = Math.min(west.getZ(), east.getZ()) >> 4; cz <= Math.max(west.getZ(), east.getZ()) >> 4; cz++) {
                 helper.getLevel().setChunkForced(cx, cz, forced);

@@ -37,11 +37,12 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 final class CargoAccessTests {
 
     /**
-     * Beside the Rail a block down, at the front end of the coupled Cargo car, which leads a Train
+     * In the row beside the Rail, two blocks off it at the car's chests' height, at the front end of
+     * the coupled Cargo car, which leads a Train
      * heading west: it stands with its middle where a leading Locomotive's would, two blocks back
      * from the Station, its front at the Station block's front edge, in the block {@link #CAR}.
      */
-    static final BlockPos BY_CARGO = new BlockPos(0, 1, 2);
+    static final BlockPos BY_CARGO = new BlockPos(0, 3, 1);
     /** The block the coupled Cargo car's floor is in at its middle, and those beside it on the near side and under it. */
     private static final BlockPos CAR = new BlockPos(2, 2, 3);
     private static final BlockPos BESIDE = CAR.north();
