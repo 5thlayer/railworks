@@ -108,7 +108,9 @@ final class HatchTests {
         tests.test("logistics_hatch_crafts_from_iron_round_a_chest_and_a_hopper", 20, HatchTests::crafts);
         tests.test("logistics_hatch_places_beside_a_car_spot_or_the_leading_car_and_joins_its_station", 20, HatchTests::places);
         tests.test("logistics_hatch_is_refused_beside_no_car_spot", 20, HatchTests::refused);
-        tests.test("logistics_hatch_row_places_two_off_the_rail_at_the_chests_height_and_nowhere_nearer_or_lower", 20, HatchTests::rowOnly);
+        tests.test("logistics_hatch_row_places_two_off_the_rail_at_the_chests_height_and_nowhere_nearer_or_lower", 20,
+                helper -> FluidTests.placesOnlyInTheRow(helper, RailworksRegistries.HATCH_ITEM.get(),
+                        RailworksRegistries.HATCH.get(), RailworksRefusal.HATCH_OFF_PLATFORM));
         tests.test("logistics_hatch_row_a_held_hatch_outlines_the_rows_free_blocks_alone", 20, HatchTests::rowOutline);
         tests.test("logistics_hatch_free_car_spots_are_drawn_while_one_is_held", 20, HatchTests::freeSpots);
         tests.test("logistics_hatch_switches_in_the_air_and_placed_keeping_what_it_holds", 20, HatchTests::switches);
@@ -223,34 +225,6 @@ final class HatchTests {
                 || left.stream().anyMatch(box -> box.intersects(new AABB(first).deflate(0.01)))) {
             helper.fail("with a hatch beside the first spot, the free car spots are drawn as " + left, FIRST);
         }
-        helper.succeed();
-    }
-
-    /**
-     * Only the row takes a hatch (#72): beside the first spot's first block, one off the Rail at the
-     * chests' height and one off at a car's floor, the old row, are refused with the Placement Preview
-     * red, and the row's block, two off at the chests' height, places.
-     */
-    private static void rowOnly(GameTestHelper helper) {
-        ServerPlayer player = withStation(helper);
-        for (BlockPos off : List.of(ONE_OFF, OLD_ROW)) {
-            player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.HATCH_ITEM.get(), 4));
-            PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, off));
-            if (plan == null || !plan.isRefused() || plan.refusal() != RailworksRefusal.HATCH_OFF_PLATFORM) {
-                helper.fail("a hatch out of the row at " + off + " planned " + plan + ", not refused off the platform", off);
-            }
-            if (place(helper, player, off).consumesAction() || !helper.getBlockState(off).isAir()
-                    || player.getMainHandItem().getCount() != 4) {
-                helper.fail("a hatch out of the row at " + off + " was placed or spent", off);
-            }
-        }
-        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.HATCH_ITEM.get(), 4));
-        PlacementPlan plan = Placements.planFor(player.getMainHandItem().getItem(), context(helper, player, FIRST));
-        if (plan == null || plan.isRefused()) {
-            helper.fail("a hatch in the row planned " + plan + ", not a placing", FIRST);
-        }
-        hatch(helper, player, FIRST, HatchMode.PROVIDER);
-        expectJoined(helper, FIRST, 0);
         helper.succeed();
     }
 

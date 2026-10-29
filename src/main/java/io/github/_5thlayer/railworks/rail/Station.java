@@ -12,11 +12,12 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 /**
  * A Station: a named block beside the Rail (ADR 0007), in the {@link #inRow row} two blocks off its
  * line at the height of a Cargo car's chests, where hatches and Chargers stand too (ADR 0010). It
- * serves the one Span it is nearest of those it is in the row of, and is
- * reached from {@link #STRETCH} blocks either way of its foot, the point of the Span nearest it: a
- * car whose Place is in that stretch is at the Station. It serves only the Trains that have it on
- * their {@link DriveSide}, those heading for its {@link #servingEnd} (ADR 0008). Nothing about it is stored but its block and its name, so a
- * Span strung, cut or moved after it was placed is asked about afresh.
+ * serves the one Span it is nearest of those it is in the row of, and is reached from
+ * {@link #STRETCH} blocks either way of its foot, the point of the Span nearest it: a car whose
+ * Place is in that stretch is at the Station. It serves only the Trains that have it on their
+ * {@link DriveSide}, those heading for its {@link #servingEnd} (ADR 0008). Nothing about it is
+ * stored but its block and its name, so a Span strung, cut or moved after it was placed is asked
+ * about afresh.
  *
  * <p>Pure: no Minecraft types.
  *
@@ -106,9 +107,9 @@ public record Station(int x, int y, int z, String name) {
     }
 
     /**
-     * The Span this Station serves: of the Spans it is in the {@link #inRow row} of, the nearest, and between
-     * two as near, the one whose ends sort first, so every caller picks the same. Empty when the Station
-     * is by no Rail.
+     * The Span this Station serves: of the Spans it is in the {@link #inRow row} of, the nearest,
+     * and between two as near, the one whose ends sort first, so every caller picks the same. Empty
+     * when the Station is by no Rail.
      */
     public Optional<Foot> foot(RailNetwork network) {
         return network.all().stream()

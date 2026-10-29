@@ -13,7 +13,8 @@ import java.util.SequencedSet;
  * (ADR 0006), as the blocks it reaches into: a car's box at each spot along the Span's curve, a block
  * across and {@link CarBody#HEIGHT} up from the flange's top. A block that only touches the box is
  * outside it, so a block beside a Straight leg at a car's floor is clear, and the row two off it
- * at a Cargo car's chests' height, where Stations, hatches and Chargers stand (ADR 0010), is too. Another Span's Rail is no block, so one line passes over or under another at any height
+ * at a Cargo car's chests' height, where Stations, hatches and Chargers stand (ADR 0010), is too.
+ * Another Span's Rail is no block, so one line passes over or under another at any height
  * (ADR 0002).
  *
  * <p>Pure: no Minecraft types. The world is asked only which blocks are filled, through
