@@ -259,7 +259,7 @@ class CarBodyTest {
     }
 
     @Test
-    void theFluidCarHasASightGlassAQuarterOfItsLengthAcrossTheMiddleOfEachSideOfItsTank() {
+    void theFluidCarHasASightGlass0Point8LongAcrossTheMiddleOfEachSideOfItsTank() {
         List<CarBody.SightGlass> glasses = CarBody.FLUID.sightGlasses();
         assertEquals(2, glasses.size(), "a Sight glass a side");
         for (double side : new double[] {1.0, -1.0}) {
@@ -270,7 +270,7 @@ class CarBodyTest {
         for (CarBody.SightGlass glass : glasses) {
             CarBody.Box pane = glass.pane();
             assertTrue(pane.minZ() > -trims && pane.maxZ() < trims, pane + " reaches past the end trims");
-            assertEquals(CarBody.FLUID.length() / 4.0, pane.maxZ() - pane.minZ(), 1e-9, pane + " is not a quarter of the car's length");
+            assertEquals(0.8, pane.maxZ() - pane.minZ(), 1e-9, pane + " is not 0.8 long");
             assertEquals(0.0, pane.minZ() + pane.maxZ(), 1e-9, pane + " is not across the car's middle");
             assertTrue(pane.minY() > 1.0 && pane.maxY() < 2.3 && pane.maxY() - pane.minY() > 0.9,
                     pane + " is not across most of the tank's height");
