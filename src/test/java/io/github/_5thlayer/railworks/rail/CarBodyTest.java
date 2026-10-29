@@ -261,9 +261,9 @@ class CarBodyTest {
     @Test
     void theFluidCarHasASightGlassAlongEachSideOfItsTankBetweenItsEndTrims() {
         List<CarBody.SightGlass> glasses = CarBody.FLUID.sightGlasses();
-        assertEquals(2, glasses.size(), "a sight glass a side");
+        assertEquals(2, glasses.size(), "a Sight glass a side");
         for (double side : new double[] {1.0, -1.0}) {
-            assertEquals(1, glasses.stream().filter(glass -> glass.side() == side).count(), "a sight glass on side " + side);
+            assertEquals(1, glasses.stream().filter(glass -> glass.side() == side).count(), "a Sight glass on side " + side);
         }
         // The tank's wide box runs from 1.0 to 2.3 up, and its end trims stand 0.44 to 0.5 in from its ends.
         double trims = CarBody.FLUID.length() / 2.0 - 0.5;
@@ -278,7 +278,7 @@ class CarBodyTest {
             assertEquals(pane, firstHit(boxes(CarBody.FLUID), from, new double[] {-glass.side(), 0.0, 0.0}), "the pane is hidden");
         }
         for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO)) {
-            assertTrue(body.sightGlasses().isEmpty(), "a car that is no Fluid car has a sight glass");
+            assertTrue(body.sightGlasses().isEmpty(), "a car that is no Fluid car has a Sight glass");
         }
     }
 

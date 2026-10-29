@@ -47,8 +47,8 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     public static final class State extends EntityRenderState {
         float yRot;
         float xRot;
-        /** A Fluid car's fluid, as its still texture; null for none, or another car. */
-        @Nullable TextureAtlasSprite fluid;
+        /** A Fluid car's fluid's still texture; null for none, or another car. */
+        @Nullable TextureAtlasSprite fluidSprite;
         /** The fluid's tint, ARGB. */
         int fluidTint;
         /** The fluid's own light level, 0 for none. */
@@ -60,6 +60,8 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
 
     /** The six faces shaded apart: top, bottom, then the four sides. */
     private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
+    /** Just off a pane's outer face, so the fluid and the dark glass never share a plane. */
+    private static final float FLUID_PROUD = 0.002F;
 
     private final CarBody body;
     private final ChestModel chest;
@@ -99,15 +101,16 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         super.extractRenderState(car, state, partialTicks);
         state.yRot = Mth.rotLerp(partialTicks, car.yRotO, car.getYRot());
         state.xRot = Mth.lerp(partialTicks, car.xRotO, car.getXRot());
-        state.fluid = null;
+        state.fluidSprite = null;
         if (car instanceof FluidCarEntity fluidCar) {
             FluidStack tank = fluidCar.tankSeen();
             if (!tank.isEmpty()) {
                 FluidModel model = Minecraft.getInstance().getModelManager().getFluidStateModelSet()
                         .get(tank.getFluid().defaultFluidState());
                 FluidTintSource tint = model.fluidTintSource();
-                state.fluid = model.stillMaterial().sprite();
-                state.fluidTint = tint == null ? -1 : tint.colorAsStack(tank);
+                state.fluidSprite = model.stillMaterial().sprite();
+                // Opaque, as the world draws a fluid's tint: the sprite's own alpha is its translucency.
+                state.fluidTint = tint == null ? -1 : 0xFF000000 | tint.colorAsStack(tank);
                 state.fluidLight = tank.getFluidType().getLightLevel(tank);
                 state.amount = tank.getAmount();
                 state.capacity = fluidCar.tankCapacitySeen();
@@ -134,7 +137,7 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         for (CarBody.Box chest : body.chests()) {
             submitChest(chest, poseStack, collector, light);
         }
-        TextureAtlasSprite fluid = state.fluid;
+        TextureAtlasSprite fluid = state.fluidSprite;
         if (fluid != null) {
             int fluidLight = LightCoordsUtil.lightCoordsWithEmission(light, state.fluidLight);
             collector.submitCustomGeometry(poseStack, RenderTypes.entityTranslucent(fluid.atlasLocation()), (pose, buffer) -> {
@@ -145,9 +148,6 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         }
         poseStack.popPose();
     }
-
-    /** Just off a pane's outer face, so the fluid and the dark glass never share a plane. */
-    private static final float FLUID_PROUD = 0.002F;
 
     /**
      * The fluid in {@code glass} up to {@code surface}, on its pane's outer face: one quad per tile of
@@ -165,8 +165,10 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
             float y1 = Math.min(y0 + 1.0F, surface);
             for (float z0 = back; z0 < pane.maxZ(); z0 += 1.0F) {
                 float z1 = Math.min(z0 + 1.0F, (float) pane.maxZ());
-                float uLeft = sprite.getU0();
-                float uRight = sprite.getU(z1 - z0);
+                // The sprite runs along z from the tile's back end on both sides, so a cropped tile
+                // still meets the next at the sprite's edge.
+                float uBack = sprite.getU0();
+                float uFront = sprite.getU(z1 - z0);
                 // The sprite's top is v0: a cropped row shows its lower part, as a block's fluid shows its top cut off.
                 float v1 = sprite.getV1();
                 float v0 = sprite.getV(1.0F - (y1 - y0));
@@ -174,6 +176,8 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
                 // the tile's front end on the +x side and its back end on the -x side.
                 float left = side > 0 ? z1 : z0;
                 float right = side > 0 ? z0 : z1;
+                float uLeft = side > 0 ? uFront : uBack;
+                float uRight = side > 0 ? uBack : uFront;
                 fluidVertex(pose, buffer, x, y0, left, uLeft, v1, tint, light, side);
                 fluidVertex(pose, buffer, x, y0, right, uRight, v1, tint, light, side);
                 fluidVertex(pose, buffer, x, y1, right, uRight, v0, tint, light, side);

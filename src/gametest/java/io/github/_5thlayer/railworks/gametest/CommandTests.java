@@ -139,7 +139,7 @@ final class CommandTests {
         var cars = helper.getLevel().getEntitiesOfClass(FluidCarEntity.class, helper.getBounds());
         helper.assertTrue(cars.size() == 1, "the command set " + cars.size() + " Fluid cars, not one");
         FluidTests.expectSeen(helper, cars.getFirst(), Fluids.EMPTY, 0, "a Fluid car the command set");
-        helper.assertTrue(cars.getFirst().tankCapacitySeen() == 12_000, "its sight glass shows a tank of "
+        helper.assertTrue(cars.getFirst().tankCapacitySeen() == 12_000, "its Sight glasses show a tank of "
                 + cars.getFirst().tankCapacitySeen() + ", not of 12 buckets");
         helper.succeed();
     }

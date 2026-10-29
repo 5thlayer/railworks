@@ -31,9 +31,8 @@ import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
 
 /**
  * The Module's blocks, items, entity and block entity types, the held Span end, the synched data of a
- * Fluid car's tank, the hatch's and the
- * Burner Generator's item handlers, the Fluid hatch's fluid handler, and the energy handlers of the
- * Charger, the Burner Generator and the Electric Locomotive.
+ * Fluid car's tank, the hatch's and the Burner Generator's item handlers, the Fluid hatch's fluid
+ * handler, and the energy handlers of the Charger, the Burner Generator and the Electric Locomotive.
  */
 public final class RailworksRegistries {
 

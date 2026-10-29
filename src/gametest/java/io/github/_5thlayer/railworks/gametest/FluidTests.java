@@ -472,7 +472,7 @@ final class FluidTests {
     }
 
     /**
-     * What {@code car}'s sight glass shows, as synced to every player tracking it: {@code amount} of
+     * What {@code car}'s Sight glasses show, as synced to every player tracking it: {@code amount} of
      * {@code fluid}, none for 0, and its record's tank, its capacity too.
      */
     static void expectSeen(GameTestHelper helper, FluidCarEntity car, Fluid fluid, int amount, String what) {
@@ -481,7 +481,7 @@ final class FluidTests {
         boolean matches = (amount == 0 ? seen.isEmpty() : seen.is(fluid) && seen.getAmount() == amount)
                 && tank != null && FluidStack.matches(seen, tank.held()) && car.tankCapacitySeen() == tank.capacity();
         if (!matches) {
-            throw helper.assertionException(LONE, Component.literal(what + ", the sight glass shows " + seen.getAmount() + " of "
+            throw helper.assertionException(LONE, Component.literal(what + ", the Sight glasses show " + seen.getAmount() + " of "
                     + seen.getFluid() + " in " + car.tankCapacitySeen() + ", not " + amount + " of " + fluid + ", and the record holds "
                     + (tank == null ? "nothing" : tank.held().getAmount() + " in " + tank.capacity())));
         }
