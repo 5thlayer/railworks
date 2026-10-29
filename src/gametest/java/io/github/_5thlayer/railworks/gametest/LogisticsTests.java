@@ -81,7 +81,7 @@ final class LogisticsTests {
      * A line out of the plot east past the structure: west along z 3, a 45-degree jog south-east, and
      * on east along z 5, each Straight leg ten blocks, so each ends a platform after one five-block car
      * spot and the two never overlap. A Span bends all along when either Arm does, so the Span each
-     * side of the jog takes the bend, and is {@link Clearance#SWING_CLEAR_LENGTH} long, so a car
+     * side of the jog takes the bend, and is {@link Clearance#swingClearLength()} long, so a car
      * swinging round the jog leaves the legs' rows clear.
      */
     private static final BlockPos[] LINE = {new BlockPos(-7, 1, 3), new BlockPos(3, 1, 3), new BlockPos(7, 1, 3),

@@ -3,8 +3,10 @@
 
 package io.github._5thlayer.railworks.rail;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.SequencedSet;
 
@@ -41,15 +43,6 @@ public final class Clearance {
      */
     public static final int REACH = 4 + (int) Math.ceil(Math.hypot(BODY_LENGTH / 2.0, CarBody.WIDTH / 2.0))
             + (int) Math.ceil(CarBody.HEIGHT);
-    /**
-     * The shortest bent Span a Straight leg may run on into, in line, with its row two off the Rail
-     * at a Cargo car's chests' height, where hatches, Stations and Chargers stand, left clear: on a
-     * shorter one, bending at the bend limit at its far Arm, a car's body swings into that row beside
-     * the leg's last blocks. Measured by {@code ClearanceTest} at the default bend limit, 45 degrees:
-     * a bent Span 3 long reaches one row block, 2 long two, 1 long three each side, and from 4 on
-     * none, whichever way it bends and however long the Span beyond.
-     */
-    public static final int SWING_CLEAR_LENGTH = 4;
     /** Slack for a block that only touches the car's box, so the floating point never tips a touch into an overlap. */
     private static final double TOUCH = 1e-6;
 
@@ -70,7 +63,78 @@ public final class Clearance {
         boolean filled(int x, int y, int z);
     }
 
+    /** The {@link #swingClearLength} last measured, and the bend limit it was measured at. */
+    private record SwingClear(double bendLimit, int length) {
+    }
+
+    private static volatile SwingClear swingClear;
+
     private Clearance() {
+    }
+
+    /**
+     * The shortest bent Span a Straight leg may run on into, in line, with its row two off the Rail
+     * at a Cargo car's chests' height, where hatches, Stations and Chargers stand, left clear: on a
+     * shorter one, bending at {@link SpanRules#bendLimit()} at its far Arm, a car's body swings into
+     * that row beside the leg's last blocks. At the default limit, 45 degrees, it is 4: a bent Span 3
+     * long reaches one row block, 2 long two, 1 long three each side. Measured once for each bend limit
+     * configured; past the length limit, when no bent Span leaves the row clear, a block longer.
+     */
+    public static int swingClearLength() {
+        double limit = SpanRules.bendLimit();
+        SwingClear known = swingClear;
+        if (known == null || known.bendLimit() != limit) {
+            known = new SwingClear(limit, measureSwingClear(limit));
+            swingClear = known;
+        }
+        return known.length();
+    }
+
+    /**
+     * The first length a bent Span leaves the row clear from: a Straight leg east to the origin, a Span
+     * on in line, then one turned as near the limit as whole blocks go, within 15 degrees of it, each
+     * of those headings out to eight blocks. Mirrored, a turn the other way reaches the other row.
+     */
+    private static int measureSwingClear(double limit) {
+        List<int[]> turns = new ArrayList<>();
+        for (int dx = -8; dx <= 8; dx++) {
+            for (int dz = 1; dz <= 8; dz++) {
+                double turn = Math.toDegrees(Math.atan2(dz, dx));
+                if (turn <= limit + 1e-9 && turn >= limit - 15.0) {
+                    turns.add(new int[] {dx, dz});
+                }
+            }
+        }
+        int longest = (int) Math.floor(SpanRules.lengthLimit());
+        for (int bent = 1; bent <= longest; bent++) {
+            if (!swingsIntoRow(bent, turns)) {
+                return bent;
+            }
+        }
+        return longest + 1;
+    }
+
+    /** Whether a car on a Span {@code bent} long, after a Straight leg and bending onto any of {@code turns}, reaches the leg's row. */
+    private static boolean swingsIntoRow(int bent, List<int[]> turns) {
+        Arm leg = new Arm(-20, 0, 0);
+        Arm a = new Arm(0, 0, 0);
+        Arm b = new Arm(bent, 0, 0);
+        int chests = 2;
+        for (int[] turn : turns) {
+            RailNetwork line = new RailNetwork();
+            Arm c = new Arm(bent + turn[0], 0, turn[1]);
+            line.add(Span.of(leg, a, 1));
+            line.add(Span.of(a, b, 1));
+            line.add(Span.of(b, c, 1));
+            for (Span span : List.of(line.get(a, b), line.get(b, c))) {
+                for (Cell cell : along(line.curve(span))) {
+                    if (cell.y() == chests && Math.abs(cell.z()) == 2 && cell.x() >= leg.x() && cell.x() <= a.x()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** The blocks the car's body at {@code pose}, a spot on a curve in Arm coordinates, reaches into. */

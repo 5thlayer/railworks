@@ -10,7 +10,7 @@ package io.github._5thlayer.railworks.rail;
  * a line's end or carries on in line. A Straight leg is also square to the blocks, along x or along
  * z, since what stands beside a stopped car is whole blocks: on a diagonal the block beside a car is
  * in the Rail's path a block on, and a car leaving would run through it. And it runs on into no bent
- * Span shorter than {@link Clearance#SWING_CLEAR_LENGTH}, whose cars swing into the row beside its
+ * Span shorter than {@link Clearance#swingClearLength()}, whose cars swing into the row beside its
  * end. A leg may climb.
  *
  * <p>It agrees with how the Rail curves (#19), which bends a Span through an Arm toward the Span
@@ -41,13 +41,13 @@ public final class StraightLeg {
 
     /**
      * Whether each Span {@code span} runs on into, in line, is straight too or at least
-     * {@link Clearance#SWING_CLEAR_LENGTH} long: on a shorter bent one a car's body, swinging round the
+     * {@link Clearance#swingClearLength()} long: on a shorter bent one a car's body, swinging round the
      * bend at its far Arm, reaches the row beside {@code span}'s end.
      */
     private static boolean clearOfSwing(RailNetwork network, Span span) {
         for (Arm end : new Arm[] {span.a(), span.b()}) {
             for (Span beyond : network.spansAt(end)) {
-                if (!beyond.otherEnd(end).equals(span.otherEnd(end)) && !straight(network, beyond) && beyond.length() < Clearance.SWING_CLEAR_LENGTH) {
+                if (!beyond.otherEnd(end).equals(span.otherEnd(end)) && !straight(network, beyond) && beyond.length() < Clearance.swingClearLength()) {
                     return false;
                 }
             }

@@ -94,13 +94,13 @@ final class BendTests {
         tests.testOnItsOwn("bend_a_block_placed_where_a_car_swings_out_on_a_bend_is_refused", 20, BendTests::blockRefused);
         tests.testOnItsOwn("bend_a_train_runs_a_bend_at_the_limit_beside_blocks_just_outside_its_clearance", 20,
                 BendTests::runsBeside);
-        for (int bent = 1; bent < Clearance.SWING_CLEAR_LENGTH; bent++) {
+        for (int bent = 1; bent < Clearance.swingClearLength(); bent++) {
             int length = bent;
             tests.testOnItsOwn("bend_a_platform_ends_short_of_a_bent_span_" + bent + "_long_whose_cars_swing_into_its_row", 20,
                     helper -> platformBeforeBend(helper, length));
         }
-        tests.testOnItsOwn("bend_a_platform_runs_on_to_a_bent_span_" + Clearance.SWING_CLEAR_LENGTH + "_long_whose_cars_leave_its_row_clear",
-                20, helper -> platformBeforeBend(helper, Clearance.SWING_CLEAR_LENGTH));
+        tests.testOnItsOwn("bend_a_platform_runs_on_to_a_bent_span_" + Clearance.swingClearLength() + "_long_whose_cars_leave_its_row_clear",
+                20, helper -> platformBeforeBend(helper, Clearance.swingClearLength()));
     }
 
     private static void spanRefused(GameTestHelper helper) {
@@ -156,7 +156,7 @@ final class BendTests {
 
     /**
      * A platform whose leg runs on into a Span {@code bent} long, bending at the limit at its far end:
-     * shorter than {@link Clearance#SWING_CLEAR_LENGTH}, its cars swing into the row beside the leg's
+     * shorter than {@link Clearance#swingClearLength()}, its cars swing into the row beside the leg's
      * end, so the Span there is no Straight leg and the platform ends a spot short of it; at that
      * length the platform runs to the leg's end and a hatch beside its last block goes. Either way
      * every block the held hatch draws as free is outside every Span's Clearance.
@@ -198,7 +198,7 @@ final class BendTests {
                 }
             }
         }
-        boolean clear = bent >= Clearance.SWING_CLEAR_LENGTH;
+        boolean clear = bent >= Clearance.swingClearLength();
         if (!drawsFree(helper, drawn, FIRST)) {
             helper.fail("the first car spot is not drawn", FIRST);
         }
