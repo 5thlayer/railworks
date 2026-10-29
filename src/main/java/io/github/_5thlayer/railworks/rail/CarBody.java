@@ -296,9 +296,9 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
 
     /**
      * The Fluid car: an open floor carrying a tank along it, rounded by a wide box crossing a tall one,
-     * on a saddle at each end, a band round it near each end and a dome on top. Along each side of the
-     * wide box, between the bands, a Sight glass: a dark pane standing just proud of a frame a little
-     * larger, which shows round it as a rim.
+     * on a saddle at each end, a band round it near each end and a dome on top. Across the middle of
+     * each side of the wide box, a quarter of the car's length, a Sight glass: a dark pane standing just
+     * proud of a frame a little larger, which shows round it as a rim.
      */
     private static CarBody fluid() {
         double length = FluidCar.LENGTH - GAP;
@@ -309,7 +309,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         parts.add(new Part(Paint.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
         ends(parts, new Part(Paint.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
         ends(parts, new Part(Paint.DARK_RUST, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
-        double glassEnd = half - 0.6;
+        double glassEnd = length / 8.0;
         sides(parts, new Part(Paint.TRIM, 0.94, 1.08, -glassEnd - 0.04, 0.96, 2.22, glassEnd + 0.04));
         Box pane = new Box(0.945, 1.12, -glassEnd, 0.965, 2.18, glassEnd);
         sides(parts, new Part(Paint.GLASS, pane));
