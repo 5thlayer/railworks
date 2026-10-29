@@ -26,23 +26,19 @@ class ClearanceTest {
     }
 
     @Test
-    void aStraightSpansClearanceIsTheThreeBlocksAboveTheRailFromArmToArm() {
-        Set<Clearance.Cell> expected = new HashSet<>();
-        for (int x = 0; x <= 4; x++) {
-            for (int y = 6; y <= 8; y++) {
-                expected.add(new Clearance.Cell(x, y, 0));
-            }
-        }
-        assertEquals(expected, new HashSet<>(Clearance.along(RailCurve.between(network, A, B))));
+    void aStraightSpansClearanceIsThreeBlocksAcrossAndThreeUpFromArmToArmAndABlockPast() {
+        // A car two wide centred on the Rail reaches halfway into the blocks either side (ADR 0010),
+        // and its box at either Arm a block past it.
+        assertEquals(cells(-1, 5, 6, 8, -1, 1), new HashSet<>(Clearance.along(RailCurve.between(network, A, B))));
     }
 
     @Test
-    void aDiagonalSpanReachesTheBlocksEitherSideOfItsLineButNoFarther() {
+    void aDiagonalSpanReachesTwoBlocksEitherSideOfItsLineButNoFarther() {
         var cells = Clearance.along(RailCurve.between(network, A, new Arm(4, 5, 4)));
-        assertTrue(cells.contains(new Clearance.Cell(1, 6, 0)));
-        assertTrue(cells.contains(new Clearance.Cell(0, 6, 1)));
-        assertFalse(cells.contains(new Clearance.Cell(2, 6, 0)));
-        assertFalse(cells.contains(new Clearance.Cell(0, 6, 2)));
+        assertTrue(cells.contains(new Clearance.Cell(2, 6, 0)));
+        assertTrue(cells.contains(new Clearance.Cell(0, 6, 2)));
+        assertFalse(cells.contains(new Clearance.Cell(3, 6, 0)));
+        assertFalse(cells.contains(new Clearance.Cell(0, 6, 3)));
     }
 
     @Test
@@ -63,8 +59,8 @@ class ClearanceTest {
         Arm b = new Arm(20, 5, 0);
         network.add(Span.of(b, new Arm(30, 5, 10), 15));
         var cells = Clearance.along(RailCurve.between(network, A, b));
-        assertTrue(cells.stream().anyMatch(cell -> cell.z() < 0), "the curve swings out before turning");
-        assertTrue(Clearance.along(RailCurve.between(new RailNetwork(), A, b)).stream().allMatch(cell -> cell.z() == 0));
+        assertTrue(cells.stream().anyMatch(cell -> cell.z() < -1), "the curve swings out before turning");
+        assertTrue(Clearance.along(RailCurve.between(new RailNetwork(), A, b)).stream().allMatch(cell -> Math.abs(cell.z()) <= 1));
     }
 
     @Test
@@ -72,22 +68,36 @@ class ClearanceTest {
         // Where Stations, hatches and Chargers stand (ADR 0010): two off the line, the second block above the Rail.
         var cells = Clearance.along(RailCurve.between(network, A, B));
         for (int x = 0; x <= 4; x++) {
+            assertTrue(cells.contains(new Clearance.Cell(x, 7, 1)), "the block between the row and the Rail, south at " + x);
+            assertTrue(cells.contains(new Clearance.Cell(x, 7, -1)), "the block between the row and the Rail, north at " + x);
             assertFalse(cells.contains(new Clearance.Cell(x, 7, 2)), "south at " + x);
             assertFalse(cells.contains(new Clearance.Cell(x, 7, -2)), "north at " + x);
         }
     }
 
     @Test
-    void aCarFillsTheThreeBlocksAboveTheRailWhereItStands() {
-        assertEquals(Set.of(new Clearance.Cell(2, 6, 0), new Clearance.Cell(2, 7, 0), new Clearance.Cell(2, 8, 0)),
-                Set.copyOf(Clearance.car(new Place.Point(2.0, 5.0, 0.0))));
+    void aCarFillsTheThreeBlocksAcrossAndUpAroundTheRailWhereItStands() {
+        assertEquals(cells(1, 3, 6, 8, -1, 1), Set.copyOf(Clearance.car(new Place.Point(2.0, 5.0, 0.0))));
     }
 
     @Test
     void theFirstFilledBlockIsTheOneNearestTheFirstArm() {
         var cells = Clearance.along(RailCurve.between(network, A, B));
-        Clearance.Blocks filled = (x, y, z) -> y == 7 && (x == 3 || x == 1);
+        Clearance.Blocks filled = (x, y, z) -> y == 7 && z == 0 && (x == 3 || x == 1);
         assertEquals(new Clearance.Cell(1, 7, 0), Clearance.firstFilled(cells, filled).orElseThrow());
         assertTrue(Clearance.firstFilled(cells, Clearance.Blocks.OPEN).isEmpty());
+    }
+
+    /** Every block from x0 to x1, y0 to y1 and z0 to z1, the ends included. */
+    private static Set<Clearance.Cell> cells(int x0, int x1, int y0, int y1, int z0, int z1) {
+        Set<Clearance.Cell> cells = new HashSet<>();
+        for (int x = x0; x <= x1; x++) {
+            for (int y = y0; y <= y1; y++) {
+                for (int z = z0; z <= z1; z++) {
+                    cells.add(new Clearance.Cell(x, y, z));
+                }
+            }
+        }
+        return cells;
     }
 }

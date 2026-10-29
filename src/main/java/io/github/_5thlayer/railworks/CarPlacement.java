@@ -47,7 +47,7 @@ public final class CarPlacement {
     private CarPlacement() {
     }
 
-    /** The box a car takes above the Rail point, a block across and its height up: {@link Clearance}'s car. */
+    /** The box a car takes above the Rail point, two blocks square and its height up: {@link Clearance}'s car. */
     static AABB carBox(Vec3 rail) {
         double half = CarEntity.WIDTH / 2.0;
         return new AABB(rail.x - half, rail.y, rail.z - half, rail.x + half, rail.y + CarEntity.HEIGHT, rail.z + half);

@@ -442,8 +442,8 @@ final class FarAwayTests {
                     expectInBay(helper, view, back);
                     players[1] = LocomotiveTests.board(helper, view);
                     players[1].rideTick();
-                    // A seated player's feet 0.6 over the floor's underside, at the cab's seat along the car.
-                    Vec3 cab = view.position().add(new Vec3(0.0, 0.6, CarBody.CAB_SEAT.z()).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
+                    // A seated player's feet 0.6 below the cab's seat, at the seat along the car.
+                    Vec3 cab = view.position().add(new Vec3(0.0, CarBody.CAB_SEAT.y() - 0.6, CarBody.CAB_SEAT.z()).yRot(-view.getYRot() * Mth.DEG_TO_RAD));
                     helper.assertTrue(players[1].position().distanceTo(cab) < 1e-3,
                             "the player boarding after the pig came back is at " + players[1].position().subtract(view.position())
                                     + " from the car's middle, not in the cab");
@@ -678,6 +678,15 @@ final class FarAwayTests {
     private static RailNetwork line(GameTestHelper helper) {
         forceLoad(helper, true);
         RailNetwork network = LevelRails.of(helper.getLevel()).network();
+        // An earlier test's Spans left across this line's ground, whose two-wide Clearance could reach
+        // its Stations' row, are taken up first.
+        BlockPos from = helper.absolutePos(new BlockPos(WEST - SPAN, 0, Z - 8));
+        BlockPos to = helper.absolutePos(new BlockPos(FAR + SPAN, 0, Z + 8));
+        for (Span left : List.copyOf(network.all())) {
+            if (within(left.a(), from, to) || within(left.b(), from, to)) {
+                network.remove(left.a(), left.b());
+            }
+        }
         for (int x = WEST; x < FAR; x += SPAN) {
             Arm one = arm(helper, x);
             Arm other = arm(helper, x + SPAN);
@@ -702,6 +711,12 @@ final class FarAwayTests {
             }
         }
         return network;
+    }
+
+    /** Whether {@code arm} stands over the box from {@code from} to {@code to}, seen from above. */
+    private static boolean within(Arm arm, BlockPos from, BlockPos to) {
+        return arm.x() >= Math.min(from.getX(), to.getX()) && arm.x() <= Math.max(from.getX(), to.getX())
+                && arm.z() >= Math.min(from.getZ(), to.getZ()) && arm.z() <= Math.max(from.getZ(), to.getZ());
     }
 
     /** A Train of {@code cars} standing heading east on the far stretch, the first at {@link #YARD}, out of view and never shown. */

@@ -296,9 +296,16 @@ class StringingTest {
     }
 
     @Test
-    void aBlockBesideTheRailOrUnderItLeavesTheClearanceClear() {
-        Clearance.Blocks besideAndUnder = (x, y, z) -> (y == 6 && z == 1) || (y == 6 && z == -1) || y == 5;
-        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, besideAndUnder, A, B, 100).result());
+    void aBlockInTheRowTwoOffTheRailOrUnderItLeavesTheClearanceClear() {
+        Clearance.Blocks rowAndUnder = (x, y, z) -> (y == 7 && z == 2) || (y == 7 && z == -2) || y == 5;
+        assertEquals(Stringing.Result.STRUNG, Stringing.click(network, rowAndUnder, A, B, 100).result());
+    }
+
+    @Test
+    void aBlockOneOffTheRailAtACarsFloorIsInTheTwoWideCarsWay() {
+        Clearance.Blocks beside = (x, y, z) -> y == 6 && z == 1 && x == 3;
+        assertEquals(Stringing.Result.BLOCKED, Stringing.click(network, beside, A, B, 100).result());
+        assertFalse(network.contains(A, B));
     }
 
     @Test
