@@ -133,34 +133,26 @@ class ClearanceTest {
     }
 
     /**
-     * The blocks a rigid body {@code 4.8} long, two wide and {@code 2.75} up from the flange's top,
-     * turned and pitched to {@code pose}, reaches into: found by points spread through it, a hair in
-     * from its faces, so a block it only touches is not one.
+     * The blocks a rigid body {@link Clearance#BODY_LENGTH} long, {@link CarBody#WIDTH} across and
+     * {@link CarBody#HEIGHT} up from the flange's top, on the body's own axes at {@code pose}, reaches
+     * into: found by points spread through it, a hair in from its faces, so a block it only touches is
+     * not one.
      */
     private static Set<Clearance.Cell> body(RailCurve.Pose pose) {
-        double horizontal = Math.hypot(pose.dx(), pose.dz());
-        double[] along = {pose.dx(), pose.dy(), pose.dz()};
-        double[] across = {-pose.dz() / horizontal, 0.0, pose.dx() / horizontal};
-        double[] up = {
-                along[1] * across[2] - along[2] * across[1],
-                along[2] * across[0] - along[0] * across[2],
-                along[0] * across[1] - along[1] * across[0]
-        };
-        if (up[1] < 0) {
-            up = new double[] {-up[0], -up[1], -up[2]};
-        }
-        double x = pose.x() + RailGeometry.ATTACH_X;
-        double y = pose.y() + RailGeometry.RIDE_Y;
-        double z = pose.z() + RailGeometry.ATTACH_Z;
+        double[][] axes = Clearance.Body.axes(pose);
+        double[] rail = {pose.x() + RailGeometry.ATTACH_X, pose.y() + RailGeometry.RIDE_Y, pose.z() + RailGeometry.ATTACH_Z};
+        double halfLength = Clearance.BODY_LENGTH / 2.0;
+        double halfWidth = CarBody.WIDTH / 2.0;
         double in = 1e-3;
         Set<Clearance.Cell> cells = new HashSet<>();
-        for (double u = -2.4 + in; u <= 2.4 - in + 1e-9; u += (4.8 - 2 * in) / 48) {
-            for (double v = -1.0 + in; v <= 1.0 - in + 1e-9; v += (2.0 - 2 * in) / 20) {
-                for (double w = in; w <= 2.75 - in + 1e-9; w += (2.75 - 2 * in) / 4) {
-                    cells.add(new Clearance.Cell(
-                            (int) Math.floor(x + u * along[0] + v * across[0] + w * up[0]),
-                            (int) Math.floor(y + u * along[1] + v * across[1] + w * up[1]),
-                            (int) Math.floor(z + u * along[2] + v * across[2] + w * up[2])));
+        for (double u = -halfLength + in; u <= halfLength - in + 1e-9; u += (2 * halfLength - 2 * in) / 48) {
+            for (double v = -halfWidth + in; v <= halfWidth - in + 1e-9; v += (2 * halfWidth - 2 * in) / 20) {
+                for (double w = in; w <= CarBody.HEIGHT - in + 1e-9; w += (CarBody.HEIGHT - 2 * in) / 4) {
+                    double[] point = new double[3];
+                    for (int i = 0; i < 3; i++) {
+                        point[i] = rail[i] + u * axes[0][i] + v * axes[1][i] + w * axes[2][i];
+                    }
+                    cells.add(new Clearance.Cell((int) Math.floor(point[0]), (int) Math.floor(point[1]), (int) Math.floor(point[2])));
                 }
             }
         }
