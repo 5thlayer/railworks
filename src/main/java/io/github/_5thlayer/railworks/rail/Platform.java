@@ -214,6 +214,70 @@ public final class Platform {
     }
 
     /**
+     * A car at rest as a client sees it, with no Train: where it stands, facing its Train's heading,
+     * whether it is its Train's first car and its last, and whether it faces against the heading.
+     */
+    public record CarAtRest(Place place, boolean first, boolean last, boolean reversed) {
+
+        /** Where it leads its Train from, as an end of it ({@link Train#leadsFrom}). */
+        List<Place> leads() {
+            return Train.leadsFrom(place, first, last, reversed);
+        }
+
+        /** Whether its Train goes on past it, the far way from where it leads: true for a car between, or an end of a Train of more. */
+        boolean carriesOn() {
+            return !(first && last);
+        }
+    }
+
+    /**
+     * Whether a Train at rest leading from one of {@code leads} ({@link Train#leads}) is stopped at
+     * this platform's Station: its leading car within a Station's {@link Station#STRETCH} of the
+     * {@link #leadMark}, arriving its serving way. {@code Stations.stoppedAt} asks it of a Train, and
+     * {@link #standingAt} of the cars a client sees.
+     */
+    public boolean stoppedHere(RailNetwork network, List<Place> leads) {
+        return leads.stream().anyMatch(lead -> Math.abs(toLeadMark(network, lead, Station.STRETCH)) <= Station.STRETCH);
+    }
+
+    /**
+     * Which of {@code atRest}, cars at rest, stands at {@code spot}, or {@link #LEADING} for the
+     * leading car's place, in a Train {@link #stoppedHere stopped here}: the car the spot's count
+     * back from the leading car, as a hatch there trades with it, with a car of the same Train at
+     * each spot between, each within a Station's stretch of its spot's middle. A Train ends at a car
+     * that is its end on both sides, or an end other than the leading car, so a car past it is
+     * another Train's. Empty for a spot the platform has not, or no such car.
+     */
+    public Optional<CarAtRest> standingAt(RailNetwork network, int spot, List<CarAtRest> atRest) {
+        if (spot != LEADING && (spot < 0 || spot >= spots.size())) {
+            return Optional.empty();
+        }
+        Optional<CarAtRest> at = atRest.stream()
+                .filter(car -> stoppedHere(network, car.leads()))
+                .findFirst();
+        for (int i = 0; at.isPresent() && i <= spot; i++) {
+            CarAtRest ahead = at.get();
+            boolean carriesOn = i == 0 ? ahead.carriesOn() : !ahead.first() && !ahead.last();
+            if (!carriesOn) {
+                return Optional.empty();
+            }
+            Place mark = spots.get(i).middle();
+            at = atRest.stream().filter(car -> car != ahead && near(network, car.place(), mark)).findFirst();
+        }
+        return at;
+    }
+
+    /** Whether {@code one} is within a Station's stretch of {@code other}. */
+    private static boolean near(RailNetwork network, Place one, Place other) {
+        Place.Point at = one.point(network);
+        Place.Point there = other.point(network);
+        double dx = at.x() - there.x();
+        double dy = at.y() - there.y();
+        double dz = at.z() - there.z();
+        return Math.sqrt(dx * dx + dy * dy + dz * dz) <= Station.STRETCH + EPSILON;
+    }
+
+    /**
      * How far ahead of {@code lead}, a car running the way it faces, the {@link #leadMark} is, along the
      * Line through the Arms: negative when the car has run past it by up to {@code past}, and NaN when
      * it is out of reach or the car would arrive against the serving way.

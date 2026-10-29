@@ -107,6 +107,7 @@ public final class RailworksGameTests {
         FarAwayTests.register(tests);
         ElectricTests.register(tests);
         EngineRoomTests.register(tests);
+        BellowsTests.register(tests);
         FluidTests.register(tests);
     }
 

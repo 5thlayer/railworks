@@ -10,6 +10,7 @@ import com.mojang.serialization.DataResult;
 import io.github._5thlayer.railworks.rail.Car;
 import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.FluidCar;
+import io.github._5thlayer.railworks.rail.Goods;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.world.entity.EntityType;
@@ -54,6 +55,14 @@ public enum CarKind {
         CarKind kind = of(model);
         return kind != null ? DataResult.success(kind) : DataResult.error(() -> "no car kind " + model);
     }, CarKind::model);
+
+    /** The car a hatch holding {@code goods} serves: a Cargo car for a hatch of items, a Fluid car for a Fluid hatch. */
+    public static CarKind carrying(Goods.Kind goods) {
+        return switch (goods) {
+            case ITEMS -> CARGO;
+            case FLUID -> FLUID;
+        };
+    }
 
     /** The kind whose model car's {@link Car#kind()} is {@code model}; null for none. */
     static @Nullable CarKind of(String model) {

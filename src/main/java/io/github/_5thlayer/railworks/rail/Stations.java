@@ -69,13 +69,10 @@ public final class Stations {
         if (!train.atRest()) {
             return List.of();
         }
-        List<Place> leads = train.cars().size() == 1
-                ? List.of(train.facing(network, train.cars().getFirst()))
-                : List.of(train.lead(network, 1), train.lead(network, -1));
+        List<Place> leads = train.leads(network);
         return stations.values().stream()
                 .filter(station -> Platform.of(network, station)
-                        .map(platform -> leads.stream().anyMatch(lead ->
-                                Math.abs(platform.toLeadMark(network, lead, Station.STRETCH)) <= Station.STRETCH))
+                        .map(platform -> platform.stoppedHere(network, leads))
                         .orElse(false))
                 .toList();
     }
