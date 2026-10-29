@@ -106,6 +106,11 @@ public final class Logistics<I> {
     public record Hatch<I>(int x, int y, int z, Station station, int spot, boolean engineRoom, boolean provider,
                            Goods.Kind holds, Optional<HatchRequest<I>> request) {
 
+        /** Whether it can fuel a Locomotive from beside its Engine room ({@link Logistics#fuels}). */
+        boolean fuels() {
+            return Logistics.fuels(provider, holds);
+        }
+
         boolean samePlace(Hatch<?> other) {
             return x == other.x && y == other.y && z == other.z;
         }
@@ -118,6 +123,15 @@ public final class Logistics<I> {
      * never runs out. Only a Charger that joins a Station is handed in.
      */
     public record Charger(int x, int y, int z, Station station, int spot, boolean engineRoom, boolean creative) {
+    }
+
+    /**
+     * Whether a hatch that is a {@code provider} or not, and {@code holds} goods of that kind, can fuel
+     * a Locomotive from beside its Engine room (ADR 0008): only a provider of items. A requester gives
+     * nothing, and a Fluid hatch holds no fuel a Locomotive burns.
+     */
+    public static boolean fuels(boolean provider, Goods.Kind holds) {
+        return provider && holds == Goods.Kind.ITEMS;
     }
 
     /** What a status line says an automatic Train does. */
@@ -507,8 +521,8 @@ public final class Logistics<I> {
         boolean moved = false;
         Beside beside = new Beside(network, train, job);
         for (Hatch<I> hatch : hatches) {
-            Locomotive locomotive = hatch.provider() && hatch.engineRoom() ? beside.locomotive(hatch.station(), hatch.spot()) : null;
-            if (locomotive == null || locomotive.isElectric() || hatch.holds() != Goods.Kind.ITEMS) {
+            Locomotive locomotive = hatch.fuels() && hatch.engineRoom() ? beside.locomotive(hatch.station(), hatch.spot()) : null;
+            if (locomotive == null || locomotive.isElectric()) {
                 continue;
             }
             for (I item : goods.contents(hatch).keySet()) {

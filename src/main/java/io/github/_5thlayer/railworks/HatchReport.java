@@ -27,8 +27,7 @@ import net.minecraft.network.codec.StreamCodec;
  * @param mode    whether it is a provider or a requester
  * @param request what a requester asks for; empty for one asking for nothing, and for a provider
  * @param joined  the Station it joins and the car spot it stands beside; empty for none
- * @param fuels   whether it is a provider of items, the one hatch that can fuel a Locomotive, from
- *                beside its Engine room; a requester and a Fluid hatch fuel none
+ * @param fuels   whether it can fuel a Locomotive from beside its Engine room ({@link Logistics#fuels})
  */
 public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, Optional<StationSpot> joined,
         boolean fuels) {
@@ -70,8 +69,7 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, 
     public static HatchReport of(HatchBlockEntity entity) {
         Hatches.Hatch hatch = entity.hatch().orElseThrow();
         Optional<StationSpot> joined = PlatformsNear.joined(entity.getLevel(), entity.getBlockPos()).map(StationSpot::of);
-        return new HatchReport(hatch.mode(), hatch.request(), joined,
-                hatch.mode() == HatchMode.PROVIDER && hatch.holds() == Goods.Kind.ITEMS);
+        return new HatchReport(hatch.mode(), hatch.request(), joined, Logistics.fuels(hatch.mode() == HatchMode.PROVIDER, hatch.holds()));
     }
 
     /**
