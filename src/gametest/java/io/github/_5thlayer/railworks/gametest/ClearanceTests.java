@@ -41,8 +41,10 @@ final class ClearanceTests {
         tests.testOnItsOwn("clearance_a_placed_pylon_strings_no_span_through_a_block", 20,
                 AutoStringTests.within(9.0, ClearanceTests::placedPylonRefused));
         tests.test("clearance_a_block_placed_into_a_spans_clearance_is_refused", 20, ClearanceTests::blockRefused);
-        tests.test("clearance_a_block_placed_beside_a_span_stays", 20, ClearanceTests::blockBesideStays);
+        tests.test("clearance_a_block_placed_in_the_row_beside_a_span_stays", 20, ClearanceTests::blockBesideStays);
         tests.test("clearance_a_pylon_stacked_on_an_arm_is_not_in_the_way", 20, ClearanceTests::stackingAllowed);
+        tests.test("two_wide_a_span_through_a_block_beside_the_rail_is_refused", 20, ClearanceTests::spanRefusedBeside);
+        tests.test("two_wide_a_block_placed_beside_the_rail_is_refused", 20, ClearanceTests::blockRefusedBeside);
         tests.test("clearance_one_line_passes_over_another", 20, ClearanceTests::linesCross);
     }
 
@@ -60,10 +62,10 @@ final class ClearanceTests {
 
     private static void besideAndUnder(GameTestHelper helper) {
         ServerPlayer player = player(helper, new ItemStack(RailworksRegistries.RAIL.get(), 20));
-        // Beside the Rail at a car's floor, in the row two off it at a car's chests, where a hatch
+        // Beside the Rail below a car's floor, in the row two off it at a car's chests, where a hatch
         // stands, and under it.
-        helper.setBlock(new BlockPos(5, 2, 4), Blocks.STONE);
-        helper.setBlock(new BlockPos(5, 2, 2), Blocks.STONE);
+        helper.setBlock(new BlockPos(5, 1, 4), Blocks.STONE);
+        helper.setBlock(new BlockPos(5, 1, 2), Blocks.STONE);
         helper.setBlock(new BlockPos(5, 3, 5), Blocks.STONE);
         helper.setBlock(new BlockPos(5, 3, 1), Blocks.STONE);
         helper.setBlock(new BlockPos(5, 1, 3), Blocks.STONE);
@@ -109,23 +111,43 @@ final class ClearanceTests {
     }
 
     /**
-     * A block beside the Rail at a car's floor, and one in the row two off it at the height of a Cargo
-     * car's chests, where Stations, hatches and Chargers stand (ADR 0010): neither is in the Clearance.
+     * A block in the row two off the Rail at the height of a Cargo car's chests, where Stations,
+     * hatches and Chargers stand (ADR 0010): it is outside the Clearance.
      */
     private static void blockBesideStays(GameTestHelper helper) {
         string(helper);
         ServerPlayer player = player(helper, new ItemStack(Items.STONE, 4));
-        BlockPos beside = new BlockPos(5, 1, 4);
-        helper.setBlock(beside, Blocks.STONE);
-        placeOnTop(helper, player, beside);
-        if (!helper.getBlockState(beside.above()).is(Blocks.STONE)) {
-            helper.fail("a block beside the Rail at a car's floor was refused", beside.above());
-        }
         BlockPos underRow = new BlockPos(5, 2, 5);
         helper.setBlock(underRow, Blocks.STONE);
         placeOnTop(helper, player, underRow);
         if (!helper.getBlockState(underRow.above()).is(Blocks.STONE)) {
             helper.fail("a block in the row two off the Rail at a car's chests was refused", underRow.above());
+        }
+        helper.succeed();
+    }
+
+    /** A two-wide car reaches halfway into the blocks beside the Rail (ADR 0010): stone one off it is in the way. */
+    private static void spanRefusedBeside(GameTestHelper helper) {
+        ServerPlayer player = player(helper, new ItemStack(RailworksRegistries.RAIL.get(), 20));
+        helper.setBlock(new BlockPos(5, 2, 4), Blocks.STONE);
+        use(helper, player, A);
+        use(helper, player, B);
+        expectStrung(helper, A, B, false, "stringing beside stone at a car's floor");
+        helper.succeed();
+    }
+
+    /** A block placed one off the Rail at a car's floor goes into the two-wide Clearance, and is refused. */
+    private static void blockRefusedBeside(GameTestHelper helper) {
+        string(helper);
+        ServerPlayer player = player(helper, new ItemStack(Items.STONE, 4));
+        BlockPos beside = new BlockPos(5, 1, 4);
+        helper.setBlock(beside, Blocks.STONE);
+        placeOnTop(helper, player, beside);
+        if (!helper.getBlockState(beside.above()).isAir()) {
+            helper.fail("a block went into the Span's Clearance beside the Rail", beside.above());
+        }
+        if (player.getMainHandItem().getCount() != 4) {
+            helper.fail("a refused block was spent", beside.above());
         }
         helper.succeed();
     }

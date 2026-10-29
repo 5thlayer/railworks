@@ -22,8 +22,8 @@ import java.util.List;
  */
 public record CarBody(double length, List<Part> parts, List<Box> chests) {
 
-    /** A car's box across: a block. */
-    public static final double WIDTH = 1.0;
+    /** A car's box across: two blocks, centred on the Rail (ADR 0010). */
+    public static final double WIDTH = 2.0;
     /** A car's box up from the floor's underside. */
     public static final double HEIGHT = 2.75;
     /**
@@ -115,7 +115,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
      */
     private static final double WINDOW_SILL = 1.7;
     private static final double WINDOW_HEAD = 2.44;
-    private static final double WINDOW_FROM_CAB_BACK = 0.65;
+    private static final double WINDOW_FROM_CAB_BACK = 0.45;
     private static final double WINDOW_FROM_FRONT = 0.16;
 
     /** The Locomotive's body, and the low wall around its bay. */
@@ -135,10 +135,11 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
     static final double BAY_FRONT = -0.5;
 
     /**
-     * Where the Locomotive's Driver sits, in the cab, above the floor's underside and 0.6 short of
-     * its body's front. Only a Locomotive is ridden.
+     * Where the Locomotive's Driver sits, in the cab, above the floor's underside and 0.8 short of
+     * its body's front: far enough back and low enough that, across the two-wide cab, the side
+     * windows still frame the view past the front's pillars. Only a Locomotive is ridden.
      */
-    public static final Point CAB_SEAT = new Point(0.0, 1.2, LOCOMOTIVE_LENGTH / 2.0 - 0.6);
+    public static final Point CAB_SEAT = new Point(0.0, 1.1, LOCOMOTIVE_LENGTH / 2.0 - 0.8);
     /**
      * Where the Locomotive's Rider stands, mob or player: on the bay's floor, not raised to a seat,
      * halfway between the Engine room's back and the car's back end.
@@ -165,13 +166,13 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         double half = length / 2.0;
         List<Part> parts = new ArrayList<>();
         sides(parts, new Part(Paint.DARK_RUST, 0.17, 0.0, -half + 0.01, 0.49, 0.62, half - 0.01));
-        parts.add(new Part(Paint.SHELL, -0.5, 0.55, -half, 0.5, FLOOR_TOP, half));
+        parts.add(new Part(Paint.SHELL, -1.0, 0.55, -half, 1.0, FLOOR_TOP, half));
         return parts;
     }
 
     /** A roof from {@code back} to {@code front}. */
     private static Part roof(double back, double front) {
-        return new Part(Paint.SHELL, -0.5, 2.6, back, 0.5, 2.75, front);
+        return new Part(Paint.SHELL, -1.0, 2.6, back, 1.0, 2.75, front);
     }
 
     /**
@@ -190,37 +191,37 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         parts.add(roof(CAB_BACK, half));
         // The cab's side wall below and above the window, then behind and ahead of it; the band runs
         // on behind and ahead of the window and frames it above and below.
-        sides(parts, new Part(Paint.SHELL, 0.42, 0.68, CAB_BACK + 0.015, 0.49, WINDOW_SILL - 0.005, half - 0.06));
-        sides(parts, new Part(Paint.SHELL, 0.42, WINDOW_HEAD + 0.005, CAB_BACK + 0.015, 0.49, 2.62, half - 0.06));
-        sides(parts, new Part(Paint.SHELL, 0.425, BAND_BOTTOM + 0.05, CAB_BACK + 0.02, 0.485, BAND_TOP - 0.05, windowBack + 0.005));
-        sides(parts, new Part(Paint.SHELL, 0.425, BAND_BOTTOM + 0.05, windowFront - 0.005, 0.485, BAND_TOP - 0.05, half - 0.065));
-        sides(parts, new Part(Paint.TRIM, 0.47, BAND_BOTTOM, CAB_BACK, 0.5, BAND_TOP, windowBack));
-        sides(parts, new Part(Paint.TRIM, 0.47, BAND_BOTTOM, windowFront, 0.5, BAND_TOP, half));
-        sides(parts, new Part(Paint.TRIM, 0.472, BAND_BOTTOM + 0.005, windowBack - 0.005, 0.498, WINDOW_SILL, windowFront + 0.005));
-        sides(parts, new Part(Paint.TRIM, 0.472, WINDOW_HEAD, windowBack - 0.005, 0.498, BAND_TOP - 0.005, windowFront + 0.005));
-        // The cab's back wall, and its door.
-        parts.add(new Part(Paint.SHELL, -0.45, 0.67, CAB_BACK + 0.01, 0.45, 2.63, CAB_BACK + 0.08));
+        sides(parts, new Part(Paint.SHELL, 0.92, 0.68, CAB_BACK + 0.015, 0.99, WINDOW_SILL - 0.005, half - 0.06));
+        sides(parts, new Part(Paint.SHELL, 0.92, WINDOW_HEAD + 0.005, CAB_BACK + 0.015, 0.99, 2.62, half - 0.06));
+        sides(parts, new Part(Paint.SHELL, 0.925, BAND_BOTTOM + 0.05, CAB_BACK + 0.02, 0.985, BAND_TOP - 0.05, windowBack + 0.005));
+        sides(parts, new Part(Paint.SHELL, 0.925, BAND_BOTTOM + 0.05, windowFront - 0.005, 0.985, BAND_TOP - 0.05, half - 0.065));
+        sides(parts, new Part(Paint.TRIM, 0.97, BAND_BOTTOM, CAB_BACK, 1.0, BAND_TOP, windowBack));
+        sides(parts, new Part(Paint.TRIM, 0.97, BAND_BOTTOM, windowFront, 1.0, BAND_TOP, half));
+        sides(parts, new Part(Paint.TRIM, 0.972, BAND_BOTTOM + 0.005, windowBack - 0.005, 0.998, WINDOW_SILL, windowFront + 0.005));
+        sides(parts, new Part(Paint.TRIM, 0.972, WINDOW_HEAD, windowBack - 0.005, 0.998, BAND_TOP - 0.005, windowFront + 0.005));
+        // The cab's back wall, and its door, a door's width whatever the car's.
+        parts.add(new Part(Paint.SHELL, -0.95, 0.67, CAB_BACK + 0.01, 0.95, 2.63, CAB_BACK + 0.08));
         parts.add(new Part(Paint.DARK_RUST, -0.25, 0.75, CAB_BACK, 0.25, 2.35, CAB_BACK + 0.03));
         // The cab's front.
-        sides(parts, new Part(Paint.TRIM, 0.3, 0.66, half - 0.14, 0.495, 2.64, half - 0.015));
-        parts.add(new Part(Paint.TRIM, -0.49, 2.45, half - 0.05, 0.49, 2.65, half - 0.005));
-        parts.add(new Part(Paint.TRIM, -0.31, 0.65, half - 0.12, 0.31, 1.6, half - 0.02));
-        parts.add(new Part(Paint.DEEP_RED, -0.5, 0.72, half - 0.04, 0.5, 1.45, half - 0.01));
-        sides(parts, new Part(Paint.LAMP, 0.22, 1.1, half - 0.025, 0.36, 1.3, half));
+        sides(parts, new Part(Paint.TRIM, 0.8, 0.66, half - 0.14, 0.995, 2.64, half - 0.015));
+        parts.add(new Part(Paint.TRIM, -0.99, 2.45, half - 0.05, 0.99, 2.65, half - 0.005));
+        parts.add(new Part(Paint.TRIM, -0.81, 0.65, half - 0.12, 0.81, 1.6, half - 0.02));
+        parts.add(new Part(Paint.DEEP_RED, -1.0, 0.72, half - 0.04, 1.0, 1.45, half - 0.01));
+        sides(parts, new Part(Paint.LAMP, 0.72, 1.1, half - 0.025, 0.86, 1.3, half));
         // The Engine room, stopping just short of the cab's door, its roof reaching just under the
         // cab's back wall, and its louvres and a dark band low down its sides, set into its walls.
-        parts.add(new Part(Paint.SHELL, -0.45, 0.69, BAY_FRONT, 0.45, 2.2, CAB_BACK - 0.005));
-        parts.add(new Part(Paint.SHELL, -0.49, ENGINE_ROOM_TOP - 0.15, BAY_FRONT - 0.02, 0.49, ENGINE_ROOM_TOP, CAB_BACK + 0.005));
+        parts.add(new Part(Paint.SHELL, -0.95, 0.69, BAY_FRONT, 0.95, 2.2, CAB_BACK - 0.005));
+        parts.add(new Part(Paint.SHELL, -0.99, ENGINE_ROOM_TOP - 0.15, BAY_FRONT - 0.02, 0.99, ENGINE_ROOM_TOP, CAB_BACK + 0.005));
         for (double z = BAY_FRONT + 0.2; z + 0.12 < CAB_BACK - 0.1; z += 0.3) {
-            sides(parts, new Part(Paint.TRIM, 0.44, 1.2, z, 0.47, 2.05, z + 0.12));
+            sides(parts, new Part(Paint.TRIM, 0.94, 1.2, z, 0.97, 2.05, z + 0.12));
         }
-        sides(parts, new Part(Paint.DARK_RUST, 0.445, 0.75, BAY_FRONT + 0.1, 0.48, 1.1, CAB_BACK - 0.1));
+        sides(parts, new Part(Paint.DARK_RUST, 0.945, 0.75, BAY_FRONT + 0.1, 0.98, 1.1, CAB_BACK - 0.1));
         // The bay's low wall along each side and across the back, reaching into the Engine room, and
         // the rail along its top.
-        sides(parts, new Part(Paint.SHELL, 0.425, 0.685, -half + 0.015, 0.485, BAY_WALL_TOP, BAY_FRONT + 0.02));
-        parts.add(new Part(Paint.SHELL, -0.45, 0.69, -half + 0.01, 0.45, BAY_WALL_TOP - 0.01, -half + 0.07));
-        sides(parts, new Part(Paint.TRIM, 0.41, BAY_WALL_TOP - 0.005, -half, 0.5, BAY_WALL_TOP + 0.08, BAY_FRONT + 0.03));
-        parts.add(new Part(Paint.TRIM, -0.495, BAY_WALL_TOP - 0.015, -half + 0.005, 0.495, BAY_WALL_TOP + 0.075, -half + 0.065));
+        sides(parts, new Part(Paint.SHELL, 0.925, 0.685, -half + 0.015, 0.985, BAY_WALL_TOP, BAY_FRONT + 0.02));
+        parts.add(new Part(Paint.SHELL, -0.95, 0.69, -half + 0.01, 0.95, BAY_WALL_TOP - 0.01, -half + 0.07));
+        sides(parts, new Part(Paint.TRIM, 0.91, BAY_WALL_TOP - 0.005, -half, 1.0, BAY_WALL_TOP + 0.08, BAY_FRONT + 0.03));
+        parts.add(new Part(Paint.TRIM, -0.995, BAY_WALL_TOP - 0.015, -half + 0.005, 0.995, BAY_WALL_TOP + 0.075, -half + 0.065));
         return new CarBody(LOCOMOTIVE_LENGTH, List.copyOf(parts), List.of());
     }
 
@@ -242,12 +243,12 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         double half = length / 2.0;
         List<Part> parts = shell(length);
         parts.add(roof(-half, half));
-        sides(parts, new Part(Paint.TRIM, 0.47, BAND_BOTTOM, -half, 0.5, BAND_TOP, half));
-        ends(parts, new Part(Paint.SHELL, -0.45, 0.67, half - 0.08, 0.45, 2.63, half - 0.01));
+        sides(parts, new Part(Paint.TRIM, 0.97, BAND_BOTTOM, -half, 1.0, BAND_TOP, half));
+        ends(parts, new Part(Paint.SHELL, -0.95, 0.67, half - 0.08, 0.95, 2.63, half - 0.01));
         ends(parts, new Part(Paint.DARK_RUST, -0.25, 0.75, half - 0.03, 0.25, 2.35, half));
         // The side's inner wall, then the facing between and around the recesses, which stands proud
         // of the wall by the recess's depth, and the facing above and below each recess.
-        sides(parts, new Part(Paint.SHELL, 0.33, 0.68, -half + 0.015, 0.39, 2.62, half - 0.015));
+        sides(parts, new Part(Paint.SHELL, 0.83, 0.68, -half + 0.015, 0.89, 2.62, half - 0.015));
         List<Double> edges = new ArrayList<>(List.of(-half + 0.02));
         for (double at : CHESTS_AT) {
             edges.add(at - HALF_RECESS + 0.01);
@@ -255,14 +256,14 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         }
         edges.add(half - 0.02);
         for (int i = 0; i < edges.size(); i += 2) {
-            sides(parts, new Part(Paint.SHELL, 0.38, 0.665, edges.get(i), 0.49, 2.635, edges.get(i + 1)));
+            sides(parts, new Part(Paint.SHELL, 0.88, 0.665, edges.get(i), 0.99, 2.635, edges.get(i + 1)));
         }
         List<Box> chests = new ArrayList<>();
         for (double at : CHESTS_AT) {
-            sides(parts, new Part(Paint.SHELL, 0.382, 1.48, at - HALF_RECESS, 0.488, 2.625, at + HALF_RECESS));
-            sides(parts, new Part(Paint.SHELL, 0.382, 0.675, at - HALF_RECESS, 0.488, 1.07, at + HALF_RECESS));
+            sides(parts, new Part(Paint.SHELL, 0.882, 1.48, at - HALF_RECESS, 0.988, 2.625, at + HALF_RECESS));
+            sides(parts, new Part(Paint.SHELL, 0.882, 0.675, at - HALF_RECESS, 0.988, 1.07, at + HALF_RECESS));
             // The chest fills a cube in the recess, its lock just behind the facing.
-            Box chest = new Box(0.05, 1.075, at - 0.195, 0.44, 1.465, at + 0.195);
+            Box chest = new Box(0.55, 1.075, at - 0.195, 0.94, 1.465, at + 0.195);
             chests.add(chest);
             chests.add(chest.mirrored());
         }
@@ -277,11 +278,11 @@ public record CarBody(double length, List<Part> parts, List<Box> chests) {
         double length = FluidCar.LENGTH - GAP;
         double half = length / 2.0;
         List<Part> parts = shell(length);
-        parts.add(new Part(Paint.TANK, -0.46, 0.95, -half + 0.07, 0.46, 2.05, half - 0.07));
-        parts.add(new Part(Paint.TANK, -0.33, 0.72, -half + 0.06, 0.33, 2.33, half - 0.06));
-        parts.add(new Part(Paint.TANK, -0.12, 2.32, -0.15, 0.12, 2.5, 0.15));
-        ends(parts, new Part(Paint.TRIM, -0.47, 0.94, half - 0.5, 0.47, 2.06, half - 0.44));
-        ends(parts, new Part(Paint.DARK_RUST, -0.4, 0.69, half - 0.35, 0.4, 0.8, half - 0.2));
+        parts.add(new Part(Paint.TANK, -0.95, 1.0, -half + 0.07, 0.95, 2.3, half - 0.07));
+        parts.add(new Part(Paint.TANK, -0.7, 0.72, -half + 0.06, 0.7, 2.58, half - 0.06));
+        parts.add(new Part(Paint.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
+        ends(parts, new Part(Paint.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
+        ends(parts, new Part(Paint.DARK_RUST, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
         return new CarBody(length, List.copyOf(parts), List.of());
     }
 

@@ -33,7 +33,7 @@ import net.minecraft.world.phys.Vec3;
 final class LocomotiveSeatTests {
 
     /**
-     * The cab's seat, {@link CarBody#CAB_SEAT}: in the cab, a seated player's feet 0.6 below it, 0.6 over the floor's underside.
+     * The cab's seat, {@link CarBody#CAB_SEAT}: in the cab, a seated player's feet 0.6 below it.
      */
     private static final Vec3 CAB = new Vec3(CarBody.CAB_SEAT.x(), CarBody.CAB_SEAT.y() - 0.6, CarBody.CAB_SEAT.z());
     /**
@@ -250,7 +250,7 @@ final class LocomotiveSeatTests {
             helper.fail(who + " did not get off", STAND);
         }
         double across = (player.getZ() - car.getZ()) * south;
-        if (Math.abs(player.getX() - x) > 1e-3 || across < 0.5 + player.getBbWidth() / 2.0 || across > 1.5
+        if (Math.abs(player.getX() - x) > 1e-3 || across < CarBody.WIDTH / 2.0 + player.getBbWidth() / 2.0 || across > CarBody.WIDTH / 2.0 + 1.0
                 || Math.abs(player.getY() - floor) > 1e-3) {
             helper.fail(who + " got out at " + player.position().subtract(car.position()) + " from the car's middle, not beside "
                     + "their seat at x " + (x - car.getX()) + " on the " + (south > 0 ? "south" : "north") + " side, on the floor", STAND);

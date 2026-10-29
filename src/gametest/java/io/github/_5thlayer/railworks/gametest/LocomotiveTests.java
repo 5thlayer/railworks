@@ -39,6 +39,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.entity.vehicle.boat.Boat;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.ItemStack;
@@ -85,6 +86,8 @@ final class LocomotiveTests {
         tests.test("locomotive_plan_is_refused_off_a_span", 20, LocomotiveTests::refusedOffSpan);
         tests.test("locomotive_plan_is_refused_where_the_car_would_sit_in_a_block", 20, LocomotiveTests::refusedBlocked);
         tests.test("locomotive_plan_is_refused_on_a_span_another_holds", 20, LocomotiveTests::refusedTaken);
+        tests.test("two_wide_a_car_placed_into_a_block_beside_the_rail_is_refused", 20, LocomotiveTests::refusedBlockedBeside);
+        tests.test("two_wide_a_car_is_clicked_anywhere_across_its_width_at_its_middle", 20, LocomotiveTests::clickedAcross);
         tests.test("refuel_fuel_in_hand_goes_in_the_four_slots_the_same_fuels_first", 20, LocomotiveTests::fuelSlot);
         tests.test("locomotive_is_boarded_by_using_it_and_left_by_sneaking", 20, LocomotiveTests::boardsAndLeaves);
         tests.test("locomotive_sneaking_at_the_car_opens_its_menu", 20, LocomotiveTests::sneakOpensMenu);
@@ -140,7 +143,7 @@ final class LocomotiveTests {
         onlyCar(helper).discard();
         ServerPlayer other = player(helper, 45.0F);
         use(helper, other);
-        float west = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class, searchBox(helper)).stream()
+        float west = locomotives(helper).stream()
                 .filter(car -> !car.isRemoved()).findFirst().orElseThrow().getYRot();
         if (Math.abs(east - -90.0F) > 0.5F || Math.abs(west - 90.0F) > 0.5F) {
             helper.fail("a player looking east then west got cars facing " + east + " then " + west, STAND);
@@ -172,7 +175,7 @@ final class LocomotiveTests {
             helper.fail("a Locomotive aimed off any Span planned " + plan, STAND);
         }
         use(helper, player);
-        if (!helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class, searchBox(helper)).isEmpty()) {
+        if (!locomotives(helper).isEmpty()) {
             helper.fail("a refused click placed a Locomotive", STAND);
         }
         if (player.getMainHandItem().getCount() != 1) {
@@ -188,6 +191,44 @@ final class LocomotiveTests {
         PlacementPlan plan = plan(helper, player);
         if (plan == null || plan.refusal() != RailworksRefusal.BLOCKED_CAR) {
             helper.fail("a car that would sit in stone planned " + plan, STAND);
+        }
+        helper.succeed();
+    }
+
+    /** Beside the Rail, where the two-wide car's side would sit: refused as a block under the car would be. */
+    private static void refusedBlockedBeside(GameTestHelper helper) {
+        ServerPlayer player = player(helper, 45.0F);
+        helper.setBlock(new BlockPos(3, 3, 4), Blocks.STONE);
+        PlacementPlan plan = plan(helper, player);
+        if (plan == null || plan.refusal() != RailworksRefusal.BLOCKED_CAR) {
+            helper.fail("a car whose side would sit in stone planned " + plan, STAND);
+        }
+        use(helper, player);
+        if (!locomotives(helper).isEmpty()) {
+            helper.fail("a refused click placed a Locomotive", STAND);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The car's box is two blocks square at its middle: a look straight down at it anywhere across
+     * its width, out to a shade short of its sides, picks it, and one past its side does not.
+     */
+    private static void clickedAcross(GameTestHelper helper) {
+        LocomotiveEntity car = placed(helper);
+        if (Math.abs(car.getBbWidth() - CarBody.WIDTH) > 1e-6) {
+            helper.fail("the car's box is " + car.getBbWidth() + " wide, not " + CarBody.WIDTH, STAND);
+        }
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        for (double across : new double[] {-0.95, -0.5, 0.0, 0.5, 0.95, 1.2, -1.2}) {
+            Vec3 from = car.position().add(0.0, CarEntity.HEIGHT + 2.0, across);
+            Vec3 to = from.add(0.0, -CarEntity.HEIGHT - 3.0, 0.0);
+            var hit = ProjectileUtil.getEntityHitResult(helper.getLevel(), player, from, to, new AABB(from, to).inflate(1.0),
+                    entity -> entity instanceof CarEntity, 0.0F);
+            boolean picked = hit != null && hit.getEntity() == car;
+            if (picked != Math.abs(across) < CarBody.WIDTH / 2.0) {
+                helper.fail("a look down " + across + " across the car's middle " + (picked ? "picked" : "missed") + " it", STAND);
+            }
         }
         helper.succeed();
     }
@@ -418,15 +459,15 @@ final class LocomotiveTests {
         ServerPlayer driver = board(helper, car);
         driver.rideTick();
         double x = car.getX() + CarBody.CAB_SEAT.z() * east;
-        // A seated player's feet are 0.6 below the seat, which is 1.2 over the floor's underside.
+        // A seated player's feet are 0.6 below the seat.
         double y = car.getY() + CarBody.CAB_SEAT.y() - 0.6;
         if (Math.abs(driver.getX() - x) > 1e-3 || Math.abs(driver.getY() - y) > 1e-3
                 || Math.abs(driver.getZ() - car.getZ()) > 1e-3) {
             helper.fail("the Driver sits at " + driver.position() + ", not in the cab at " + new Vec3(x, y, car.getZ()), STAND);
         }
         // Their eye, 1.62 over their feet, at the height CarBody's sight lines are drawn from.
-        if (Math.abs(driver.getEyeY() - (car.getY() + 2.22)) > 1e-3) {
-            helper.fail("the rider's eye is " + (driver.getEyeY() - car.getY()) + " over the car, not 2.22", STAND);
+        if (Math.abs(driver.getEyeY() - (car.getY() + CarBody.eye().y())) > 1e-3) {
+            helper.fail("the rider's eye is " + (driver.getEyeY() - car.getY()) + " over the car, not " + CarBody.eye().y(), STAND);
         }
         helper.succeed();
     }
@@ -740,8 +781,17 @@ final class LocomotiveTests {
         player.getMainHandItem().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
     }
 
+    /**
+     * The Locomotives whose middle is over the test's Span, by {@link #searchBox}: by its middle, since
+     * a two-wide car left beside the plot by an earlier test reaches its box in.
+     */
+    private static List<LocomotiveEntity> locomotives(GameTestHelper helper) {
+        AABB box = searchBox(helper);
+        return helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class, box, car -> box.contains(car.position()));
+    }
+
     private static LocomotiveEntity onlyCar(GameTestHelper helper) {
-        List<LocomotiveEntity> cars = helper.getLevel().getEntitiesOfClass(LocomotiveEntity.class, searchBox(helper));
+        List<LocomotiveEntity> cars = locomotives(helper);
         if (cars.size() != 1) {
             helper.fail("expected one Locomotive, found " + cars.size(), STAND);
         }

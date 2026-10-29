@@ -15,14 +15,25 @@ import org.junit.jupiter.api.Test;
 /** The boxes each car is drawn from, and what a rider in the Locomotive's cab sees past them. */
 class CarBodyTest {
 
-    /** A car's box, as {@code CarEntity}'s: a block across, 2.75 tall, from the floor's underside. */
-    private static final double HALF_WIDTH = 0.5;
+    /** A car's box, as {@code CarEntity}'s: two blocks across, 2.75 tall, from the floor's underside. */
+    private static final double HALF_WIDTH = 1.0;
     private static final double HEIGHT = 2.75;
 
     @Test
     void eachBodyStaysWithinItsCarsBoxAndLength() {
         for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO, CarBody.FLUID)) {
             check(body, 4.8);
+        }
+    }
+
+    @Test
+    void everyBodyIsTwoBlocksWideItsSidesOutAtTheCarsBox() {
+        assertEquals(2.0, CarBody.WIDTH);
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO, CarBody.FLUID)) {
+            for (double side : new double[] {1.0, -1.0}) {
+                double reach = boxes(body).stream().mapToDouble(box -> side > 0 ? box.maxX() : -box.minX()).max().orElseThrow();
+                assertTrue(reach > HALF_WIDTH - 0.05, "a body reaches only " + reach + " to side " + side);
+            }
         }
     }
 

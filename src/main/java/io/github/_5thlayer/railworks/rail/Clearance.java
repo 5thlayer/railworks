@@ -10,10 +10,12 @@ import java.util.SequencedSet;
 
 /**
  * The space a car straddling the Rail passes through, above a Span and down both sides of its web
- * (ADR 0006), as the blocks it reaches into: a car's box at each spot along the Span's curve, a block
- * across and {@link CarBody#HEIGHT} up from the flange's top. A block that only touches the box is
- * outside it, so a block beside a Straight leg at a car's floor is clear, and the row two off it
- * at a Cargo car's chests' height, where Stations, hatches and Chargers stand (ADR 0010), is too.
+ * (ADR 0006), as the blocks it reaches into: a car's box at each spot along the Span's curve,
+ * {@link CarBody#WIDTH} square and {@link CarBody#HEIGHT} up from the flange's top. Centred on the
+ * Rail, a two-wide box reaches halfway into the blocks either side, so a straight Span's Clearance
+ * is three blocks across (ADR 0010), and a block past either Arm. A block that only touches the box
+ * is outside it, so the row two off a Straight leg at a Cargo car's chests' height, where Stations,
+ * hatches and Chargers stand, is clear.
  * Another Span's Rail is no block, so one line passes over or under another at any height
  * (ADR 0002).
  *
