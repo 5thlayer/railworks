@@ -7,12 +7,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.LevelRails;
 import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.CarBody;
+import io.github._5thlayer.railworks.rail.CargoCar;
 import io.github._5thlayer.railworks.rail.Clearance;
+import io.github._5thlayer.railworks.rail.FluidCar;
 import io.github._5thlayer.railworks.rail.Locomotive;
 import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailNetwork;
@@ -24,11 +28,11 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -54,6 +58,14 @@ final class BendTests {
     /** The ground a test lays, cleared first: the line's Clearance and the blocks around it. */
     private static final BlockPos FROM = new BlockPos(-3, 1, -2);
     private static final BlockPos TO = new BlockPos(17, 5, 11);
+    /**
+     * A longer line through the same bend at {@link #B}, for a Train of three cars, 15 blocks: 16
+     * blocks east to B, then 15.6 south-east to its end.
+     */
+    static final BlockPos RUN_START = new BlockPos(-8, 1, 2);
+    static final BlockPos RUN_END = new BlockPos(19, 1, 13);
+    private static final BlockPos RUN_FROM = new BlockPos(-12, 1, -2);
+    private static final BlockPos RUN_TO = new BlockPos(23, 5, 17);
 
     private BendTests() {
     }
@@ -66,7 +78,7 @@ final class BendTests {
     }
 
     private static void spanRefused(GameTestHelper helper) {
-        ground(helper);
+        ground(helper, FROM, TO, List.of(A, B, C));
         // Outside the straight Span's Clearance: it strings past the stone.
         helper.setBlock(SWUNG_INTO, Blocks.STONE);
         string(helper, A, B);
@@ -82,7 +94,7 @@ final class BendTests {
     }
 
     private static void blockRefused(GameTestHelper helper) {
-        ground(helper);
+        ground(helper, FROM, TO, List.of(A, B, C));
         string(helper, A, B);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
@@ -115,64 +127,74 @@ final class BendTests {
     }
 
     /**
-     * Every block around the line that its Clearance leaves clear is stone, and a Locomotive driven
-     * from near A through the bend to the line's end at C never has its body, as the entity stands
-     * and faces each tick, in any of them.
+     * Every block around a longer line through the same bend that its Clearance leaves clear is
+     * stone, and a Train of a Locomotive, a Cargo car and a Fluid car, driven from its last car near
+     * the line's start through the bend to the line's end, never has a car's body, as each entity
+     * stands and faces each tick, in any of them.
      */
     private static void runsBeside(GameTestHelper helper) {
-        RailNetwork network = ground(helper);
-        string(helper, A, B);
-        string(helper, B, C);
+        RailNetwork network = ground(helper, RUN_FROM, RUN_TO, List.of(RUN_START, B, RUN_END));
+        string(helper, RUN_START, B);
+        string(helper, B, RUN_END);
+        Span first = network.get(arm(helper, RUN_START), arm(helper, B));
+        Span beyond = network.get(arm(helper, B), arm(helper, RUN_END));
         Set<BlockPos> clear = new HashSet<>();
-        for (Span span : List.of(network.get(arm(helper, A), arm(helper, B)), network.get(arm(helper, B), arm(helper, C)))) {
+        for (Span span : List.of(first, beyond)) {
             for (Clearance.Cell cell : Clearance.along(network.curve(span))) {
                 clear.add(new BlockPos(cell.x(), cell.y(), cell.z()));
             }
         }
         Set<BlockPos> stone = new HashSet<>();
-        for (BlockPos pos : BlockPos.betweenClosed(FROM, TO)) {
+        for (BlockPos pos : BlockPos.betweenClosed(RUN_FROM, RUN_TO)) {
             BlockPos at = pos.immutable();
-            if (!clear.contains(helper.absolutePos(at)) && !List.of(A, B, C).contains(at)) {
+            if (!clear.contains(helper.absolutePos(at)) && !List.of(RUN_START, B, RUN_END).contains(at)) {
                 helper.setBlock(at, Blocks.STONE);
                 stone.add(helper.absolutePos(at));
             }
         }
-        Span first = network.get(arm(helper, A), arm(helper, B));
-        Span beyond = network.get(arm(helper, B), arm(helper, C));
         Locomotive locomotive = Locomotive.burner();
-        Train train = Train.of(new Place(first, arm(helper, B), first.length() - 2.5), locomotive);
-        LevelRails.of(helper.getLevel()).add(train);
-        LocomotiveEntity car = RailworksRegistries.LOCOMOTIVE_ENTITY.get().create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
-        car.setCar(train, locomotive);
-        helper.getLevel().addFreshEntity(car);
-        LocomotiveTests.fill(helper, car, new ItemStack(Items.COAL, 4));
-        ServerPlayer driver = LocomotiveTests.board(helper, car);
+        CargoCar cargo = CargoCar.create();
+        FluidCar fluid = FluidCar.create();
+        // The last car's middle 2.6 from the line's start, its body's back end just short of it.
+        double headFromStart = 2.6 + 2 * CargoCar.LENGTH;
+        Train train = Train.of(new Place(first, arm(helper, B), first.length() - headFromStart), List.of(locomotive, cargo, fluid));
+        List<CarEntity> cars = List.of(
+                LogisticsTests.spawn(helper, RailworksRegistries.LOCOMOTIVE_ENTITY.get(), train, locomotive),
+                LogisticsTests.spawn(helper, RailworksRegistries.CARGO_CAR_ENTITY.get(), train, cargo),
+                LogisticsTests.spawn(helper, RailworksRegistries.FLUID_CAR_ENTITY.get(), train, fluid));
+        LocomotiveEntity front = (LocomotiveEntity) cars.getFirst();
+        LocomotiveTests.fill(helper, front, new ItemStack(Items.COAL, 8));
+        ServerPlayer driver = LocomotiveTests.board(helper, front);
         LocomotiveTests.press(driver, true, false);
         boolean ranBeyond = false;
-        for (int tick = 0; tick < 2000; tick++) {
-            LocomotiveTests.step(car);
-            BlockPos hit = struck(car, stone);
-            if (hit != null) {
-                helper.fail("on tick " + tick + " the car's body reached into the stone at " + hit + ", outside the Clearance", B);
-                return;
+        for (int tick = 0; tick < 4000; tick++) {
+            LocomotiveTests.step(front);
+            for (CarEntity car : cars) {
+                BlockPos hit = struck(car, stone);
+                if (hit != null) {
+                    helper.fail("on tick " + tick + " the " + car.getType().getDescription().getString()
+                            + "'s body reached into the stone at " + hit + ", outside the Clearance", B);
+                    return;
+                }
             }
-            ranBeyond |= car.holds(beyond) && !car.holds(first);
-            if (ranBeyond && car.train().speed() == 0.0) {
+            ranBeyond |= cars.getLast().holds(beyond) && !cars.getLast().holds(first);
+            if (ranBeyond && front.train().speed() == 0.0) {
                 break;
             }
         }
-        if (!ranBeyond || car.train().speed() != 0.0) {
-            helper.fail("the car never ran through the bend to the line's end", C);
+        if (!ranBeyond || front.train().speed() != 0.0) {
+            helper.fail("the Train never ran through the bend to the line's end", RUN_END);
         }
         helper.succeed();
     }
 
     /**
-     * The first of {@code filled} that {@code car}'s body reaches into: a box 4.8 long, two wide and
-     * 2.75 up from where the entity stands, turned and pitched as it faces, by points spread through
-     * it a hair in from its faces. Null when it reaches into none.
+     * The first of {@code filled} that {@code car}'s body reaches into: a box
+     * {@link Clearance#BODY_LENGTH} long, {@link CarBody#WIDTH} across and {@link CarBody#HEIGHT} up
+     * from where the entity stands, turned and pitched as it faces, by points spread through it a
+     * hair in from its faces. Null when it reaches into none.
      */
-    private static BlockPos struck(LocomotiveEntity car, Set<BlockPos> filled) {
+    private static BlockPos struck(CarEntity car, Set<BlockPos> filled) {
         Vec3 along = Vec3.directionFromRotation(car.getXRot(), car.getYRot());
         Vec3 across = new Vec3(-along.z, 0.0, along.x).normalize();
         Vec3 up = along.cross(across);
@@ -180,10 +202,12 @@ final class BendTests {
             up = up.reverse();
         }
         Vec3 at = car.position();
+        double halfLength = Clearance.BODY_LENGTH / 2.0;
+        double halfWidth = CarBody.WIDTH / 2.0;
         double in = 1e-3;
-        for (double u = -2.4 + in; u <= 2.4 - in + 1e-9; u += (4.8 - 2 * in) / 48) {
-            for (double v = -1.0 + in; v <= 1.0 - in + 1e-9; v += (2.0 - 2 * in) / 20) {
-                for (double w = in; w <= 2.75 - in + 1e-9; w += (2.75 - 2 * in) / 4) {
+        for (double u = -halfLength + in; u <= halfLength - in + 1e-9; u += (2 * halfLength - 2 * in) / 48) {
+            for (double v = -halfWidth + in; v <= halfWidth - in + 1e-9; v += (2 * halfWidth - 2 * in) / 20) {
+                for (double w = in; w <= CarBody.HEIGHT - in + 1e-9; w += (CarBody.HEIGHT - 2 * in) / 4) {
                     BlockPos pos = BlockPos.containing(at.add(along.scale(u)).add(across.scale(v)).add(up.scale(w)));
                     if (filled.contains(pos)) {
                         return pos;
@@ -195,31 +219,29 @@ final class BendTests {
     }
 
     /**
-     * Clears the test's ground, taking up any Span an earlier test left on it, and stands the three
-     * Pylons: an on-its-own test lands on ground others ran on.
+     * Clears the ground from {@code from} to {@code to}, taking up any Span an earlier test left on
+     * it, and stands the Pylons at {@code columns}: an on-its-own test lands on ground others ran on.
      */
-    private static RailNetwork ground(GameTestHelper helper) {
+    private static RailNetwork ground(GameTestHelper helper, BlockPos from, BlockPos to, List<BlockPos> columns) {
         RailNetwork network = LevelRails.of(helper.getLevel()).network();
-        BlockPos from = helper.absolutePos(FROM.offset(-4, -4, -4));
-        BlockPos to = helper.absolutePos(TO.offset(4, 4, 4));
+        // LevelClearance.near's box test, which is private to the Module: any Span with an Arm near goes.
+        AABB near = AABB.encapsulatingFullBlocks(helper.absolutePos(from), helper.absolutePos(to)).inflate(4);
         for (Span left : List.copyOf(network.all())) {
-            if (within(left.a(), from, to) || within(left.b(), from, to)) {
+            if (near(near, left.a()) || near(near, left.b())) {
                 network.remove(left.a(), left.b());
             }
         }
-        for (BlockPos pos : BlockPos.betweenClosed(FROM, TO)) {
+        for (BlockPos pos : BlockPos.betweenClosed(from, to)) {
             helper.setBlock(pos, Blocks.AIR);
         }
-        for (BlockPos column : List.of(A, B, C)) {
+        for (BlockPos column : columns) {
             helper.setBlock(column, RailworksRegistries.PYLON.get().defaultBlockState());
         }
         return network;
     }
 
-    private static boolean within(Arm arm, BlockPos from, BlockPos to) {
-        return arm.x() >= Math.min(from.getX(), to.getX()) && arm.x() <= Math.max(from.getX(), to.getX())
-                && arm.y() >= Math.min(from.getY(), to.getY()) && arm.y() <= Math.max(from.getY(), to.getY())
-                && arm.z() >= Math.min(from.getZ(), to.getZ()) && arm.z() <= Math.max(from.getZ(), to.getZ());
+    private static boolean near(AABB box, Arm arm) {
+        return box.contains(arm.x() + 0.5, arm.y() + 0.5, arm.z() + 0.5);
     }
 
     /** The Span between the columns at {@code one} and {@code other}, strung by the command's rule. */
