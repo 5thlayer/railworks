@@ -205,6 +205,37 @@ public final class Train {
     }
 
     /**
+     * Where it could lead from, either end, as {@link #leadsFrom} says of its end cars: what a
+     * Station asks of a Train at rest to say whether it is stopped there.
+     */
+    public List<Place> leads(RailNetwork network) {
+        Car first = cars.getFirst();
+        Car last = cars.getLast();
+        List<Place> leads = new ArrayList<>(leadsFrom(placeOf(network, first), true, first == last, reversed(first)));
+        if (first != last) {
+            leads.addAll(leadsFrom(placeOf(network, last), false, true, reversed(last)));
+        }
+        return List.copyOf(leads);
+    }
+
+    /**
+     * Where a car at {@code place}, facing its Train's heading, leads its Train from as an end of it:
+     * as its first car, from its place, and as its last, from its place turned round, as
+     * {@link #lead} says; as its only car, only the way the car faces, against the heading when it is
+     * {@code reversed}; and as a car between, from nowhere. A client, which sees a car's place and
+     * whether it is an end but not its Train, asks the same.
+     */
+    public static List<Place> leadsFrom(Place place, boolean first, boolean last, boolean reversed) {
+        if (first && last) {
+            return List.of(reversed ? place.turned() : place);
+        }
+        if (first) {
+            return List.of(place);
+        }
+        return last ? List.of(place.turned()) : List.of();
+    }
+
+    /**
      * Its leading car running {@code way}, +1 its heading and -1 against it: its first car, or its
      * last turned round, facing the way it runs.
      */

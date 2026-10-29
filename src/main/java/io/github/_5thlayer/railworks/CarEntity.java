@@ -222,6 +222,11 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         return (links() & LAST) != 0;
     }
 
+    /** Whether a client sees it facing against its Train's heading. */
+    boolean seenReversed() {
+        return (links() & REVERSED) != 0;
+    }
+
     /** Whether a client sees its Train at rest, so a car may couple to it. */
     boolean seenAtRest() {
         return (links() & AT_REST) != 0;

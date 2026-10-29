@@ -131,11 +131,11 @@ A hatch holding one fluid in a tank, filled and emptied by any mod's pipes, whic
 _Avoid_: tank, fluid port, fluid loader
 
 **Bellows**:
-What a hatch of items stretches across the half block to the Cargo car standing at its spot, shown while the car stands there.
+What a hatch of items stretches across the half block to the Cargo car standing at its spot, shown while the car stands there in a Train stopped at the Station: the car the hatch trades with, whether or not goods are moving.
 _Avoid_: chute (Create's), coupling (cars'), gangway, dock seal
 
 **Loading arm**:
-What a Fluid hatch swings across the half block to the Fluid car standing at its spot, shown while the car stands there, as a hatch of items stretches its Bellows. Not a Pylon's Arm.
+What a Fluid hatch swings across the half block to the Fluid car standing at its spot, shown while the car stands there in a Train stopped at the Station, as a hatch of items stretches its Bellows. Not a Pylon's Arm.
 _Avoid_: pump (Pipeworks' Pump), hose, transfer hose, Bellows (for a Fluid hatch)
 
 **Charger**:

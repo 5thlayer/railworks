@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -170,6 +171,90 @@ class PlatformTest {
         assertEquals(Optional.of(new Platform.Joined(south(30), Platform.LEADING, false)),
                 Platform.joined(network, List.of(south(30)), 26, 7, -2));
         assertEquals(10, platform.besideBlocks(network).stream().filter(b -> b.spot() == Platform.LEADING).count());
+    }
+
+    /** A car's middle on the line at {@code x}, facing B. */
+    private Place carAt(double x) {
+        return new Place(network.get(A, B), B, B.x() - x);
+    }
+
+    /** A Train at rest heading for B, its first car's middle at {@code head} and each car behind five blocks back toward A. */
+    private List<Platform.CarAtRest> trainAt(double head, int cars) {
+        List<Platform.CarAtRest> seen = new ArrayList<>();
+        for (int i = 0; i < cars; i++) {
+            seen.add(new Platform.CarAtRest(carAt(head - 5.0 * i), i == 0, i == cars - 1, false));
+        }
+        return seen;
+    }
+
+    @Test
+    void eachCarOfATrainStoppedAtTheStationStandsAtItsSpotCountedBackFromItsLeadingCar() {
+        line();
+        Platform platform = platform(south(30));
+        // The lead mark is at 28, the first spot's middle at 23, the second's at 18.
+        List<Platform.CarAtRest> train = trainAt(28, 3);
+        assertEquals(Optional.of(train.get(0)), platform.standingAt(network, Platform.LEADING, train));
+        assertEquals(Optional.of(train.get(1)), platform.standingAt(network, 0, train));
+        assertEquals(Optional.of(train.get(2)), platform.standingAt(network, 1, train));
+        assertEquals(Optional.empty(), platform.standingAt(network, 2, train), "a spot with no car");
+        List<Platform.CarAtRest> settling = trainAt(28.8, 3);
+        assertEquals(Optional.of(settling.get(1)), platform.standingAt(network, 0, settling), "still settling onto its mark");
+    }
+
+    @Test
+    void noCarStandsAtASpotOfATrainAtRestOffTheStationsMark() {
+        line();
+        Platform platform = platform(south(30));
+        // Its Locomotive on the first spot, its cars on the second and third: lined up, but not stopped there.
+        List<Platform.CarAtRest> train = trainAt(23, 3);
+        assertEquals(Optional.empty(), platform.standingAt(network, Platform.LEADING, train));
+        assertEquals(Optional.empty(), platform.standingAt(network, 1, train));
+        List<Platform.CarAtRest> halfOff = trainAt(25.5, 2);
+        assertEquals(Optional.empty(), platform.standingAt(network, 0, halfOff), "half a car off its marks");
+    }
+
+    @Test
+    void eitherEndOfATrainLeadsButALoneCarOnlyTheWayItFaces() {
+        line();
+        Platform platform = platform(south(30));
+        // Heading for A, its last car on the lead mark: it arrived the serving way, last car first.
+        Platform.CarAtRest last = new Platform.CarAtRest(carAt(28).turned(), false, true, false);
+        Platform.CarAtRest first = new Platform.CarAtRest(carAt(23).turned(), true, false, false);
+        assertEquals(Optional.of(first), platform.standingAt(network, 0, List.of(first, last)));
+        Platform.CarAtRest facingB = new Platform.CarAtRest(carAt(28), true, true, false);
+        Platform.CarAtRest facingA = new Platform.CarAtRest(carAt(28).turned(), true, true, false);
+        Platform.CarAtRest backingB = new Platform.CarAtRest(carAt(28).turned(), true, true, true);
+        assertEquals(Optional.of(facingB), platform.standingAt(network, Platform.LEADING, List.of(facingB)));
+        assertEquals(Optional.empty(), platform.standingAt(network, Platform.LEADING, List.of(facingA)), "against the serving way");
+        assertEquals(Optional.of(backingB), platform.standingAt(network, Platform.LEADING, List.of(backingB)),
+                "facing against its heading, as a reversed car does, the way it faces");
+    }
+
+    @Test
+    void aCarPastTheEndOfTheTrainStoppedThereIsAnotherTrainsAndStandsAtNoSpot() {
+        line();
+        Platform platform = platform(south(30));
+        // A lone Locomotive on the lead mark, a Cargo car of another Train on the first spot just behind.
+        Platform.CarAtRest alone = new Platform.CarAtRest(carAt(28), true, true, false);
+        Platform.CarAtRest other = new Platform.CarAtRest(carAt(23), true, true, false);
+        assertEquals(Optional.of(alone), platform.standingAt(network, Platform.LEADING, List.of(alone, other)));
+        assertEquals(Optional.empty(), platform.standingAt(network, 0, List.of(alone, other)));
+        // A Train of two stopped there, and a third Train's car on the second spot behind its last.
+        List<Platform.CarAtRest> two = trainAt(28, 2);
+        Platform.CarAtRest third = new Platform.CarAtRest(carAt(18), true, false, false);
+        List<Platform.CarAtRest> cars = List.of(two.get(0), two.get(1), third);
+        assertEquals(Optional.of(two.get(1)), platform.standingAt(network, 0, cars));
+        assertEquals(Optional.empty(), platform.standingAt(network, 1, cars));
+    }
+
+    @Test
+    void noCarStandsAtASpotThePlatformHasNot() {
+        line();
+        Platform.configure(2);
+        Platform platform = platform(south(30));
+        List<Platform.CarAtRest> train = trainAt(28, 5);
+        assertEquals(Optional.empty(), platform.standingAt(network, 2, train));
+        assertEquals(Optional.empty(), platform.standingAt(network, 3, train));
     }
 
     @Test
