@@ -27,8 +27,11 @@ import net.minecraft.network.codec.StreamCodec;
  * @param mode    whether it is a provider or a requester
  * @param request what a requester asks for; empty for one asking for nothing, and for a provider
  * @param joined  the Station it joins and the car spot it stands beside; empty for none
+ * @param fuels   whether it is a provider of items, the one hatch that can fuel a Locomotive, from
+ *                beside its Engine room; a requester and a Fluid hatch fuel none
  */
-public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, Optional<StationSpot> joined) {
+public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, Optional<StationSpot> joined,
+        boolean fuels) {
 
     /**
      * The Station a hatch or a Charger joins, by name, its car spot's index, 0 the one behind the
@@ -60,13 +63,15 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, 
             HatchMode.STREAM_CODEC, HatchReport::mode,
             ByteBufCodecs.optional(Hatches.REQUEST_STREAM_CODEC), HatchReport::request,
             ByteBufCodecs.optional(JOINED_CODEC), HatchReport::joined,
+            ByteBufCodecs.BOOL, HatchReport::fuels,
             HatchReport::new);
 
     /** What {@code entity}'s hatch shows, on the server. */
     public static HatchReport of(HatchBlockEntity entity) {
         Hatches.Hatch hatch = entity.hatch().orElseThrow();
         Optional<StationSpot> joined = PlatformsNear.joined(entity.getLevel(), entity.getBlockPos()).map(StationSpot::of);
-        return new HatchReport(hatch.mode(), hatch.request(), joined);
+        return new HatchReport(hatch.mode(), hatch.request(), joined,
+                hatch.mode() == HatchMode.PROVIDER && hatch.holds() == Goods.Kind.ITEMS);
     }
 
     /**
@@ -98,7 +103,7 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, 
 
     /**
      * Its lines in Jade: provider or requester, a requester's request, and the Station it joins and
-     * whether beside an Engine room, or that it joins none.
+     * that it fuels a Locomotive where it can and stands beside an Engine room, or that it joins none.
      */
     public List<Component> lines() {
         List<Component> lines = new ArrayList<>();
@@ -110,7 +115,7 @@ public record HatchReport(HatchMode mode, Optional<HatchRequest<Ware>> request, 
         }
         lines.add(joined.map(at -> at.line("tooltip.railworks.hatch.jade."))
                 .orElseGet(() -> Component.translatable("tooltip.railworks.hatch.jade.no_station")));
-        if (joined.isPresent() && joined.get().engineRoom()) {
+        if (fuels && joined.isPresent() && joined.get().engineRoom()) {
             lines.add(Component.translatable("tooltip.railworks.hatch.jade.engine_room"));
         }
         return lines;

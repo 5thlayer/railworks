@@ -527,6 +527,16 @@ final class HatchTests {
         expectLines(helper, HatchReport.of(helper.getBlockEntity(LEADER, HatchBlockEntity.class)).lines(),
                 List.of("tooltip.railworks.hatch.jade.provider", "tooltip.railworks.hatch.jade.station_leading",
                         "tooltip.railworks.hatch.jade.engine_room"));
+        // Only a provider of items fuels a Locomotive, so neither a requester nor a Fluid hatch says it does.
+        helper.setBlock(LEADER, Blocks.AIR);
+        hatch(helper, player, LEADER, Goods.Kind.ITEMS, HatchMode.REQUESTER);
+        expectLines(helper, HatchReport.of(helper.getBlockEntity(LEADER, HatchBlockEntity.class)).lines(),
+                List.of("tooltip.railworks.hatch.jade.requester", "message.railworks.hatch.requesting_nothing",
+                        "tooltip.railworks.hatch.jade.station_leading"));
+        helper.setBlock(LEADER, Blocks.AIR);
+        hatch(helper, player, LEADER, Goods.Kind.FLUID, HatchMode.PROVIDER);
+        expectLines(helper, HatchReport.of(helper.getBlockEntity(LEADER, HatchBlockEntity.class)).lines(),
+                List.of("tooltip.railworks.hatch.jade.provider", "tooltip.railworks.hatch.jade.station_leading"));
         helper.setBlock(STATION, Blocks.AIR);
         expectLines(helper, HatchReport.of(helper.getBlockEntity(SECOND, HatchBlockEntity.class)).lines(),
                 List.of("tooltip.railworks.hatch.jade.requester", "message.railworks.hatch.requesting",
@@ -751,10 +761,16 @@ final class HatchTests {
         return Span.of(one, other, SpanRules.cost(one, other));
     }
 
-    /** A hatch of {@code mode} placed by {@code player} at {@code pos}, which must go. */
+    /** A hatch of items of {@code mode} placed by {@code player} at {@code pos}, which must go. */
     private static void hatch(GameTestHelper helper, ServerPlayer player, BlockPos pos, HatchMode mode) {
-        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(HatchItem.of(Goods.Kind.ITEMS, mode)));
-        if (!place(helper, player, pos).consumesAction() || !helper.getBlockState(pos).is(RailworksRegistries.HATCH.get())) {
+        hatch(helper, player, pos, Goods.Kind.ITEMS, mode);
+    }
+
+    /** A hatch holding {@code holds}, of {@code mode}, placed by {@code player} at {@code pos}, which must go. */
+    private static void hatch(GameTestHelper helper, ServerPlayer player, BlockPos pos, Goods.Kind holds, HatchMode mode) {
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(HatchItem.of(holds, mode)));
+        if (!place(helper, player, pos).consumesAction() || !(helper.getBlockState(pos).getBlock() instanceof HatchBlock block)
+                || block.holds() != holds) {
             throw helper.assertionException(pos, Component.literal("a hatch beside a car spot was refused"));
         }
     }
