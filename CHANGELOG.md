@@ -3,6 +3,8 @@
 Written for Consumers: what a mod building against Railworks can use, or will see change. A published version never changes: a fix is the next patch (`docs/agents/releases.md`).
 
 ## Unreleased
+
+## 0.1.1
 - Getting off a raised Train is safe at any height (#17): whoever gets off a car, sneaking, led out on a lead, logging out or put off by the car breaking under them, steps out beside their own seat two off the Rail, the row clear of the car where a Station's hatches stand. A walkway there about level with the car's floor comes first, on the side they look to and then the other; then the first floor below there, at any depth, unless it is buried under a block or they don't fit on it, where getting off once gave up after 24 blocks. Water's top counts as a floor, and lava never does. With nowhere to land, a sneak or a lead finds nothing: they stay aboard, told "Nowhere safe to get off here", and the lead stays in hand; a car breaking, or a player logging out, puts them down where they sat. A mob led out far down is leashed on landing, and the lead snaps as vanilla's does once it is stretched past 12 blocks.
 
 ## 0.1.0
