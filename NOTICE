@@ -107,3 +107,18 @@ Source:  https://github.com/malcolmriley/unused-textures
          glass tube's dark inside and its glint, are Railworks' own.
 Licence: Creative Commons Attribution 4.0 International
          https://creativecommons.org/licenses/by/4.0/
+
+Item icons
+----------
+
+Files:   src/main/resources/assets/railworks/textures/item/{burner_locomotive,electric_locomotive}.png
+         src/main/resources/assets/railworks/textures/item/{cargo_car,fluid_car,rail}.png
+Author:  Malcolm Riley
+Source:  https://github.com/malcolmriley/unused-textures
+         blocks/ at commit 8b85ad732023174d9a9da74e6bf2272d6c0bef17, the files under data/art/ that
+         the car panel sprites, the Rail's cement and steel, the smelter, the copper coil and the
+         crates are drawn from. scripts/build-textures.py paints each car's icon, a side view, from
+         the mean colours and a little of the grain of the sprites its panels wear, and the Rail's, a
+         stub of it, from gray_cement_horizontal.png and steel_block.png.
+Licence: Creative Commons Attribution 4.0 International
+         https://creativecommons.org/licenses/by/4.0/
