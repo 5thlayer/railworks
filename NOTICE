@@ -41,3 +41,38 @@ Source:  https://github.com/malcolmriley/unused-textures
          rail/cement.png, pylon/post.png, pylon/cap.png and steel.png.
 Licence: Creative Commons Attribution 4.0 International
          https://creativecommons.org/licenses/by/4.0/
+
+Hatch, Charger and Burner Generator sprites
+-------------------------------------------
+
+Files:   data/art/industrial_metal_duct_flat_1.png
+         data/art/space-plating-access-hatch.png
+         data/art/metal_tank_copper_sides.png
+         data/art/copper_coil_side.png
+         data/art/battery_top.png
+         data/art/battery_bottom.png
+         data/art/device_smelter_front.png
+         data/art/device_smelter_front_lit.png
+         data/art/brick_refractory.png
+         data/art/device_smelter_top.png
+         src/main/resources/assets/railworks/textures/block/hatch/*.png
+         src/main/resources/assets/railworks/textures/block/fluid_hatch/*.png
+         src/main/resources/assets/railworks/textures/block/charger/*.png
+         src/main/resources/assets/railworks/textures/block/creative_charger/*.png
+         src/main/resources/assets/railworks/textures/block/burner_generator/*.png
+         src/main/resources/assets/railworks/textures/block/burner_generator/front_on.png.mcmeta
+Author:  Malcolm Riley
+Source:  https://github.com/malcolmriley/unused-textures
+         blocks/ at commit 8b85ad732023174d9a9da74e6bf2272d6c0bef17, the files named above, and
+         blocks/device_smelter_front_lit.png.mcmeta's animation timing. The files under data/art/ are
+         the unmodified copies. scripts/build-textures.py writes industrial_metal_duct_flat_1.png
+         unchanged as hatch/casing.png, battery_top.png and battery_bottom.png as charger/top.png and
+         charger/bottom.png, and device_smelter_front.png, device_smelter_front_lit.png,
+         brick_refractory.png and device_smelter_top.png as burner_generator/front.png, front_on.png
+         (with the .mcmeta), side.png and top.png. hatch/provider.png and requester.png are
+         space-plating-access-hatch.png tinted orange and blue; fluid_hatch/provider.png and
+         requester.png are metal_tank_copper_sides.png tinted the same way with a round Sight glass and
+         its ring painted on; charger/sides.png is copper_coil_side.png turned and mirrored so its dark
+         band runs down both edges; creative_charger/*.png are the Charger's re-lit in pink.
+Licence: Creative Commons Attribution 4.0 International
+         https://creativecommons.org/licenses/by/4.0/

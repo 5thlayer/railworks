@@ -17,10 +17,20 @@ The Rail is his horizontal grey cement with a steel running strip, and the Pylon
 cement, its top segment capped with his concrete slabs under a steel bearing plate; the renderer
 draws the Rail and the cap from these.
 
+A hatch is his access-hatch plating round his flat duct, and a Fluid hatch his copper tank side with
+the round Sight glass let into it: the dark glass the renderer fills from the bottom
+(SightGlassFill.WINDOW), its dark rim and a ring with its studs drawn here. Each comes in the mode
+colours, the plating or copper tinted and the ring painted orange for a provider and blue for a
+requester. The Charger is his copper coil, made symmetric as Wireworks' Steam Turbine and Fieldworks'
+tier-2 Harvester wear it, between his battery's top and bottom, and the Creative Charger the same
+re-lit in the FactoryWorks creative pink, as Wireworks' creative pole is. The Burner Generator is his
+smelter front, cold or lit and animated at his timing, in his refractory brick under his smelter top.
+
     scripts/build-textures.py
     scripts/build-textures.py --check    # regenerate and diff
 """
 import argparse
+import json
 import os
 import struct
 import sys
@@ -53,6 +63,49 @@ ARROW = [
 # through it: a pixel of paint is scaled by the tile's brightness against the mean, by this much.
 ARROW_PAINT = (214, 168, 38)
 ARROW_SHADING = 0.4
+
+
+# The tints a hatch's plating or a Fluid hatch's copper is multiplied by: a provider's warm, a requester's cool.
+MODE_TINT = {"provider": (255, 184, 120), "requester": (159, 196, 255)}
+FLUID_MODE_TINT = {"provider": (255, 200, 160), "requester": (184, 208, 255)}
+
+# A Fluid hatch's side, over his copper: `o` the dark glass the fill draws on (SightGlassFill.WINDOW),
+# `n` its glint, `m` the dark rim round it, `j`, `g`, `k` and `q` the ring from its lit to its shaded
+# side, `f` and `p` the ring's studs, lit and shaded; `.` is copper.
+SIGHT_GLASS = [
+    "................",
+    ".......ff.......",
+    "....ffgfggff....",
+    "...fjgggggkkf...",
+    "..fjggmmmmkkkf..",
+    "..fggmnooomkkp..",
+    "..ggmnooooomqq..",
+    ".ffgmoooooomqqp.",
+    ".fggmoooooomqfp.",
+    "..ggmoooooomqq..",
+    "..fkkmoooomqqp..",
+    "..fkkkmmmmqqqp..",
+    "...fkkqqqqqqp...",
+    "....fpqqfqpp....",
+    ".......pp.......",
+    "................",
+]
+SIGHT_GLASS_PAINT = {"o": (38, 48, 56), "n": (150, 178, 190), "m": (24, 30, 36), "f": (205, 184, 155),
+                     "p": (156, 139, 116)}
+RING = {
+    "provider": {"j": (250, 160, 72), "g": (219, 111, 24), "k": (194, 87, 7), "q": (139, 60, 5)},
+    "requester": {"j": (110, 116, 210), "g": (67, 71, 170), "k": (48, 52, 145), "q": (34, 36, 104)},
+}
+
+# Half the width of the dark band down the copper coil side's left edge.
+COIL_BAND_HALF = 2
+
+# The colour a creative block's mid-bright pixel lands on (Wireworks' creative pole), and Rec. 601 luma.
+CREATIVE_PINK = (0xE6, 0x5A, 0xC8)
+LUMA = (0.299, 0.587, 0.114)
+
+# The lit smelter's animation, at his own timing.
+SMELTER_LIT_ANIMATION = {"animation": {"frametime": 37, "interpolate": True}}
 
 
 def png(pixels):
@@ -130,6 +183,54 @@ def station_top():
     return tiles
 
 
+def tinted(pixels, tint):
+    """Each pixel multiplied by `tint`, as a block's tint colours it."""
+    return [[[round(p[c] * tint[c] / 255) for c in range(3)] + [p[3]] for p in row] for row in pixels]
+
+
+def hatch_side(mode):
+    """His access-hatch plating in the mode's tint."""
+    return tinted(art("space-plating-access-hatch.png"), MODE_TINT[mode])
+
+
+def fluid_hatch_side(mode):
+    """His copper tank side in the mode's tint, with the Sight glass let into it, its ring in the mode's colour."""
+    side = tinted(art("metal_tank_copper_sides.png"), FLUID_MODE_TINT[mode])
+    paint = dict(SIGHT_GLASS_PAINT, **RING[mode])
+    for y, line in enumerate(SIGHT_GLASS):
+        for x, mark in enumerate(line):
+            if mark != ".":
+                side[y][x] = list(paint[mark]) + [255]
+    return side
+
+
+def coil():
+    """The copper coil's side turned half its dark band over, so the band's darker half runs down the
+    left edge, and then its left half mirrored onto its right: the same dark half band down either
+    edge and the coil's shine in the middle, as Fieldworks' tier-2 Harvester wears it."""
+    turned = [row[COIL_BAND_HALF:] + row[:COIL_BAND_HALF] for row in art("copper_coil_side.png")]
+    return [row[:8] + row[7::-1] for row in turned]
+
+
+def luma(pixel):
+    return sum(weight * channel for weight, channel in zip(LUMA, pixel[:3]))
+
+
+def creative(pixels):
+    """Re-lit in the creative pink, each pixel keeping its brightness against the sprite's mean, as
+    Wireworks' creative pole is; capped so the brightest channel lands on 255 rather than clipping."""
+    shown = [p for row in pixels for p in row if p[3] > 0]
+    midpoint = sum(luma(p) for p in shown) / max(1, len(shown))
+    out = []
+    for row in pixels:
+        line = []
+        for p in row:
+            scale = min(luma(p) / midpoint, 255.0 / max(CREATIVE_PINK))
+            line.append([round(c * scale) for c in CREATIVE_PINK] + [p[3]] if p[3] else p)
+        out.append(line)
+    return out
+
+
 # Every texture this script writes, by its path under textures/, with what builds it.
 TEXTURES_BUILT = {
     "block/station/top.png": station_top,
@@ -140,11 +241,32 @@ TEXTURES_BUILT = {
     "block/pylon/cap.png": unchanged("concrete_slabs.png"),
     # The Rail's running strip and the bearing plate it rests on.
     "block/steel.png": unchanged("steel_block.png"),
+    "block/hatch/casing.png": unchanged("industrial_metal_duct_flat_1.png"),
+    "block/hatch/provider.png": lambda: hatch_side("provider"),
+    "block/hatch/requester.png": lambda: hatch_side("requester"),
+    "block/fluid_hatch/provider.png": lambda: fluid_hatch_side("provider"),
+    "block/fluid_hatch/requester.png": lambda: fluid_hatch_side("requester"),
+    "block/charger/sides.png": coil,
+    "block/charger/top.png": unchanged("battery_top.png"),
+    "block/charger/bottom.png": unchanged("battery_bottom.png"),
+    "block/creative_charger/sides.png": lambda: creative(coil()),
+    "block/creative_charger/top.png": lambda: creative(art("battery_top.png")),
+    "block/creative_charger/bottom.png": lambda: creative(art("battery_bottom.png")),
+    "block/burner_generator/front.png": unchanged("device_smelter_front.png"),
+    "block/burner_generator/front_on.png": unchanged("device_smelter_front_lit.png"),
+    "block/burner_generator/side.png": unchanged("brick_refractory.png"),
+    "block/burner_generator/top.png": unchanged("device_smelter_top.png"),
 }
+
+# The animations, by the texture they play, with their .mcmeta.
+ANIMATIONS = {"block/burner_generator/front_on.png": SMELTER_LIT_ANIMATION}
 
 
 def build():
-    return {os.path.join(TEXTURES, path): png(builder()) for path, builder in TEXTURES_BUILT.items()}
+    files = {os.path.join(TEXTURES, path): png(builder()) for path, builder in TEXTURES_BUILT.items()}
+    for path, meta in ANIMATIONS.items():
+        files[os.path.join(TEXTURES, path + ".mcmeta")] = (json.dumps(meta, indent=2) + "\n").encode()
+    return files
 
 
 def main():
@@ -160,13 +282,13 @@ def main():
             print(f"FAIL: {os.path.relpath(path, ROOT)} is missing or stale")
         if stale:
             return 1
-        print(f"ok   {len(files)} textures match the generator")
+        print(f"ok   {len(files)} textures and animations match the generator")
         return 0
 
     for path, image in sorted(files.items()):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         open(path, "wb").write(image)
-    print(f"wrote {len(files)} textures")
+    print(f"wrote {len(files)} textures and animations")
     return 0
 
 
