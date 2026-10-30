@@ -43,6 +43,6 @@ A 5thlayer Module, released on its own to Modrinth and CurseForge. The design is
 
 ## License
 
-MIT, except the block sprites, the item icons, the cover and the icon, which are Malcolm Riley's under CC BY 4.0 (see Art). Source is on [GitHub](https://github.com/5thlayer/railworks).
+MIT, except the block sprites, the item icons, the cover and the icon, which are Malcolm Riley's under CC BY 4.0 (see Art). Source is on [GitHub](https://github.com/5thlayer/railworks). Releases are on [CurseForge](https://www.curseforge.com/projects/1774647).
 
 This is a hobby project: I’m not monetizing any part of FactoryWorks. I’m building it for fun, to see how far I can take it.
