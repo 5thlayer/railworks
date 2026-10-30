@@ -36,8 +36,8 @@ import net.minecraft.world.phys.Vec3;
  * A Station faces the way it serves (ADR 0008): placed by a real player beside {@link LocomotiveTests}'
  * Span, which runs east from x -1 to x 11 along z 3, its arrow points the way the Trains it serves
  * head, the Trains with it on their drive side, its terminal faces the Rail, and a Train standing at
- * it is stopped there only when it came in that way. Run driving on the right and, in a batch of their own, on the left. A
- * Station under the Rail, off the row beside it, or one whose platform would overlap another's, is
+ * it is stopped there only when it came in that way. Run driving on the right and, in a batch of
+ * their own, on the left. A Station under the Rail, off the row beside it, or one whose platform would overlap another's, is
  * refused with the reason on the action bar. Where the platform runs and what overlaps is {@code PlatformTest}'s; what only a
  * server shows is the placed block, the level's Stations and real cars. All of these tests share the
  * {@code logistics_station_} prefix, as the logistics work's (#26) game tests do.

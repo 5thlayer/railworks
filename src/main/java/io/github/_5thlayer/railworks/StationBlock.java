@@ -60,7 +60,10 @@ public final class StationBlock extends Block implements EntityBlock {
         RIGHT, LEFT;
 
         static Side of(DriveSide side) {
-            return side == DriveSide.RIGHT ? RIGHT : LEFT;
+            return switch (side) {
+                case RIGHT -> RIGHT;
+                case LEFT -> LEFT;
+            };
         }
 
         @Override
