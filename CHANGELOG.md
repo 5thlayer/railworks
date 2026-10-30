@@ -3,6 +3,8 @@
 Written for Consumers: what a mod building against Railworks can use, or will see change. A published version never changes: a fix is the next patch (`docs/agents/releases.md`).
 
 ## Unreleased
+
+## 0.2.0
 - A hatch's Bellows and a Fluid hatch's Loading arm now reach out as a car comes to rest at the hatch's spot and fold back the tick it moves off, instead of popping in and out. The Bellows' frame slides out to the Cargo car and its pleats unfold behind it; the Loading arm rises from the hatch, runs out over the Fluid car and drops onto its tank. Each makes a sound, vanilla's retuned under Railworks' own sound events (`railworks:hatch.bellows.reach`, `.fold`, `railworks:hatch.loading_arm.reach`, `.land`, `.fold`), each with a subtitle. A link already there when a client first sees the hatch is drawn reached, silently. Only drawn: trading and when a Train leaves are unchanged.
 - A Fluid hatch's Loading arm is now a pipe rising from the hatch's top, running over the Fluid car and dropping into the top of its tank: into the dome when the hatch stands beside the car's middle block, and into a collar straight across from the hatch otherwise. A requester's bucket on its top is hidden while the arm is drawn.
 - The Cargo car's crates are a block square at 16 px per block (#98), like every panel round them: each side carries a row of three in one long recess, one over each of its three inner blocks, the window band running on over their tops, and each crate's sides wear Malcolm Riley's crate top, his sprite whole, and the Cargo car's item icon paints that row the same. They were 0.39 cubes in recesses of their own, wearing his crate sides at about 41 px per block.
