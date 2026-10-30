@@ -213,6 +213,55 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
     private static final double STEP_OVERLAP = 0.002;
     private static final double STEP_SHORT = 0.001;
 
+    /** The radius of the Fluid car's tank. */
+    private static final double TANK_RADIUS = 0.93;
+    /** The height of the tank's axis. */
+    private static final double TANK_MIDDLE = 1.65;
+    /** The flat belt across the tank's sides, carrying the Sight glasses: its bottom, its top and its half width. */
+    private static final double BELT_BOTTOM = 1.08;
+    private static final double BELT_TOP = 2.22;
+    private static final double BELT_HALF_WIDTH = 0.93;
+    /** How far a ring round the tank stands out past it, and past each run's bottom and top. */
+    private static final double RING_PROUD = 1.0 / 64.0;
+    private static final double RING_PAST = 0.001;
+
+    /**
+     * How far a circle of {@code radius} reaches across at {@code up} from its middle, to the nearest
+     * {@link #ROUNDING_STEP}.
+     */
+    private static double steppedReach(double radius, double up) {
+        return Math.round(Math.sqrt(Math.max(0.0, radius * radius - up * up)) / ROUNDING_STEP) * ROUNDING_STEP;
+    }
+
+    /** One run of a tank's rows of one width: from {@code bottom} to {@code top}, {@code halfWidth} either side. */
+    private record Run(double bottom, double top, double halfWidth) {
+    }
+
+    /**
+     * The Fluid car's tank across, from the bottom up: rows {@link #ROUNDING_STEP} high round
+     * {@link #TANK_MIDDLE} on {@link #TANK_RADIUS}, whole rows only so none stands past the circle, each
+     * as wide as the circle at its middle to the nearest step, and those across the belt
+     * {@link #BELT_HALF_WIDTH}, so its sides are flat there. Rows of one width are one run.
+     */
+    private static List<Run> tankRuns() {
+        int rows = (int) Math.floor(2.0 * TANK_RADIUS / ROUNDING_STEP);
+        double bottom = TANK_MIDDLE - TANK_RADIUS;
+        List<Run> runs = new ArrayList<>();
+        for (int row = 0; row < rows; row++) {
+            double lo = bottom + row * ROUNDING_STEP;
+            double hi = lo + ROUNDING_STEP;
+            double halfWidth = hi > BELT_BOTTOM && lo < BELT_TOP ? BELT_HALF_WIDTH
+                    : steppedReach(TANK_RADIUS, (lo + hi) / 2.0 - TANK_MIDDLE);
+            Run last = runs.isEmpty() ? null : runs.getLast();
+            if (last != null && last.halfWidth() == halfWidth) {
+                runs.set(runs.size() - 1, new Run(last.bottom(), hi, halfWidth));
+            } else {
+                runs.add(new Run(lo, hi, halfWidth));
+            }
+        }
+        return runs;
+    }
+
     /** A roof from {@code back} to {@code front}, its long edges rounded, and its front's when {@code roundFront}. */
     private static void roof(List<Part> parts, double back, double front, boolean roundFront) {
         rounded(parts, Panel.ROOF, 1.0, 2.6, 2.75, back, front, false, roundFront);
@@ -233,8 +282,7 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         int full = 0;
         for (int row = 0; row < rows; row++) {
             double up = (row + 0.5) * ROUNDING_STEP;
-            double reach = Math.sqrt(Math.max(0.0, ROOF_ROUNDING * ROOF_ROUNDING - up * up));
-            insets[row] = ROOF_ROUNDING - Math.round(reach / ROUNDING_STEP) * ROUNDING_STEP;
+            insets[row] = ROOF_ROUNDING - steppedReach(ROOF_ROUNDING, up);
             if (insets[row] == 0.0 && full == row) {
                 full++;
             }
@@ -356,22 +404,40 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
     }
 
     /**
-     * The Fluid car: an open floor carrying a tank along it, rounded by a wide box crossing a tall one,
-     * on a saddle at each end, a band round it near each end and a dome on top. Across the middle of
-     * each side of the wide box, {@value #SIGHT_GLASS_LENGTH} long, a Sight glass: a dark pane standing just
-     * proud of a frame a little larger, which shows round it as a rim.
+     * The Fluid car: an open floor carrying a round tank along it, a cylinder stepped every half pixel
+     * with a flat belt across its sides, on a saddle at each end, a ring round it near each end and a
+     * dome on top. Across the middle of each side of the belt, {@value #SIGHT_GLASS_LENGTH} long, a Sight
+     * glass: a dark pane standing just proud of a frame a little larger, which shows round it as a rim.
      */
     private static CarBody fluid() {
         double length = FluidCar.LENGTH - GAP;
         double half = length / 2.0;
         List<Part> parts = shell(length);
-        parts.add(new Part(Panel.TANK, -0.95, 1.0, -half + 0.07, 0.95, 2.3, half - 0.07));
-        parts.add(new Part(Panel.TANK, -0.7, 0.72, -half + 0.06, 0.7, 2.58, half - 0.06));
-        parts.add(new Part(Panel.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
-        ends(parts, new Part(Panel.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
+        // The tank, each run reaching a hair into the next toward the belt, and stopping a hair shorter
+        // of the ends for each run it is out from the belt, as a roof's rows do, so no two share a
+        // plane; and each ring the same runs, standing out past each, reaching twice as far into the
+        // next and a hair past its own bottom and top, and as much shorter of its own ends.
+        List<Run> runs = tankRuns();
+        int belt = 0;
+        while (runs.get(belt).halfWidth() != BELT_HALF_WIDTH) {
+            belt++;
+        }
+        for (int i = 0; i < runs.size(); i++) {
+            Run run = runs.get(i);
+            double toBelt = Math.abs(i - belt);
+            double reachDown = i > belt ? STEP_OVERLAP : 0.0;
+            double reachUp = i < belt ? STEP_OVERLAP : 0.0;
+            double shortOfEnd = STEP_SHORT * toBelt;
+            parts.add(new Part(Panel.TANK, -run.halfWidth(), run.bottom() - reachDown, -half + 0.07 + shortOfEnd,
+                    run.halfWidth(), run.top() + reachUp, half - 0.07 - shortOfEnd));
+            double ring = run.halfWidth() + RING_PROUD;
+            ends(parts, new Part(Panel.TRIM, -ring, run.bottom() - 2.0 * reachDown - RING_PAST, half - 0.5 + shortOfEnd,
+                    ring, run.top() + 2.0 * reachUp + RING_PAST, half - 0.44 - shortOfEnd));
+        }
+        parts.add(new Part(Panel.TANK, -0.15, 2.5, -0.2, 0.15, 2.72, 0.2));
         ends(parts, new Part(Panel.SKIRT, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
         double glassEnd = SIGHT_GLASS_LENGTH / 2.0;
-        sides(parts, new Part(Panel.TRIM, 0.94, 1.08, -glassEnd - 0.04, 0.96, 2.22, glassEnd + 0.04));
+        sides(parts, new Part(Panel.TRIM, 0.94, BELT_BOTTOM, -glassEnd - 0.04, 0.96, BELT_TOP, glassEnd + 0.04));
         Box pane = new Box(0.945, 1.12, -glassEnd, 0.965, 2.18, glassEnd);
         sides(parts, new Part(Panel.GLASS, pane));
         List<SightGlass> glasses = List.of(new SightGlass(pane), new SightGlass(pane.mirrored()));
