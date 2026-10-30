@@ -1,1 +1,9 @@
-{"parent": "railworks:block/station"}
+{
+  "parent": "minecraft:block/orientable_with_bottom",
+  "textures": {
+    "top": "railworks:block/station/top",
+    "bottom": "railworks:block/station/side",
+    "front": "railworks:block/station/front",
+    "side": "railworks:block/station/side"
+  }
+}

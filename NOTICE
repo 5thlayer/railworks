@@ -5,3 +5,20 @@ Each entry names the files, their author, where they came from and the licence t
 file listed here is NOT covered by the licence this repository states for its own work; its own
 licence governs it. Which licence covers which file is REUSE.toml's to say; this list is the
 credits for what was copied in.
+
+Station sprites
+---------------
+
+Files:   data/art/stone_tiles_small.png
+         data/art/device_terminal_front_on.png
+         data/art/concrete_paver.png
+         src/main/resources/assets/railworks/textures/block/station/*.png
+Author:  Malcolm Riley
+Source:  https://github.com/malcolmriley/unused-textures
+         blocks/stone_tiles_small.png, blocks/device_terminal_front_on.png and blocks/concrete_paver.png
+         at commit 8b85ad732023174d9a9da74e6bf2272d6c0bef17. The files under data/art/ are the
+         unmodified copies. scripts/build-textures.py writes device_terminal_front_on.png unchanged as
+         front.png and concrete_paver.png as side.png; top.png is stone_tiles_small.png with the
+         Station's arrow painted on it in yellow.
+Licence: Creative Commons Attribution 4.0 International
+         https://creativecommons.org/licenses/by/4.0/
