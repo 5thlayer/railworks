@@ -32,7 +32,7 @@ import net.minecraft.world.level.block.Blocks;
 
 /**
  * A hatch's Bellows and a Fluid hatch's Loading arm (#76) reach across to a car of their kind at rest
- * at their spot, as a client draws them from the cars it sees ({@link PlatformsNear#facingCar}),
+ * at their spot, as a client draws them from the cars it sees ({@link PlatformsNear#carFacing}),
  * asked here of the same synched cars on the server: the car a hatch trades with, in a Train stopped
  * at the Station. On {@code HatchTests}' line: a Span south along
  * x 5 from z -3 to z 12, a Station east of its north end serving Trains heading north, the leading
@@ -177,8 +177,8 @@ final class BellowsTests {
     /** That the hatch at {@code pos} reaches out of {@code side} to a car, or to none. */
     private static void expectFacing(GameTestHelper helper, BlockPos pos, Optional<Direction> side, String what) {
         HatchBlock block = (HatchBlock) helper.getBlockState(pos).getBlock();
-        Optional<Direction> facing = PlatformsNear.facingCar(helper.getLevel(), helper.absolutePos(pos),
-                CarKind.carrying(block.holds()));
+        Optional<Direction> facing = PlatformsNear.carFacing(helper.getLevel(), helper.absolutePos(pos),
+                CarKind.carrying(block.holds())).map(PlatformsNear.CarFacing::side);
         if (!facing.equals(side)) {
             throw helper.assertionException(pos, Component.literal((side.isPresent() ? "no " : "") + what
                     + ": it reaches " + facing.map(Direction::getName).orElse("nothing")));

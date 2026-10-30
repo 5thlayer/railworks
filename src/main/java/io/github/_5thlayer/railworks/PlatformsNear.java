@@ -83,22 +83,17 @@ public final class PlatformsNear {
         return Platform.joined(network(level), stations(level, pos), pos.getX(), pos.getY(), pos.getZ());
     }
 
-    /**
-     * Which side of a hatch at {@code pos} faces the car of {@code kind} standing at its spot in a
-     * Train stopped at its Station ({@link Platform#standingAt}), the car the hatch trades with, whose
-     * side its Bellows or Loading arm reaches across to: the side toward the Rail; empty with no such
-     * car there, or its Train moving. Asked of the cars as a client sees them, so it needs nothing
-     * sent beyond them.
-     */
-    public static Optional<Direction> facingCar(Level level, BlockPos pos, CarKind kind) {
-        return carFacing(level, pos, kind).map(CarFacing::side);
-    }
-
-    /** The car a hatch reaches across to, and the side of the hatch facing it. */
+    /** The car a hatch reaches across to, and the side of the hatch facing it: the side toward the Rail. */
     public record CarFacing(Direction side, CarEntity car) {
     }
 
-    /** As {@link #facingCar}, with the car. */
+    /**
+     * The car of {@code kind} standing at the spot of a hatch at {@code pos} in a Train stopped at its
+     * Station ({@link Platform#standingAt}), the car the hatch trades with, whose side its Bellows or
+     * Loading arm reaches across to, and the side of the hatch facing it; empty with no such car
+     * there, or its Train moving. Asked of the cars as a client sees them, so it needs nothing sent
+     * beyond them.
+     */
     public static Optional<CarFacing> carFacing(Level level, BlockPos pos, CarKind kind) {
         Optional<Platform.Joined> joined = joined(level, pos);
         if (joined.isEmpty()) {

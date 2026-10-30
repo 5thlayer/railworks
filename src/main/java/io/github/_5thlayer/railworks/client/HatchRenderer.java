@@ -318,9 +318,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         float drop = stage(out, RUN_OUT, 1.0);
         // The first elbow starts inside the hatch, under its top; the second, a little smaller, inside the first.
         float rise = Mth.lerp(risen, top - ELBOW - 0.02F, OVER_CAR);
-        float second = ELBOW - 0.01F;
-        float reach = Mth.lerp(run, 0.0F, car);
-        float under = OVER_CAR - second;
+        float secondHalf = ELBOW - 0.01F;
+        float secondAt = Mth.lerp(run, 0.0F, car);
+        float under = OVER_CAR - secondHalf;
         float end = Mth.lerp(drop, under, landing + 0.07F);
         // The flange on the hatch, the pipe up to the first elbow, out to the second, then down into the
         // collar. Each pipe starts and ends inside what it joins, and no two are as wide, so no two
@@ -333,10 +333,10 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         if (run <= 0.0F) {
             return;
         }
-        if (reach + second - 0.01F < -ELBOW + 0.01F) {
-            box(pose, buffer, PIPE + 0.005F, OVER_CAR, -ELBOW + 0.01F, reach + second - 0.01F, Paint.PIPE, light);
+        if (secondAt + secondHalf - 0.01F < -ELBOW + 0.01F) {
+            box(pose, buffer, PIPE + 0.005F, OVER_CAR, -ELBOW + 0.01F, secondAt + secondHalf - 0.01F, Paint.PIPE, light);
         }
-        box(pose, buffer, second, OVER_CAR, reach + second, reach - second, Paint.IRON, light);
+        box(pose, buffer, secondHalf, OVER_CAR, secondAt + secondHalf, secondAt - secondHalf, Paint.IRON, light);
         if (drop <= 0.0F) {
             return;
         }
