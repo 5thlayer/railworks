@@ -103,6 +103,7 @@ Source:  https://github.com/malcolmriley/unused-textures
          space_crate_sides.png, space_crate_top.png and space_crate_bottom.png as car/crate_side.png,
          crate_top.png and crate_bottom.png; car/skirt.png is
          space-plating-inset-horizontal.png tinted grey and car/trim.png space-plating-plain.png
-         darkened. car/paint.png, a white sprite, is Railworks' own.
+         darkened. car/paint.png, a white sprite, and car/sight_glass.png and car/glint.png, a Sight
+         glass tube's dark inside and its glint, are Railworks' own.
 Licence: Creative Commons Attribution 4.0 International
          https://creativecommons.org/licenses/by/4.0/

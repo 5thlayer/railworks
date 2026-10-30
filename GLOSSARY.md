@@ -81,7 +81,7 @@ A car that carries one fluid in its tank, filled and emptied by the Fluid hatch 
 _Avoid_: tank car, tanker, fluid wagon
 
 **Sight glass**:
-A window onto a tank that shows the fluid it holds, filled from the bottom as far as the tank is full, and dark above, so its fluid and how full it is are seen at a glance: one along each side of a Fluid car's tank, seen from the platform, and the round one on each side of a Fluid hatch.
+A window onto a tank that shows the fluid it holds, filled from the bottom as far as the tank is full, and dark above, so its fluid and how full it is are seen at a glance: a glass tube up each side of a Fluid car's tank, seen from the platform, and the round one on each side of a Fluid hatch.
 _Avoid_: gauge, fill window, level indicator, porthole
 
 **View**:
