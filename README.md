@@ -4,13 +4,11 @@
 and how it feels to play. It is also the Modrinth and CurseForge description
 (docs/agents/publishing.md). The technical sections go below it. -->
 
-> **Placeholder for the maintainer to rewrite:** the blurb and "Why?" below are the maintainer's to write, never an agent's (`docs/agents/publishing.md`).
-
-Factorio's trains as a straddle-beam monorail.
+Railworks adds trains running on a monorail. A train is built by stringing a rail between pylons, setting a locomotive on it and coupling cargo and fluid cars behind it. Automatic trains can transport items and fluids from a station that provides them to one that requests them. Players, and a pet or any other mob, can also be transported by riding on the locomotive and setting it on manual drive.
 
 ## Why?
 
-*Placeholder for the maintainer to rewrite.*
+Because it was the missing piece of my -works suite: intra-dimensional long haul logistics to complement short range belts and inter-dimensional void dragons.
 
 **NeoForge, Minecraft 26.1.2 only.** Please report anything odd on [GitHub](https://github.com/5thlayer/railworks/issues).
 
