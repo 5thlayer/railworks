@@ -65,9 +65,14 @@ ARROW_PAINT = (214, 168, 38)
 ARROW_SHADING = 0.4
 
 
-# The tints a hatch's plating or a Fluid hatch's copper is multiplied by: a provider's warm, a requester's cool.
-MODE_TINT = {"provider": (255, 184, 120), "requester": (159, 196, 255)}
-FLUID_MODE_TINT = {"provider": (255, 200, 160), "requester": (184, 208, 255)}
+# Each mode's colours: the tint a hatch's plating and a Fluid hatch's copper are multiplied by, a
+# provider's warm and a requester's cool, and the Sight glass's ring from its lit to its shaded side.
+MODES = {
+    "provider": {"plating": (255, 184, 120), "copper": (255, 200, 160),
+                 "ring": {"j": (250, 160, 72), "g": (219, 111, 24), "k": (194, 87, 7), "q": (139, 60, 5)}},
+    "requester": {"plating": (159, 196, 255), "copper": (184, 208, 255),
+                  "ring": {"j": (110, 116, 210), "g": (67, 71, 170), "k": (48, 52, 145), "q": (34, 36, 104)}},
+}
 
 # A Fluid hatch's side, over his copper: `o` the dark glass the fill draws on (SightGlassFill.WINDOW),
 # `n` its glint, `m` the dark rim round it, `j`, `g`, `k` and `q` the ring from its lit to its shaded
@@ -92,15 +97,12 @@ SIGHT_GLASS = [
 ]
 SIGHT_GLASS_PAINT = {"o": (38, 48, 56), "n": (150, 178, 190), "m": (24, 30, 36), "f": (205, 184, 155),
                      "p": (156, 139, 116)}
-RING = {
-    "provider": {"j": (250, 160, 72), "g": (219, 111, 24), "k": (194, 87, 7), "q": (139, 60, 5)},
-    "requester": {"j": (110, 116, 210), "g": (67, 71, 170), "k": (48, 52, 145), "q": (34, 36, 104)},
-}
 
 # Half the width of the dark band down the copper coil side's left edge.
 COIL_BAND_HALF = 2
 
-# The colour a creative block's mid-bright pixel lands on (Wireworks' creative pole), and Rec. 601 luma.
+# The colour a creative block's mid-bright pixel lands on (Wireworks' creative pole), and Rec. 601
+# luma, which the pink is re-lit by as Wireworks' is, where the Station's arrow takes a plain mean.
 CREATIVE_PINK = (0xE6, 0x5A, 0xC8)
 LUMA = (0.299, 0.587, 0.114)
 
@@ -190,13 +192,14 @@ def tinted(pixels, tint):
 
 def hatch_side(mode):
     """His access-hatch plating in the mode's tint."""
-    return tinted(art("space-plating-access-hatch.png"), MODE_TINT[mode])
+    return tinted(art("space-plating-access-hatch.png"), MODES[mode]["plating"])
 
 
 def fluid_hatch_side(mode):
-    """His copper tank side in the mode's tint, with the Sight glass let into it, its ring in the mode's colour."""
-    side = tinted(art("metal_tank_copper_sides.png"), FLUID_MODE_TINT[mode])
-    paint = dict(SIGHT_GLASS_PAINT, **RING[mode])
+    """His copper tank side in the mode's tint, with the Sight glass let into it, its ring in the
+    mode's colour."""
+    side = tinted(art("metal_tank_copper_sides.png"), MODES[mode]["copper"])
+    paint = dict(SIGHT_GLASS_PAINT, **MODES[mode]["ring"])
     for y, line in enumerate(SIGHT_GLASS):
         for x, mark in enumerate(line):
             if mark != ".":
