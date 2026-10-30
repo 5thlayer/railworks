@@ -400,24 +400,36 @@ class CarBodyTest {
     }
 
     @Test
-    void theFluidCarHasASightGlass0Point8LongAcrossTheMiddleOfEachSideOfItsTank() {
+    void theFluidCarHasASightGlassTubeUpTheMiddleOfEachSideOfItsBeltAndNothingOfItPastTheBelt() {
         List<CarBody.SightGlass> glasses = CarBody.FLUID.sightGlasses();
         assertEquals(2, glasses.size(), "a Sight glass a side");
         for (double side : new double[] {1.0, -1.0}) {
             assertEquals(1, glasses.stream().filter(glass -> glass.side() == side).count(), "a Sight glass on side " + side);
         }
-        // The tank's belt runs from 1.08 to 2.22 up, and its rings stand 0.44 to 0.5 in from its ends.
-        double trims = CarBody.FLUID.length() / 2.0 - 0.5;
+        // The tank's belt, flat across its sides, runs from 1.08 to 2.22 up.
+        double beltBottom = 1.08;
+        double beltTop = 2.22;
         for (CarBody.SightGlass glass : glasses) {
             CarBody.Box pane = glass.pane();
-            assertTrue(pane.minZ() > -trims && pane.maxZ() < trims, pane + " reaches past the end trims");
-            assertEquals(0.8, pane.maxZ() - pane.minZ(), 1e-9, pane + " is not 0.8 long");
             assertEquals(0.0, pane.minZ() + pane.maxZ(), 1e-9, pane + " is not across the car's middle");
-            assertTrue(pane.minY() > 1.0 && pane.maxY() < 2.3 && pane.maxY() - pane.minY() > 0.9,
-                    pane + " is not across most of the tank's height");
-            // Looking at the car square on from beside it, at the pane's middle, the pane is the first thing seen.
+            assertTrue(pane.maxZ() - pane.minZ() < 0.2, pane + " is not a narrow tube");
+            assertTrue(pane.minY() > beltBottom && pane.maxY() < beltTop && pane.maxY() - pane.minY() > 0.9,
+                    pane + " is not up most of the belt");
+            // Looking at the car square on from beside it, at the pane's middle, the glint down the
+            // tube is the first thing seen, and the pane, the tube, just behind it.
             double[] from = {glass.side(), (pane.minY() + pane.maxY()) / 2.0, 0.0};
-            assertEquals(pane, firstHit(boxes(CarBody.FLUID), from, new double[] {-glass.side(), 0.0, 0.0}), "the pane is hidden");
+            List<CarBody.Box> unglinted = CarBody.FLUID.parts().stream().filter(part -> part.panel() != CarBody.Panel.GLINT)
+                    .map(CarBody.Part::box).toList();
+            assertEquals(pane, firstHit(unglinted, from, new double[] {-glass.side(), 0.0, 0.0}), "the pane is hidden");
+        }
+        // Everything on the belt round the Sight glass, out past the tank's side, stays within the
+        // belt's height, so none of it stands past the tank where the tank curves away.
+        for (CarBody.Part part : CarBody.FLUID.parts()) {
+            CarBody.Box box = part.box();
+            boolean onTheBelt = Math.max(box.maxX(), -box.minX()) > 0.931 && box.minZ() > -0.3 && box.maxZ() < 0.3;
+            if (onTheBelt) {
+                assertTrue(box.minY() >= beltBottom && box.maxY() <= beltTop, part + " stands past the belt");
+            }
         }
         for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO)) {
             assertTrue(body.sightGlasses().isEmpty(), "a car that is no Fluid car has a Sight glass");
