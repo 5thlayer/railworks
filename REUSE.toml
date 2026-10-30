@@ -42,13 +42,25 @@ path = [
     "src/main/resources/assets/railworks/textures/block/rail/*.png",
     "src/main/resources/assets/railworks/textures/block/pylon/*.png",
     "src/main/resources/assets/railworks/textures/block/steel.png",
+    "src/main/resources/assets/railworks/textures/block/hatch/casing.png",
+    "src/main/resources/assets/railworks/textures/block/charger/top.png",
+    "src/main/resources/assets/railworks/textures/block/charger/bottom.png",
+    "src/main/resources/assets/railworks/textures/block/burner_generator/*.png",
+    "src/main/resources/assets/railworks/textures/block/burner_generator/*.png.mcmeta",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "Malcolm Riley"
 SPDX-License-Identifier = "CC-BY-4.0"
 
 [[annotations]]
-path = ["src/main/resources/assets/railworks/textures/block/station/top.png"]
+path = [
+    "src/main/resources/assets/railworks/textures/block/station/top.png",
+    "src/main/resources/assets/railworks/textures/block/hatch/provider.png",
+    "src/main/resources/assets/railworks/textures/block/hatch/requester.png",
+    "src/main/resources/assets/railworks/textures/block/fluid_hatch/*.png",
+    "src/main/resources/assets/railworks/textures/block/charger/sides.png",
+    "src/main/resources/assets/railworks/textures/block/creative_charger/*.png",
+]
 precedence = "override"
 SPDX-FileCopyrightText = ["Malcolm Riley", "2026 5thlayer"]
 SPDX-License-Identifier = "CC-BY-4.0"
