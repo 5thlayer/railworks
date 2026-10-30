@@ -4,6 +4,7 @@
 package io.github._5thlayer.railworks.rail;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -65,6 +66,32 @@ class CarBodyTest {
         assertTrue(CarBody.CAB_SEAT.z() > CarBody.CAB_BACK && CarBody.CAB_SEAT.z() < half, "the Driver is not in the cab");
         assertTrue(CarBody.BAY_SPOT.z() < CarBody.BAY_FRONT && CarBody.BAY_SPOT.z() > -half, "the Rider is not in the bay");
         assertEquals((CarBody.BAY_FRONT - half) / 2.0, CarBody.BAY_SPOT.z(), 1e-9, "the Rider stands mid-bay");
+    }
+
+    @Test
+    void everyRoofIsRoundedAlongItsTopEdgesInHalfPixelSteps() {
+        double row = 1.0 / 32.0;
+        for (CarBody body : List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC, CarBody.CARGO)) {
+            List<CarBody.Box> roof = body.parts().stream()
+                    .filter(part -> part.panel() == CarBody.Panel.ROOF).map(CarBody.Part::box).toList();
+            // A roof is a slab, and over it the rows its long edges are rounded in, each half a pixel
+            // high, give or take its reach into the one under it, and drawn in by whole half pixels.
+            List<CarBody.Box> slabs = roof.stream().filter(box -> box.maxY() - box.minY() > 2.0 * row).toList();
+            assertFalse(slabs.isEmpty(), "a car has no roof");
+            for (CarBody.Box slab : slabs) {
+                List<CarBody.Box> rows = roof.stream()
+                        .filter(box -> box != slab && box.minY() > slab.maxY() - row && box.minY() < slab.maxY() + 4.0 * row
+                                && box.minZ() < slab.maxZ() && box.maxZ() > slab.minZ())
+                        .toList();
+                assertFalse(rows.isEmpty(), slab + " is not rounded");
+                for (CarBody.Box step : rows) {
+                    assertEquals(row, step.maxY() - step.minY(), 0.0025, step + " is not a half-pixel row");
+                    double inset = slab.maxX() - step.maxX();
+                    assertTrue(inset > 0.0, step + " is not drawn in from " + slab);
+                    assertEquals(Math.round(inset / row), inset / row, 1e-9, step + " steps in by " + inset);
+                }
+            }
+        }
     }
 
     private static void check(CarBody body, double length) {

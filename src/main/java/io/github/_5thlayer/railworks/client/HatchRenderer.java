@@ -103,8 +103,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     private static final double RUN_OUT = 0.75;
 
     /**
-     * What colour a part of the Bellows or the Loading arm is drawn in, red, green and blue, as
-     * {@link CarBody.Paint} is a car's part.
+     * What colour a part of the Bellows or the Loading arm is drawn in, red, green and blue.
      */
     private enum Paint {
         /** The Bellows' leather. */
@@ -355,7 +354,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
      */
     private static void box(Matrix4f pose, VertexConsumer buffer, float half, float y, float z0, float z1,
                             Paint paint, int light) {
-        CarRenderer.box(pose, buffer, -half, y - half, Math.min(z0, z1), half, y + half, Math.max(z0, z1),
+        flatBox(pose, buffer, -half, y - half, Math.min(z0, z1), half, y + half, Math.max(z0, z1),
                 paint.red, paint.green, paint.blue, light);
     }
 
@@ -365,7 +364,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
      */
     private static void boxY(Matrix4f pose, VertexConsumer buffer, float half, float z, float y0, float y1,
                              Paint paint, int light) {
-        CarRenderer.box(pose, buffer, -half, Math.min(y0, y1), z - half, half, Math.max(y0, y1), z + half,
+        flatBox(pose, buffer, -half, Math.min(y0, y1), z - half, half, Math.max(y0, y1), z + half,
                 paint.red, paint.green, paint.blue, light);
     }
 
@@ -399,5 +398,40 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         private int topLight;
         /** Each side's light, by its {@link Direction#get2DDataValue()}. */
         private final int[] light = new int[Direction.Plane.HORIZONTAL.length()];
+    }
+
+    /** The six faces of a flat box shaded apart: top, bottom, then the four sides. */
+    private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
+
+    /** An axis-aligned box in one colour, six faces each as a padded strip of four, as {@link SpanRenderer#drawSpan} pads its tube. */
+    private static void flatBox(Matrix4f pose, VertexConsumer buffer, float x0, float y0, float z0, float x1, float y1, float z1,
+                    float r, float g, float b, int light) {
+        // Each face lists its corners in strip order, wound outward.
+        float[][][] faces = {
+                {{x0, y1, z0}, {x0, y1, z1}, {x1, y1, z0}, {x1, y1, z1}},
+                {{x0, y0, z1}, {x0, y0, z0}, {x1, y0, z1}, {x1, y0, z0}},
+                {{x0, y0, z1}, {x1, y0, z1}, {x0, y1, z1}, {x1, y1, z1}},
+                {{x1, y0, z0}, {x0, y0, z0}, {x1, y1, z0}, {x0, y1, z0}},
+                {{x1, y0, z1}, {x1, y0, z0}, {x1, y1, z1}, {x1, y1, z0}},
+                {{x0, y0, z0}, {x0, y0, z1}, {x0, y1, z0}, {x0, y1, z1}},
+        };
+        for (int face = 0; face < faces.length; face++) {
+            float[][] corners = faces[face];
+            float shade = SHADE[face];
+            // First and last vertex twice over, so the strip joins the next as zero-area triangles
+            // and keeps an even count for the winding.
+            vertex(pose, buffer, corners[0], r, g, b, shade, light);
+            vertex(pose, buffer, corners[0], r, g, b, shade, light);
+            for (float[] corner : corners) {
+                vertex(pose, buffer, corner, r, g, b, shade, light);
+            }
+            vertex(pose, buffer, corners[3], r, g, b, shade, light);
+            vertex(pose, buffer, corners[3], r, g, b, shade, light);
+        }
+    }
+
+    private static void vertex(Matrix4f pose, VertexConsumer buffer, float[] at, float r, float g, float b,
+                               float shade, int light) {
+        buffer.addVertex(pose, at[0], at[1], at[2]).setColor(r * shade, g * shade, b * shade, 1.0F).setLight(light);
     }
 }

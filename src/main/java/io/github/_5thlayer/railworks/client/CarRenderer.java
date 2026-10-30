@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.FluidCarEntity;
+import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.rail.CarBody;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.model.object.chest.ChestModel;
@@ -19,18 +20,23 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.sprite.SpriteGetter;
+import net.minecraft.client.resources.model.sprite.SpriteId;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.neoforged.neoforge.fluids.FluidStack;
-import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A car, drawn from its {@link CarBody} as placeholder boxes: a boxy car straddling the Rail, in the
- * Rail's rust red, on a Cargo car a vanilla chest set into each side, and on a Fluid car a tank. Every
- * face is its own triangle strip, padded at both ends as {@link SpanRenderer#drawSpan} pads its tube,
- * so the strips the pipeline joins in one buffer leave no triangles between them.
+ * A car, drawn from its {@link CarBody}: a boxy car straddling the Rail, on a Cargo car a vanilla chest
+ * set into each side, and on a Fluid car a tank. Each box is drawn in its {@link CarBody.Panel}'s
+ * texture, Riley's steel plating, tiled at 16 px per block with its UVs taken from the car's own
+ * coordinates, so a panel's pattern runs on from one box to the next without a seam; a face is cut at
+ * every whole block, so no quad wraps past its sprite on the block atlas. The lamps and the Sight
+ * glasses' panes stay flat colours.
  *
  * <p>A Fluid car's Sight glasses are filled, on their panes' outer faces, with its tank's fluid as
  * the server last synced it ({@link SightGlassFluid}), tiled a block to a tile from the pane's bottom,
@@ -48,8 +54,37 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         int capacity;
     }
 
-    /** The six faces shaded apart: top, bottom, then the four sides. */
-    private static final float[] SHADE = {1.0F, 0.5F, 0.8F, 0.8F, 0.65F, 0.65F};
+    /**
+     * How a panel is drawn: in {@code sprite}, under {@code textures/block/car/}, tinted
+     * {@code colour} (ARGB), and when {@code centred} with its texture's middle at the box's middle up
+     * its sides rather than laid by the car's coordinates, so a band's stripe runs along the band.
+     */
+    private record Look(SpriteId sprite, int colour, boolean centred) {
+    }
+
+    private static Look look(CarBody.Panel panel) {
+        return switch (panel) {
+            case SHELL -> new Look(sprite("shell"), -1, false);
+            case ROOF -> new Look(sprite("roof"), -1, false);
+            case SKIRT -> new Look(sprite("skirt"), -1, false);
+            case TRIM -> new Look(sprite("trim"), -1, false);
+            case WINDOW -> new Look(sprite("window"), -1, true);
+            case BURNER_NOSE -> new Look(sprite("burner_nose"), -1, true);
+            case ELECTRIC_NOSE -> new Look(sprite("electric_nose"), -1, true);
+            case TANK -> new Look(sprite("tank"), -1, false);
+            // Flat colours, on a white sprite.
+            case LAMP -> new Look(WHITE, 0xFFF2E59E, false);
+            case GLASS -> new Look(WHITE, 0xFF0D0F12, false);
+        };
+    }
+
+    private static final SpriteId WHITE = sprite("paint");
+    /**
+     * Where a panel's tiles are laid from, in the car's coordinates: its x and z on block edges,
+     * since a car's middle block runs from -0.5 to 0.5, so a stopped car's tiles line up with the blocks.
+     */
+    private static final float TILE_X = 0.5F;
+    private static final float TILE_Z = 0.5F;
     private final CarBody body;
     private final ChestModel chest;
     private final SpriteGetter sprites;
@@ -105,12 +140,15 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         poseStack.mulPose(Axis.YP.rotationDegrees(-state.yRot));
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
         int light = state.lightCoords;
-        collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
+        collector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(TextureAtlas.LOCATION_BLOCKS), (pose, buffer) -> {
             for (CarBody.Part part : body.parts()) {
-                CarBody.Box b = part.box();
-                CarBody.Paint paint = part.paint();
-                box(pose.pose(), buffer, (float) b.minX(), (float) b.minY(), (float) b.minZ(),
-                        (float) b.maxX(), (float) b.maxY(), (float) b.maxZ(), paint.red, paint.green, paint.blue, light);
+                Look look = look(part.panel());
+                TextureAtlasSprite sprite = sprites.get(look.sprite());
+                if (look.sprite() == WHITE) {
+                    flatBox(pose, buffer, part.box(), sprite, look.colour(), light);
+                } else {
+                    tiledBox(pose, buffer, part.box(), sprite, look.centred(), light);
+                }
             }
         });
         for (CarBody.Box chest : body.chests()) {
@@ -180,35 +218,129 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         poseStack.popPose();
     }
 
-    /** An axis-aligned box, six faces each as a padded strip of four. */
-    static void box(Matrix4f pose, VertexConsumer buffer, float x0, float y0, float z0, float x1, float y1, float z1,
-                    float r, float g, float b, int light) {
-        // Each face lists its corners in strip order, wound outward.
-        float[][][] faces = {
-                {{x0, y1, z0}, {x0, y1, z1}, {x1, y1, z0}, {x1, y1, z1}},
-                {{x0, y0, z1}, {x0, y0, z0}, {x1, y0, z1}, {x1, y0, z0}},
-                {{x0, y0, z1}, {x1, y0, z1}, {x0, y1, z1}, {x1, y1, z1}},
-                {{x1, y0, z0}, {x0, y0, z0}, {x1, y1, z0}, {x0, y1, z0}},
-                {{x1, y0, z1}, {x1, y0, z0}, {x1, y1, z1}, {x1, y1, z0}},
-                {{x0, y0, z0}, {x0, y0, z1}, {x0, y1, z0}, {x0, y1, z1}},
-        };
-        for (int face = 0; face < faces.length; face++) {
-            float[][] corners = faces[face];
-            float shade = SHADE[face];
-            // First and last vertex twice over, so the strip joins the next as zero-area triangles
-            // and keeps an even count for the winding.
-            vertex(pose, buffer, corners[0], r, g, b, shade, light);
-            vertex(pose, buffer, corners[0], r, g, b, shade, light);
+    private static SpriteId sprite(String name) {
+        return Sheets.BLOCKS_MAPPER.apply(Identifier.fromNamespaceAndPath(Railworks.MOD_ID, "car/" + name));
+    }
+
+    /** A box in one flat colour, each face one quad on the middle of the white sprite. */
+    private static void flatBox(PoseStack.Pose pose, VertexConsumer buffer, CarBody.Box b, TextureAtlasSprite white,
+                                int colour, int light) {
+        float u = white.getU(0.5F);
+        float v = white.getV(0.5F);
+        for (Face face : Face.values()) {
+            float[][] corners = face.corners(b);
             for (float[] corner : corners) {
-                vertex(pose, buffer, corner, r, g, b, shade, light);
+                buffer.addVertex(pose, corner[0], corner[1], corner[2]).setColor(colour).setUv(u, v)
+                        .setOverlay(OverlayTexture.NO_OVERLAY).setLight(light)
+                        .setNormal(pose, face.normalX, face.normalY, face.normalZ);
             }
-            vertex(pose, buffer, corners[3], r, g, b, shade, light);
-            vertex(pose, buffer, corners[3], r, g, b, shade, light);
         }
     }
 
-    private static void vertex(Matrix4f pose, VertexConsumer buffer, float[] at, float r, float g, float b,
-                               float shade, int light) {
-        buffer.addVertex(pose, at[0], at[1], at[2]).setColor(r * shade, g * shade, b * shade, 1.0F).setLight(light);
+    /**
+     * A box in {@code sprite}, each face tiled a block to a tile by its own coordinates: on a side, u
+     * runs along it as seen from outside and v up it; on the top and the bottom, u runs along x and v
+     * along -z. A face is cut at every whole block of u and v, each piece showing the part of the
+     * sprite it covers. Tiles are laid from {@link #TILE_X} and {@link #TILE_Z}, and up a side from the
+     * car's floor, or when {@code centred} from half a block under the box's middle.
+     */
+    private static void tiledBox(PoseStack.Pose pose, VertexConsumer buffer, CarBody.Box box, TextureAtlasSprite sprite,
+                                 boolean centred, int light) {
+        CarBody.Box b = new CarBody.Box(box.minX() + TILE_X, box.minY(), box.minZ() + TILE_Z,
+                box.maxX() + TILE_X, box.maxY(), box.maxZ() + TILE_Z);
+        float lift = centred ? 0.5F - (float) (b.minY() + b.maxY()) / 2.0F : 0.0F;
+        for (Face face : Face.values()) {
+            float[] range = face.uvRange(b, face.side ? lift : 0.0F);
+            for (float u0 = range[0]; u0 < range[1]; u0 = (float) Math.floor(u0) + 1.0F) {
+                float u1 = Math.min((float) Math.floor(u0) + 1.0F, range[1]);
+                float cellU = (float) Math.floor(u0);
+                for (float v0 = range[2]; v0 < range[3]; v0 = (float) Math.floor(v0) + 1.0F) {
+                    float v1 = Math.min((float) Math.floor(v0) + 1.0F, range[3]);
+                    float cellV = (float) Math.floor(v0);
+                    // The sprite's top is v 0, and a face's v runs up it.
+                    float[][] at = {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}};
+                    for (float[] uv : at) {
+                        float[] corner = face.at(b, uv[0], uv[1] - (face.side ? lift : 0.0F));
+                        buffer.addVertex(pose, corner[0] - TILE_X, corner[1], corner[2] - TILE_Z).setColor(-1)
+                                .setUv(sprite.getU(uv[0] - cellU), sprite.getV(1.0F - (uv[1] - cellV)))
+                                .setOverlay(OverlayTexture.NO_OVERLAY).setLight(light)
+                                .setNormal(pose, face.normalX, face.normalY, face.normalZ);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * A box's six faces, each with the way it is tiled: u and v as functions of the box's
+     * coordinates, and back again.
+     */
+    private enum Face {
+        /** +x: u runs along -z, as seen from outside it. */
+        EAST(1, 0, 0, true),
+        /** -x: u runs along z. */
+        WEST(-1, 0, 0, true),
+        /** +z: u runs along x. */
+        SOUTH(0, 0, 1, true),
+        /** -z: u runs along -x. */
+        NORTH(0, 0, -1, true),
+        /** +y: u along x, v along -z. */
+        UP(0, 1, 0, false),
+        /** -y: as the top. */
+        DOWN(0, -1, 0, false);
+
+        final float normalX;
+        final float normalY;
+        final float normalZ;
+        /** Whether it is a side, whose v runs up it. */
+        final boolean side;
+
+        Face(int x, int y, int z, boolean side) {
+            this.normalX = x;
+            this.normalY = y;
+            this.normalZ = z;
+            this.side = side;
+        }
+
+        /** The u and v it spans on {@code b}, from and to, its v raised by {@code lift}. */
+        float[] uvRange(CarBody.Box b, float lift) {
+            float x0 = (float) b.minX();
+            float x1 = (float) b.maxX();
+            float y0 = (float) b.minY() + lift;
+            float y1 = (float) b.maxY() + lift;
+            float z0 = (float) b.minZ();
+            float z1 = (float) b.maxZ();
+            return switch (this) {
+                case EAST -> new float[] {-z1, -z0, y0, y1};
+                case WEST -> new float[] {z0, z1, y0, y1};
+                case SOUTH -> new float[] {x0, x1, y0, y1};
+                case NORTH -> new float[] {-x1, -x0, y0, y1};
+                case UP, DOWN -> new float[] {x0, x1, -z1, -z0};
+            };
+        }
+
+        /** The point of the face on {@code b} at {@code u} and {@code v}, v up the side unraised. */
+        float[] at(CarBody.Box b, float u, float v) {
+            float x0 = (float) b.minX();
+            float x1 = (float) b.maxX();
+            float y0 = (float) b.minY();
+            float y1 = (float) b.maxY();
+            float z0 = (float) b.minZ();
+            float z1 = (float) b.maxZ();
+            return switch (this) {
+                case EAST -> new float[] {x1, v, -u};
+                case WEST -> new float[] {x0, v, u};
+                case SOUTH -> new float[] {u, v, z1};
+                case NORTH -> new float[] {-u, v, z0};
+                case UP -> new float[] {u, y1, -v};
+                case DOWN -> new float[] {u, y0, -v};
+            };
+        }
+
+        /** Its four corners on {@code b}, round it. */
+        float[][] corners(CarBody.Box b) {
+            float[] r = uvRange(b, 0.0F);
+            return new float[][] {at(b, r[0], r[2]), at(b, r[1], r[2]), at(b, r[1], r[3]), at(b, r[0], r[3])};
+        }
     }
 }
