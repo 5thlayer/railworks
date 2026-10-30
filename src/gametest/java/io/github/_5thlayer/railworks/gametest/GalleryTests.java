@@ -441,7 +441,7 @@ final class GalleryTests {
     /**
      * Asserts each Station on {@code plot} serves a Span and has a platform, and each hatch, Fluid
      * hatch and Charger on it joins a Station's platform: every one of them stands in the row beside
-     * the Rail, two blocks off its line at a Cargo car's chests' height, where nothing else counts.
+     * the Rail, two blocks off its line at a Cargo car's crates' height, where nothing else counts.
      */
     private static void inRow(GameTestHelper helper, String scene, BoundingBox plot) {
         var level = helper.getLevel();

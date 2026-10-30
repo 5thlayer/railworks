@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-> Amended by [ADR 0010](0010-cars-are-five-blocks-long-and-two-wide.md): cars are two wide, so a Station stands in the row two blocks off the Rail's line, at the height of a Cargo car's chests, where hatches and Chargers stand.
+> Amended by [ADR 0010](0010-cars-are-five-blocks-long-and-two-wide.md): cars are two wide, so a Station stands in the row two blocks off the Rail's line, at the height of a Cargo car's crates, where hatches and Chargers stand.
 
 > Amended by [ADR 0008](0008-trains-take-jobs-from-hatches-not-schedules.md): a Station is no longer placed under the Rail, and it serves only the Trains with it on their drive side. The hoppers, their spots and the Cargo car's open sides (the last paragraph) are gone; hatches beside the Station's platform load and unload a car. The rest stands: where a Station may stand beside the Rail, the Straight-leg rule, and which Span it serves.
 

@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Charger (ADR 0005, amended in #9): a block beside a Station's platform, two off the Rail at
- * a Cargo car's chests' height, joining that Station as a hatch does, which takes FE from any mod's
+ * a Cargo car's crates' height, joining that Station as a hatch does, which takes FE from any mod's
  * cable through its energy handler ({@link ChargerBlockEntity}) into a buffer, its record in the level's
  * {@link LevelChargers}, and charges the Electric Locomotive of any Train at rest beside it. It holds
  * no items and neither offers nor asks. The Creative Charger is one that never runs out, needs no FE

@@ -2,7 +2,7 @@
 # Smelter at its north leg's. Beside Mine's first car spot a provider hatch holds eight stacks of
 # iron ore; beside Smelter's a requester asks for two, and a hopper under it empties it into a
 # chest, so it keeps asking. Hatches stand on pillars, in the row two blocks off the Rail at a Cargo
-# car's chests' height where the Stations stand. An automatic Train of a Locomotive facing out at
+# car's crates' height where the Stations stand. An automatic Train of a Locomotive facing out at
 # each end and a Cargo car between them, five blocks apart, waits at Mine, takes the job and
 # shuttles the ore round the line until Mine runs dry.
 function railworks:gallery/clear

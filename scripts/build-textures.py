@@ -282,6 +282,9 @@ TEXTURES_BUILT = {
     "block/car/burner_nose.png": unchanged("space-plating-stripe-yellow-horizontal-undamaged.png"),
     "block/car/electric_nose.png": unchanged("space-plating-stripe-orange-horizontal-undamaged.png"),
     "block/car/tank.png": unchanged("metal_tank_copper_sides.png"),
+    "block/car/crate_side.png": unchanged("space_crate_sides.png"),
+    "block/car/crate_top.png": unchanged("space_crate_top.png"),
+    "block/car/crate_bottom.png": unchanged("space_crate_bottom.png"),
     "block/car/paint.png": white,
 }
 

@@ -621,7 +621,7 @@ final class LogisticsTests {
 
     /** Places a Station at {@code pos}, which must go, by a player beside it. */
     static void station(GameTestHelper helper, BlockPos pos) {
-        // In the row, a Cargo car's chests' height up, there is nothing to click on.
+        // In the row, a Cargo car's crates' height up, there is nothing to click on.
         helper.setBlock(pos.below(), Blocks.STONE);
         ServerPlayer player = near(helper, pos.north(2));
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(RailworksRegistries.STATION_ITEM.get()));

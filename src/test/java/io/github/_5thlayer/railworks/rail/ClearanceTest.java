@@ -137,7 +137,7 @@ class ClearanceTest {
     /**
      * A Straight leg east to A, then a Span on in line to B, bending there onto a Span heading
      * ({@code dx}, {@code dz}), at every length up to ten times that: shorter than {@code length} its
-     * cars swing into the row two off the leg at a Cargo car's chests' height, where hatches stand, for
+     * cars swing into the row two off the leg at a Cargo car's crates' height, where hatches stand, for
      * some length beyond, and from {@code length} to a dozen more blocks they never do.
      */
     private static void expectSwingClear(int length, int dx, int dz) {
