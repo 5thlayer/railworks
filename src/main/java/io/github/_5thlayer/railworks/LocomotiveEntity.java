@@ -128,6 +128,14 @@ public final class LocomotiveEntity extends CarEntity {
         return record() instanceof CarRecords.Contents contents ? contents.charge() : 0L;
     }
 
+    /**
+     * Whether it holds fuel, or an Electric Locomotive charge, as the server last synced it: what
+     * lights its fireboxes or its coil grilles.
+     */
+    public boolean holdsEnergySeen() {
+        return electric() ? chargeSeen() > 0L : fuelJoules() > 0L;
+    }
+
     /** Whether its Train is automatic, as the server last synced it. */
     public boolean automaticSeen() {
         return entityData.get(DATA_AUTOMATIC);

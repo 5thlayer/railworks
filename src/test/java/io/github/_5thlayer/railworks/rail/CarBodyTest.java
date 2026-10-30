@@ -19,6 +19,7 @@ class CarBodyTest {
     /** A car's box, as {@code CarEntity}'s: two blocks across, 2.75 tall, from the floor's underside. */
     private static final double HALF_WIDTH = 1.0;
     private static final double HEIGHT = 2.75;
+    private static final List<CarBody> LOCOMOTIVES = List.of(CarBody.LOCOMOTIVE, CarBody.ELECTRIC);
 
     @Test
     void eachBodyStaysWithinItsCarsBoxAndLength() {
@@ -94,6 +95,66 @@ class CarBodyTest {
         }
     }
 
+    @Test
+    void eachLocomotivesNoseIsRoundedAlongItsTopAndFrontInHalfPixelSteps() {
+        double row = 1.0 / 32.0;
+        double front = CarBody.LOCOMOTIVE.length() / 2.0;
+        for (CarBody body : LOCOMOTIVES) {
+            CarBody.Panel band = body == CarBody.ELECTRIC ? CarBody.Panel.ELECTRIC_NOSE : CarBody.Panel.BURNER_NOSE;
+            List<CarBody.Box> nose = body.parts().stream().filter(part -> part.panel() == band).map(CarBody.Part::box).toList();
+            CarBody.Box slab = nose.stream().filter(box -> box.maxY() - box.minY() > 2.0 * row).findFirst().orElseThrow();
+            List<CarBody.Box> rows = nose.stream().filter(box -> box != slab).toList();
+            assertFalse(rows.isEmpty(), band + " is not rounded");
+            for (CarBody.Box step : rows) {
+                assertEquals(row, step.maxY() - step.minY(), 0.0025, step + " is not a half-pixel row");
+                double across = slab.maxX() - step.maxX();
+                double along = slab.maxZ() - step.maxZ();
+                assertTrue(across > 0.0 && along > 0.0, step + " is not drawn in from " + slab + " along its top and front");
+                assertEquals(across, along, 1e-9, step + " is drawn in unevenly");
+                assertEquals(Math.round(across / row), across / row, 1e-9, step + " steps in by " + across);
+            }
+            assertTrue(slab.maxZ() > front - 0.05, "the nose is not at the front");
+        }
+    }
+
+    @Test
+    void theBurnerCarriesAStackAndAFireboxEachSideAndTheElectricACoilGrilleEachSideAndNoStack() {
+        assertEquals(2, count(CarBody.LOCOMOTIVE, CarBody.Panel.STACK), "the Burner's stack and its cap");
+        assertEquals(2, count(CarBody.LOCOMOTIVE, CarBody.Panel.FIREBOX), "a firebox door each side");
+        assertEquals(2, sidesShowing(CarBody.LOCOMOTIVE, CarBody.Panel.FIREBOX), "a firebox door each side");
+        assertEquals(0, count(CarBody.LOCOMOTIVE, CarBody.Panel.COIL));
+        assertEquals(0, count(CarBody.ELECTRIC, CarBody.Panel.STACK), "the Electric has a stack");
+        assertEquals(0, count(CarBody.ELECTRIC, CarBody.Panel.FIREBOX));
+        assertEquals(2, count(CarBody.ELECTRIC, CarBody.Panel.COIL), "a coil grille each side");
+        assertEquals(2, sidesShowing(CarBody.ELECTRIC, CarBody.Panel.COIL), "a coil grille each side");
+        for (CarBody body : LOCOMOTIVES) {
+            for (CarBody.Part part : body.parts()) {
+                CarBody.Box box = part.box();
+                switch (part.panel()) {
+                    // On the Engine room, over the car's middle block.
+                    case STACK, FIREBOX, COIL -> assertTrue(box.minZ() > CarBody.BAY_FRONT && box.maxZ() < CarBody.CAB_BACK,
+                            box + " is off the Engine room");
+                    default -> { }
+                }
+            }
+        }
+        // The stack stands on the roof, its top short of the car's.
+        double stackTop = CarBody.LOCOMOTIVE.parts().stream().filter(part -> part.panel() == CarBody.Panel.STACK)
+                .mapToDouble(part -> part.box().maxY()).max().orElseThrow();
+        assertTrue(stackTop > 2.5 && stackTop <= HEIGHT, "the stack's top is at " + stackTop);
+    }
+
+    private static long count(CarBody body, CarBody.Panel panel) {
+        return body.parts().stream().filter(part -> part.panel() == panel).count();
+    }
+
+    /** How many sides of the car {@code panel} shows on. */
+    private static long sidesShowing(CarBody body, CarBody.Panel panel) {
+        return body.parts().stream().filter(part -> part.panel() == panel)
+                .map(part -> Math.signum(part.box().minX() + part.box().maxX()))
+                .filter(side -> side != 0.0).distinct().count();
+    }
+
     private static void check(CarBody body, double length) {
         for (CarBody.Box box : boxes(body)) {
             assertTrue(box.minX() >= -HALF_WIDTH && box.maxX() <= HALF_WIDTH
@@ -153,12 +214,14 @@ class CarBodyTest {
     void theRiderSitsForwardInTheCabBehindTheDashAndTheFrontsFrame() {
         CarBody.Point eye = CarBody.eye();
         assertTrue(eye.z() > CarBody.CAB_BACK, "the rider does not sit in the cab");
-        for (CarBody.Part part : CarBody.LOCOMOTIVE.parts()) {
-            CarBody.Box box = part.box();
-            assertTrue(!contains(box, eye), "the rider's eye is inside " + part);
-            // The dash, the roof's edge and the nose, across the car ahead of the cab's back wall.
-            if (box.minX() < 0.0 && box.maxX() > 0.0 && box.minZ() > CarBody.CAB_BACK + 0.08) {
-                assertTrue(box.minZ() > eye.z(), "the rider's eye is not behind " + part);
+        for (CarBody body : LOCOMOTIVES) {
+            for (CarBody.Part part : body.parts()) {
+                CarBody.Box box = part.box();
+                assertTrue(!contains(box, eye), "the rider's eye is inside " + part);
+                // The dash, the roof's edge and the nose, across the car ahead of the cab's back wall.
+                if (box.minX() < 0.0 && box.maxX() > 0.0 && box.minZ() > CarBody.CAB_BACK + 0.08) {
+                    assertTrue(box.minZ() > eye.z(), "the rider's eye is not behind " + part);
+                }
             }
         }
     }
@@ -167,11 +230,13 @@ class CarBodyTest {
     void theRiderSeesOutOfTheOpenFrontLookingAheadOrALittleUpOrDown() {
         // Against the car's floor: down to 20 degrees, up to 15 (a rider looking level on a descent
         // at the grade limit), and 20 either side.
-        for (int pitch = -20; pitch <= 15; pitch++) {
-            for (int yaw = -20; yaw <= 20; yaw++) {
-                CarBody.Box hit = firstSeen(pitch, yaw);
-                if (hit != null) {
-                    fail("looking " + pitch + " up and " + yaw + " across, the rider sees " + hit);
+        for (CarBody body : LOCOMOTIVES) {
+            for (int pitch = -20; pitch <= 15; pitch++) {
+                for (int yaw = -20; yaw <= 20; yaw++) {
+                    CarBody.Box hit = firstSeen(body, pitch, yaw);
+                    if (hit != null) {
+                        fail("looking " + pitch + " up and " + yaw + " across, the rider sees " + hit);
+                    }
                 }
             }
         }
@@ -179,12 +244,14 @@ class CarBodyTest {
 
     @Test
     void theRiderSeesOutOfTheCabsSideWindowsLookingAcrossOrALittleUpOrDown() {
-        for (int pitch = -20; pitch <= 15; pitch++) {
-            for (int yaw = 60; yaw <= 120; yaw++) {
-                for (int side : new int[] {1, -1}) {
-                    CarBody.Box hit = firstSeen(pitch, side * yaw);
-                    if (hit != null) {
-                        fail("looking " + pitch + " up and " + side * yaw + " across, the rider sees " + hit);
+        for (CarBody body : LOCOMOTIVES) {
+            for (int pitch = -20; pitch <= 15; pitch++) {
+                for (int yaw = 60; yaw <= 120; yaw++) {
+                    for (int side : new int[] {1, -1}) {
+                        CarBody.Box hit = firstSeen(body, pitch, side * yaw);
+                        if (hit != null) {
+                            fail("looking " + pitch + " up and " + side * yaw + " across, the rider sees " + hit);
+                        }
                     }
                 }
             }
@@ -193,20 +260,22 @@ class CarBodyTest {
 
     @Test
     void theRoofAndTheSidesBehindTheCabBlockTheRidersView() {
-        for (int pitch = 40; pitch <= 90; pitch += 10) {
-            assertTrue(firstSeen(pitch, 0) != null, "looking " + pitch + " up, the rider sees out through the roof");
-        }
-        for (int yaw : new int[] {150, -150}) {
-            assertTrue(firstSeen(0, yaw) != null, "looking " + yaw + " across, the rider sees out behind the cab");
+        for (CarBody body : LOCOMOTIVES) {
+            for (int pitch = 40; pitch <= 90; pitch += 10) {
+                assertTrue(firstSeen(body, pitch, 0) != null, "looking " + pitch + " up, the rider sees out through the roof");
+            }
+            for (int yaw : new int[] {150, -150}) {
+                assertTrue(firstSeen(body, 0, yaw) != null, "looking " + yaw + " across, the rider sees out behind the cab");
+            }
         }
     }
 
-    /** The first box the rider sees, looking that far up and across from ahead, or null. */
-    private static CarBody.Box firstSeen(double pitchDegrees, double yawDegrees) {
+    /** The first box of {@code body} the rider sees, looking that far up and across from ahead, or null. */
+    private static CarBody.Box firstSeen(CarBody body, double pitchDegrees, double yawDegrees) {
         double pitch = Math.toRadians(pitchDegrees);
         double yaw = Math.toRadians(yawDegrees);
         CarBody.Point eye = CarBody.eye();
-        return firstHit(boxes(CarBody.LOCOMOTIVE), new double[] {eye.x(), eye.y(), eye.z()},
+        return firstHit(boxes(body), new double[] {eye.x(), eye.y(), eye.z()},
                 new double[] {Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)});
     }
 
