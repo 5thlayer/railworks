@@ -26,6 +26,12 @@ tier-2 Harvester wear it, between his battery's top and bottom, and the Creative
 re-lit in the FactoryWorks creative pink, as Wireworks' creative pole is. The Burner Generator is his
 smelter front, cold or lit and animated at his timing, in his refractory brick under his smelter top.
 
+The cars are his steel plating, tiled panel by panel: riveted on the shell, plain on the roofs, inset
+and greyed on the skirts, plain and darkened on the trim, his black stripe along the window bands,
+his yellow stripe across the Burner Locomotive's nose and his orange across the Electric's, and his
+copper tank side on the Fluid car's tank. The lamps and Sight glass panes are flat colours on a white
+sprite drawn here.
+
     scripts/build-textures.py
     scripts/build-textures.py --check    # regenerate and diff
 """
@@ -105,6 +111,10 @@ COIL_BAND_HALF = 2
 # luma, which the pink is re-lit by as Wireworks' is, where the Station's arrow takes a plain mean.
 CREATIVE_PINK = (0xE6, 0x5A, 0xC8)
 LUMA = (0.299, 0.587, 0.114)
+
+# The tints the cars' darker panels are multiplied by: the skirts' inset plating a mid grey, as the
+# prototype has it, and the trim's plain plating near black.
+CAR_TINT = {"skirt": (138, 138, 138), "trim": (64, 64, 66)}
 
 # The lit smelter's animation, at his own timing.
 SMELTER_LIT_ANIMATION = {"animation": {"frametime": 37, "interpolate": True}}
@@ -234,6 +244,11 @@ def creative(pixels):
     return out
 
 
+def white():
+    """A white sprite, which the cars' flat panels are drawn on in their colours."""
+    return [[[255, 255, 255, 255] for _ in range(16)] for _ in range(16)]
+
+
 # Every texture this script writes, by its path under textures/, with what builds it.
 TEXTURES_BUILT = {
     "block/station/top.png": station_top,
@@ -259,6 +274,15 @@ TEXTURES_BUILT = {
     "block/burner_generator/front_on.png": unchanged("device_smelter_front_lit.png"),
     "block/burner_generator/side.png": unchanged("brick_refractory.png"),
     "block/burner_generator/top.png": unchanged("device_smelter_top.png"),
+    "block/car/shell.png": unchanged("space-plating-rivets-horizontal.png"),
+    "block/car/roof.png": unchanged("space-plating-plain.png"),
+    "block/car/skirt.png": lambda: tinted(art("space-plating-inset-horizontal.png"), CAR_TINT["skirt"]),
+    "block/car/trim.png": lambda: tinted(art("space-plating-plain.png"), CAR_TINT["trim"]),
+    "block/car/window.png": unchanged("space-plating-stripe-black-horizontal-undamaged.png"),
+    "block/car/burner_nose.png": unchanged("space-plating-stripe-yellow-horizontal-undamaged.png"),
+    "block/car/electric_nose.png": unchanged("space-plating-stripe-orange-horizontal-undamaged.png"),
+    "block/car/tank.png": unchanged("metal_tank_copper_sides.png"),
+    "block/car/paint.png": white,
 }
 
 # The animations, by the texture they play, with their .mcmeta.
