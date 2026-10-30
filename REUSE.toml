@@ -31,13 +31,21 @@ SPDX-FileCopyrightText = "2026 5thlayer"
 SPDX-License-Identifier = "MIT"
 
 # Malcolm Riley's unused textures (https://github.com/malcolmriley/unused-textures), credited in
-# NOTICE: the unmodified copies under data/art/, and the textures scripts/build-textures.py builds
-# from them, which are both his and ours. Module CI runs that script's --check.
+# NOTICE. The unmodified copies under data/art/, and the textures scripts/build-textures.py writes
+# from them unchanged, are his; a texture it draws on them is both his and ours. Module CI runs that
+# script's --check.
 [[annotations]]
 path = [
     "data/art/*.png",
-    "src/main/resources/assets/railworks/textures/block/station/*.png",
+    "src/main/resources/assets/railworks/textures/block/station/front.png",
+    "src/main/resources/assets/railworks/textures/block/station/side.png",
 ]
+precedence = "override"
+SPDX-FileCopyrightText = "Malcolm Riley"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = ["src/main/resources/assets/railworks/textures/block/station/top.png"]
 precedence = "override"
 SPDX-FileCopyrightText = ["Malcolm Riley", "2026 5thlayer"]
 SPDX-License-Identifier = "CC-BY-4.0"
