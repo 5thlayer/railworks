@@ -30,6 +30,8 @@ import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 final class PreviewSpan {
 
     private static final float FADE = 0.5F;
+    /** The Rail's cement grey, which the Span a placed column would string is drawn in, faded. */
+    private static final float[] CEMENT = {0.42F, 0.43F, 0.45F};
 
     private PreviewSpan() {
     }
@@ -46,7 +48,7 @@ final class PreviewSpan {
         LocalPlayer player = event.getPlayer();
         var choice = PlacedColumn.autoString(level, pos, player, ClientRails.network());
         if (choice.isPresent()) {
-            draw(event, pos, choice.get().target(), FADE, new float[] {SpanRenderer.R, SpanRenderer.G, SpanRenderer.B});
+            draw(event, pos, choice.get().target(), FADE, CEMENT);
             return;
         }
         // Nothing would string: the Span the grade or bend limit or a filled Clearance refused shows red,

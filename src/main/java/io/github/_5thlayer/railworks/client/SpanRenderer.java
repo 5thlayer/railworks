@@ -57,10 +57,6 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     private static final double ATTACH_HEIGHT = RailGeometry.ATTACH_Y;
     /** The flat colours' four sides shaded apart. */
     private static final float[] SHADE = {1.0F, 0.75F, 0.55F, 0.85F};
-    /** The cement's grey, which the Placement Preview's faded Span is drawn in. */
-    static final float R = 0.42F;
-    static final float G = 0.43F;
-    static final float B = 0.45F;
 
     private static final SpriteId CEMENT = sprite("rail/cement");
     private static final SpriteId STEEL = sprite("steel");
@@ -70,8 +66,11 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     /** The Arm's cap and the bearing plate on it, in pixels of the top segment: from x, y, z to x, y, z. */
     private static final float[] CAP_BOX = {2, 11, 2, 14, 15, 14};
     private static final float[] PLATE_BOX = {3, 15, 3, 13, 16, 13};
-    /** How far the plate's top stands over the post's, so the two never share a plane. */
-    private static final float PROUD = 0.001F;
+    /**
+     * How far the plate's top stands over the post's, so the two never share a plane: under the
+     * Rail's {@link #GAP} over the Pylon top, so the flange still clears it.
+     */
+    private static final float PROUD = 0.0025F;
 
     /** Where the Rail rests on this block's own Arm, from its origin. */
     private static final Vec3 START = new Vec3(0.5, ATTACH_HEIGHT, 0.5);
@@ -99,20 +98,21 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
 
     /**
      * {@code curve} sampled for drawing, its points less {@code origin}, a world position: a point at
-     * each whole block along it and at its end, so each piece between them covers one tile of the
-     * texture or the part of one left at the end. A last piece shorter than {@link #SHORTEST_PIECE}
-     * runs on from the one before instead.
+     * each whole block it runs, measured along the curve, and at its end, so each piece between them
+     * covers one tile of the texture or the part of one left at the end. A last piece shorter than
+     * {@link #SHORTEST_PIECE} runs on from the one before instead.
      */
     static Sweep sweep(RailCurve curve, Vec3 origin) {
-        double length = curve.length();
-        int whole = (int) Math.floor(length);
-        int pieces = whole == 0 || length - whole >= SHORTEST_PIECE ? whole + 1 : whole;
+        double arc = curve.arcLength();
+        int whole = (int) Math.floor(arc);
+        int pieces = whole == 0 || arc - whole >= SHORTEST_PIECE ? whole + 1 : whole;
         Vec3[] points = new Vec3[pieces + 1];
         Vec3[] headings = new Vec3[pieces + 1];
         double[] along = new double[pieces + 1];
         for (int i = 0; i <= pieces; i++) {
-            along[i] = i == pieces ? length : i;
-            RailCurve.Pose pose = curve.at(along[i]);
+            along[i] = i == pieces ? arc : i;
+            // The curve is measured in its straight length, in equal steps along it.
+            RailCurve.Pose pose = curve.at(arc == 0.0 ? 0.0 : along[i] * curve.length() / arc);
             points[i] = new Vec3(pose.x() + RailGeometry.ATTACH_X - origin.x, pose.y() + ATTACH_HEIGHT - origin.y,
                     pose.z() + RailGeometry.ATTACH_Z - origin.z);
             headings[i] = new Vec3(pose.dx(), pose.dy(), pose.dz());
@@ -182,17 +182,12 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
     public void submit(State state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
         if (state.arm) {
             TextureAtlasSprite cap = sprites.get(CAP);
+            TextureAtlasSprite cement = sprites.get(CEMENT);
             TextureAtlasSprite steel = sprites.get(STEEL);
             int light = state.lightCoords;
             collector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(TextureAtlas.LOCATION_BLOCKS), (pose, buffer) -> {
                 drawBox(pose, buffer, CAP_BOX, 0.0F, cap, light);
                 drawBox(pose, buffer, PLATE_BOX, PROUD, steel, light);
-            });
-        }
-        if (!state.sweeps.isEmpty()) {
-            TextureAtlasSprite cement = sprites.get(CEMENT);
-            TextureAtlasSprite steel = sprites.get(STEEL);
-            collector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(TextureAtlas.LOCATION_BLOCKS), (pose, buffer) -> {
                 for (int i = 0; i < state.sweeps.size(); i++) {
                     drawTextured(pose, buffer, state.sweeps.get(i), state.lights.get(i), cement, steel);
                 }
@@ -314,12 +309,12 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
             }
         }
         int last = points.length - 1;
-        Vec3 ahead = centres[last].subtract(centres[0]).normalize().scale(GAP);
         Vec3[] f = corners[0];
         Vec3[] l = corners[last];
-        quad(pose, buffer, sprite, light, centres[0].add(ahead), f[3], f[0], f[1], f[2], across0, across1, 0.0F, height);
-        quad(pose, buffer, sprite, light, centres[last].subtract(ahead), l[0], l[3], l[2], l[1], across0, across1,
-                0.0F, height);
+        quad(pose, buffer, sprite, light, centres[0].add(sweep.headings()[0].normalize().scale(GAP)),
+                f[3], f[0], f[1], f[2], across0, across1, 0.0F, height);
+        quad(pose, buffer, sprite, light, centres[last].subtract(sweep.headings()[last].normalize().scale(GAP)),
+                l[0], l[3], l[2], l[1], across0, across1, 0.0F, height);
     }
 
     /**
@@ -360,8 +355,9 @@ public final class SpanRenderer implements BlockEntityRenderer<BlockEntity, Span
         float x1 = box[3] / 16.0F;
         float y1 = box[4] / 16.0F + proud;
         float z1 = box[5] / 16.0F;
-        // The sprite's top is v 0: a side shows the rows its height covers, counted down from the block's top.
-        float vTop = 1.0F - y1;
+        // The sprite's top is v 0: a side shows the rows its height covers, counted down from the
+        // block's top, and the proud sliver none past it.
+        float vTop = Math.max(0.0F, 1.0F - y1);
         float vFoot = 1.0F - y0;
         Vec3 inside = new Vec3((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0);
         Vec3 nwb = new Vec3(x0, y0, z0);
