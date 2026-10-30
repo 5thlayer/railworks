@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.FluidCarEntity;
+import io.github._5thlayer.railworks.LocomotiveEntity;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.rail.CarBody;
 import net.minecraft.client.renderer.Sheets;
@@ -23,8 +24,10 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.client.resources.model.sprite.SpriteId;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.fluids.FluidStack;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,7 +36,11 @@ import org.jspecify.annotations.Nullable;
  * texture, Riley's steel plating, tiled at 16 px per block with its UVs taken from the car's own
  * coordinates, so a panel's pattern runs on from one box to the next without a seam; a face is cut at
  * every whole block, so no quad wraps past its sprite on the block atlas. A crate is drawn in Riley's
- * crate sprites, each face the whole of one. The lamps and the Sight glasses' panes stay flat colours.
+ * crate sprites, each face the whole of one, as are the Burner Locomotive's firebox doors, in the
+ * Burner Generator's smelter front, and the Electric's coil grilles, in the Charger's coil. While a
+ * Burner Locomotive holds fuel its fireboxes show the lit front, and while an Electric holds charge its
+ * grilles show the coil undimmed, both at full brightness. The lamps and the Sight glasses' panes stay
+ * flat colours.
  *
  * <p>A Fluid car's Sight glasses are filled, on their panes' outer faces, with its tank's fluid as
  * the server last synced it ({@link SightGlassFluid}), tiled a block to a tile from the pane's bottom,
@@ -44,6 +51,8 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     public static final class State extends EntityRenderState {
         float yRot;
         float xRot;
+        /** Whether a Locomotive holds fuel, or an Electric charge, as the server last synced it. */
+        boolean holdsEnergy;
         /** A Fluid car's fluid; null for none, or another car. */
         @Nullable SightGlassFluid fluid;
         /** How full the tank is: its amount and capacity, in millibuckets. */
@@ -51,30 +60,55 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         int capacity;
     }
 
-    /**
-     * How a panel is drawn: in {@code sprite}, under {@code textures/block/car/}, tinted
-     * {@code colour} (ARGB), and when {@code centred} with its texture's middle at the box's middle up
-     * its sides rather than laid by the car's coordinates, so a band's stripe runs along the band.
-     */
-    private record Look(SpriteId sprite, int colour, boolean centred) {
+    /** How a sprite is laid on a box's faces. */
+    private enum Lay {
+        /** One flat colour, on the white sprite. */
+        FLAT,
+        /** Tiled a block to a tile by the car's coordinates, so a pattern runs on from box to box. */
+        TILED,
+        /** Tiled, with the sprite's middle at the box's middle up its sides, so a band's stripe runs along it. */
+        CENTRED,
+        /** The whole sprite on each face. */
+        WHOLE
     }
 
-    private static Look look(CarBody.Panel panel) {
+    /**
+     * How a panel is drawn: in {@code sprite}, tinted {@code colour} (ARGB), laid as {@code lay}, and
+     * when {@code glows} at full brightness whatever the light.
+     */
+    private record Look(SpriteId sprite, int colour, Lay lay, boolean glows) {
+    }
+
+    /** How {@code panel} is drawn, on a Locomotive that holds fuel or charge, {@code holdsEnergy}, or not. */
+    private static Look look(CarBody.Panel panel, boolean holdsEnergy) {
         return switch (panel) {
-            case SHELL -> new Look(sprite("shell"), -1, false);
-            case ROOF -> new Look(sprite("roof"), -1, false);
-            case SKIRT -> new Look(sprite("skirt"), -1, false);
-            case TRIM -> new Look(sprite("trim"), -1, false);
-            case WINDOW -> new Look(sprite("window"), -1, true);
-            case BURNER_NOSE -> new Look(sprite("burner_nose"), -1, true);
-            case ELECTRIC_NOSE -> new Look(sprite("electric_nose"), -1, true);
-            case TANK -> new Look(sprite("tank"), -1, false);
-            // Flat colours, on a white sprite.
-            case LAMP -> new Look(WHITE, 0xFFF2E59E, false);
-            case GLASS -> new Look(WHITE, 0xFF0D0F12, false);
+            case SHELL -> new Look(sprite("shell"), -1, Lay.TILED, false);
+            case ROOF -> new Look(sprite("roof"), -1, Lay.TILED, false);
+            case SKIRT -> new Look(sprite("skirt"), -1, Lay.TILED, false);
+            case TRIM -> new Look(sprite("trim"), -1, Lay.TILED, false);
+            case WINDOW -> new Look(sprite("window"), -1, Lay.CENTRED, false);
+            case BURNER_NOSE -> new Look(sprite("burner_nose"), -1, Lay.CENTRED, false);
+            case ELECTRIC_NOSE -> new Look(sprite("electric_nose"), -1, Lay.CENTRED, false);
+            case TANK -> new Look(sprite("tank"), -1, Lay.TILED, false);
+            case FIREBOX -> holdsEnergy ? new Look(FIREBOX_LIT_SPRITE, -1, Lay.WHOLE, true)
+                    : new Look(FIREBOX_SPRITE, -1, Lay.WHOLE, false);
+            case COIL -> holdsEnergy ? new Look(COIL_SPRITE, -1, Lay.WHOLE, true)
+                    : new Look(COIL_SPRITE, COIL_DIMMED, Lay.WHOLE, false);
+            case STACK -> new Look(STEEL_SPRITE, STACK_TINT, Lay.TILED, false);
+            case LAMP -> new Look(WHITE, 0xFFF2E59E, Lay.FLAT, false);
+            case GLASS -> new Look(WHITE, 0xFF0D0F12, Lay.FLAT, false);
         };
     }
 
+    /** The Burner Generator's smelter front, unlit and lit, and the Charger's coil. */
+    private static final SpriteId FIREBOX_SPRITE = blockSprite("burner_generator/front");
+    private static final SpriteId FIREBOX_LIT_SPRITE = blockSprite("burner_generator/front_on");
+    private static final SpriteId COIL_SPRITE = blockSprite("charger/sides");
+    /** The coil grille while it holds no charge: dimmed. */
+    private static final int COIL_DIMMED = 0xFF7A7A7A;
+    /** The stack: the steel, sooted dark. */
+    private static final SpriteId STEEL_SPRITE = blockSprite("steel");
+    private static final int STACK_TINT = 0xFF55504C;
     private static final SpriteId WHITE = sprite("paint");
     private static final SpriteId CRATE_SIDE = sprite("crate_side");
     private static final SpriteId CRATE_TOP = sprite("crate_top");
@@ -123,6 +157,7 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         super.extractRenderState(car, state, partialTicks);
         state.yRot = Mth.rotLerp(partialTicks, car.yRotO, car.getYRot());
         state.xRot = Mth.lerp(partialTicks, car.xRotO, car.getXRot());
+        state.holdsEnergy = car instanceof LocomotiveEntity locomotive && locomotive.holdsEnergySeen();
         state.fluid = null;
         if (car instanceof FluidCarEntity fluidCar) {
             FluidStack tank = fluidCar.tankSeen();
@@ -142,16 +177,22 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         int light = state.lightCoords;
         collector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(TextureAtlas.LOCATION_BLOCKS), (pose, buffer) -> {
             for (CarBody.Part part : body.parts()) {
-                Look look = look(part.panel());
+                Look look = look(part.panel(), state.holdsEnergy);
                 TextureAtlasSprite sprite = sprites.get(look.sprite());
-                if (look.sprite() == WHITE) {
-                    flatBox(pose, buffer, part.box(), sprite, look.colour(), light);
-                } else {
-                    tiledBox(pose, buffer, part.box(), sprite, look.centred(), light);
+                int partLight = look.glows() ? LightCoordsUtil.FULL_BRIGHT : light;
+                switch (look.lay()) {
+                    case FLAT -> flatBox(pose, buffer, part.box(), sprite, look.colour(), partLight);
+                    case TILED, CENTRED -> tiledBox(pose, buffer, part.box(), sprite, look.colour(),
+                            look.lay() == Lay.CENTRED, partLight);
+                    case WHOLE -> wholeBox(pose, buffer, part.box(), face -> sprite, look.colour(), partLight);
                 }
             }
             for (CarBody.Box crate : body.crates()) {
-                crate(pose, buffer, crate, light);
+                wholeBox(pose, buffer, crate, face -> sprites.get(switch (face) {
+                    case EAST, WEST, SOUTH, NORTH -> CRATE_SIDE;
+                    case UP -> CRATE_TOP;
+                    case DOWN -> CRATE_BOTTOM;
+                }), -1, light);
             }
         });
         SightGlassFluid fluid = state.fluid;
@@ -203,26 +244,29 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         }
     }
 
-    /** A crate filling {@code b}: each face the whole of its sprite, the side's on all four sides. */
-    private void crate(PoseStack.Pose pose, VertexConsumer buffer, CarBody.Box b, int light) {
+    /** A box with the whole of a sprite on each face, {@code sprite} giving each face's, tinted {@code colour}. */
+    private static void wholeBox(PoseStack.Pose pose, VertexConsumer buffer, CarBody.Box b,
+                                 Function<Face, TextureAtlasSprite> sprite, int colour, int light) {
         for (Face face : Face.values()) {
-            TextureAtlasSprite sprite = sprites.get(switch (face) {
-                case EAST, WEST, SOUTH, NORTH -> CRATE_SIDE;
-                case UP -> CRATE_TOP;
-                case DOWN -> CRATE_BOTTOM;
-            });
+            TextureAtlasSprite faceSprite = sprite.apply(face);
             float[][] corners = face.corners(b);
             for (int i = 0; i < 4; i++) {
-                buffer.addVertex(pose, corners[i][0], corners[i][1], corners[i][2]).setColor(-1)
-                        .setUv(sprite.getU(WHOLE_SPRITE[i][0]), sprite.getV(WHOLE_SPRITE[i][1]))
+                buffer.addVertex(pose, corners[i][0], corners[i][1], corners[i][2]).setColor(colour)
+                        .setUv(faceSprite.getU(WHOLE_SPRITE[i][0]), faceSprite.getV(WHOLE_SPRITE[i][1]))
                         .setOverlay(OverlayTexture.NO_OVERLAY).setLight(light)
                         .setNormal(pose, face.normalX, face.normalY, face.normalZ);
             }
         }
     }
 
+    /** A car's sprite, under {@code textures/block/car/}. */
     private static SpriteId sprite(String name) {
-        return Sheets.BLOCKS_MAPPER.apply(Identifier.fromNamespaceAndPath(Railworks.MOD_ID, "car/" + name));
+        return blockSprite("car/" + name);
+    }
+
+    /** A sprite under {@code textures/block/}. */
+    private static SpriteId blockSprite(String path) {
+        return Sheets.BLOCKS_MAPPER.apply(Identifier.fromNamespaceAndPath(Railworks.MOD_ID, path));
     }
 
     /** A box in one flat colour, each face one quad on the middle of the white sprite. */
@@ -241,14 +285,14 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     }
 
     /**
-     * A box in {@code sprite}, each face tiled a block to a tile by its own coordinates: on a side, u
+     * A box in {@code sprite}, tinted {@code colour}, each face tiled a block to a tile by its own coordinates: on a side, u
      * runs along it as seen from outside and v up it; on the top and the bottom, u runs along x and v
      * along -z. A face is cut at every whole block of u and v, each piece showing the part of the
      * sprite it covers. Tiles are laid from {@link #TILE_X} and {@link #TILE_Z}, and up a side from the
      * car's floor, or when {@code centred} from half a block under the box's middle.
      */
     private static void tiledBox(PoseStack.Pose pose, VertexConsumer buffer, CarBody.Box box, TextureAtlasSprite sprite,
-                                 boolean centred, int light) {
+                                 int colour, boolean centred, int light) {
         CarBody.Box b = new CarBody.Box(box.minX() + TILE_X, box.minY(), box.minZ() + TILE_Z,
                 box.maxX() + TILE_X, box.maxY(), box.maxZ() + TILE_Z);
         float lift = centred ? 0.5F - (float) (b.minY() + b.maxY()) / 2.0F : 0.0F;
@@ -264,7 +308,7 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
                     float[][] at = {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}};
                     for (float[] uv : at) {
                         float[] corner = face.at(b, uv[0], uv[1] - (face.side ? lift : 0.0F));
-                        buffer.addVertex(pose, corner[0] - TILE_X, corner[1], corner[2] - TILE_Z).setColor(-1)
+                        buffer.addVertex(pose, corner[0] - TILE_X, corner[1], corner[2] - TILE_Z).setColor(colour)
                                 .setUv(sprite.getU(uv[0] - cellU), sprite.getV(1.0F - (uv[1] - cellV)))
                                 .setOverlay(OverlayTexture.NO_OVERLAY).setLight(light)
                                 .setNormal(pose, face.normalX, face.normalY, face.normalZ);
