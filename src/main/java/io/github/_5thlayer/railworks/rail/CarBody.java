@@ -147,7 +147,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
     /** The top of the Locomotive's Engine room, under the cab's roof. */
     private static final double ENGINE_ROOM_TOP = 2.32;
     /** The top of every car's floor, over its underside. */
-    private static final double FLOOR_TOP = 0.7;
+    public static final double FLOOR_TOP = 0.7;
 
     /**
      * Where the Locomotive's cab ends and its Engine room begins, and where the Engine room ends and

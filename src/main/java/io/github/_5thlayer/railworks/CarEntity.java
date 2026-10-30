@@ -19,6 +19,7 @@ import io.github._5thlayer.railworks.rail.Place;
 import io.github._5thlayer.railworks.rail.RailCurve;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Span;
+import io.github._5thlayer.railworks.rail.Station;
 import io.github._5thlayer.railworks.rail.Train;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -32,6 +33,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.InteractionHand;
@@ -53,6 +55,7 @@ import net.minecraft.world.entity.vehicle.VehicleEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -123,6 +126,9 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     private static final int NO_DRIVER = -1;
     /** How far beyond the car's side, past half the one getting out, they are set down. */
     private static final double STEP_OUT = 0.05;
+    /** How far the near side of the row two off the Rail, where Stations stand, is from the Rail's line: where getting off steps out to. */
+    private static final double ROW_NEAR_SIDE = Station.ROW_OFF - 0.5;
+    private static final Component NOWHERE_TO_GET_OFF = Component.translatable("message.railworks.nowhere_to_get_off");
 
     /** Steps the client's car toward each position the server sends, as a boat's does, rather than snapping to it. */
     private final InterpolationHandler interpolation = new InterpolationHandler(this, 3);
@@ -262,6 +268,9 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         super.tick();
         interpolation.interpolate();
         tickedAt = level().getGameTime();
+        if (!level().isClientSide()) {
+            keepAboardWithNowhereToLand();
+        }
     }
 
     /** Whether it ticked this game tick, as the level ticks the entities of the chunks that tick them. */
@@ -387,7 +396,12 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         if (held.is(Items.LEAD) && mobInBay() instanceof Mob mob && mob instanceof Leashable leashable
                 && leashable.canBeLeashed()) {
             if (!level().isClientSide()) {
-                leadOut(player, held, mob, leashable);
+                // Nowhere to land, the mob stays in the bay and the lead in hand.
+                if (landing(mob) == null) {
+                    player.sendOverlayMessage(NOWHERE_TO_GET_OFF);
+                } else {
+                    leadOut(player, held, mob, leashable);
+                }
             }
             return InteractionResult.SUCCESS;
         }
@@ -583,42 +597,81 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     // would not move until they got off.
 
     /**
-     * Out beside their own seat, along the car, onto the first open floor below the car's side: the side
-     * they look to first, then the other, then below the car's middle, since it rides well above the
-     * ground.
+     * Where {@code passenger} gets off, by {@link #landing}; where they are when there is nowhere, as for a
+     * car breaking under them, since a sneak or a lead finding nowhere keeps them aboard instead.
      */
     @Override
     public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
+        Vec3 spot = landing(passenger);
+        return spot != null ? spot : passenger.position();
+    }
+
+    /**
+     * Where {@code passenger} gets off, at any height, or null for nowhere: out beside their own seat,
+     * along the car, two off the Rail, in the first row clear of the car, the side they look to first and
+     * then the other. A floor about level with the car's, a walkway, comes first on either side, from a
+     * step over the car's floor to a block under it; then the first floor down to the bottom of the world
+     * there; else below the car's middle, from its underside down.
+     */
+    private @Nullable Vec3 landing(LivingEntity passenger) {
         CarBody.Point seat = isCabPlayer(passenger) ? CarBody.CAB_SEAT : CarBody.BAY_SPOT;
         Vec3 along = Vec3.directionFromRotation(0.0F, getYRot());
         Vec3 right = new Vec3(-along.z, 0.0, along.x);
         // Toward the side the passenger looks; a mob faces ahead, and takes the right first.
         int first = Vec3.directionFromRotation(0.0F, passenger.getYRot()).dot(right) >= -1e-6 ? 1 : -1;
         Vec3 beside = position().add(along.scale(seat.z()));
-        double out = CarBody.WIDTH / 2.0 + passenger.getBbWidth() / 2.0 + STEP_OUT;
-        for (int side : new int[] {first, -first}) {
-            Vec3 spot = floorBelow(passenger, beside.add(right.scale(side * out)));
-            if (spot != null) {
-                return spot;
+        double out = ROW_NEAR_SIDE + passenger.getBbWidth() / 2.0 + STEP_OUT;
+        double floor = getY() + CarBody.FLOOR_TOP;
+        double top = floor + passenger.maxUpStep();
+        for (double bottom : new double[] {floor - 1.0, Double.NEGATIVE_INFINITY}) {
+            for (int side : new int[] {first, -first}) {
+                Vec3 spot = floorBelow(passenger, beside.add(right.scale(side * out)), top, bottom);
+                if (spot != null) {
+                    return spot;
+                }
             }
         }
-        Vec3 spot = floorBelow(passenger, position());
-        return spot != null ? spot : super.getDismountLocationForPassenger(passenger);
+        return floorBelow(passenger, position(), getY(), Double.NEGATIVE_INFINITY);
     }
 
-    /** The first open floor {@code passenger} fits on below the car's height at {@code from}, or null for none near. */
-    private @Nullable Vec3 floorBelow(LivingEntity passenger, Vec3 from) {
-        BlockPos.MutableBlockPos probe = BlockPos.containing(from.x, getY(), from.z).mutable();
-        for (int drop = 0; drop < 24 && !level().isOutsideBuildHeight(probe); drop++) {
-            double floor = level().getBlockFloorHeight(probe);
-            Vec3 spot = new Vec3(from.x, probe.getY() + floor, from.z);
-            if (Double.isFinite(floor) && level().noCollision(passenger, passenger.getBoundingBox().move(
-                    spot.subtract(passenger.position())))) {
-                return spot;
+    /**
+     * The first floor at {@code from}, from {@code top} down to {@code bottom} and no further than the
+     * bottom of the world, when {@code passenger} fits on it; null for none, or for one they don't fit on
+     * or that is buried over {@code top}, so nobody is put in a cave under it. Water's top is a floor, and
+     * lava rules the spot out.
+     */
+    private @Nullable Vec3 floorBelow(LivingEntity passenger, Vec3 from, double top, double bottom) {
+        BlockPos.MutableBlockPos probe = BlockPos.containing(from.x, top, from.z).mutable();
+        for (; probe.getY() + 1 >= bottom && !level().isOutsideBuildHeight(probe); probe.move(0, -1, 0)) {
+            FluidState fluid = level().getFluidState(probe);
+            if (fluid.is(FluidTags.LAVA)) {
+                return null;
             }
-            probe.move(0, -1, 0);
+            double floor = fluid.isEmpty() ? level().getBlockFloorHeight(probe) : fluid.getHeight(level(), probe);
+            if (Double.isFinite(floor)) {
+                Vec3 spot = new Vec3(from.x, probe.getY() + floor, from.z);
+                return spot.y <= top && spot.y >= bottom && fits(passenger, spot) ? spot : null;
+            }
         }
         return null;
+    }
+
+    private boolean fits(LivingEntity passenger, Vec3 spot) {
+        return level().noCollision(passenger, passenger.getBoundingBox().move(spot.subtract(passenger.position())));
+    }
+
+    /**
+     * A player sneaking to get off with nowhere to land is kept aboard, told so: their sneak is let go
+     * before they ride this tick, as the car ticks ahead of whoever rides it. Nothing else that puts them
+     * off, a car breaking, their logging out or a teleport, is kept from it.
+     */
+    private void keepAboardWithNowhereToLand() {
+        for (Entity aboard : getPassengers()) {
+            if (aboard instanceof Player player && player.isShiftKeyDown() && landing(player) == null) {
+                player.setShiftKeyDown(false);
+                player.sendOverlayMessage(NOWHERE_TO_GET_OFF);
+            }
+        }
     }
 
     // ---- logging out ----
@@ -784,7 +837,12 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
         }
         view.carId = car.car();
         view.setPos(car.at().x, car.at().y, car.at().z);
-        takeRider(level, car.car(), car.at());
+        Entity rider = takeRider(level, car.car(), car.at());
+        // Set down as getting off would, the car standing there.
+        if (rider instanceof LivingEntity living) {
+            Vec3 spot = view.getDismountLocationForPassenger(living);
+            living.snapTo(spot.x, spot.y, spot.z, living.getYRot(), living.getXRot());
+        }
         view.breakOff(level);
     }
 
@@ -797,6 +855,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
     @Override
     public void remove(RemovalReason reason) {
         if (level() instanceof ServerLevel server && reason.shouldDestroy() && !takenAway) {
+            // Put off while it stands, so each lands where getting off would set them, not where they sat.
+            ejectPassengers();
             dropContents(server);
             if (carId != null) {
                 LevelRails.of(server).carGone(carId);

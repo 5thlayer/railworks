@@ -2,6 +2,7 @@
   "block.railworks.pylon": "Pylon",
   "item.railworks.pylon": "Pylon",
   "item.railworks.rail": "Rail",
+  "message.railworks.nowhere_to_get_off": "Nowhere safe to get off here",
   "message.railworks.too_long": "That Span is longer than %s blocks",
   "message.railworks.too_steep": "That Span is steeper than %s%%",
   "message.railworks.too_sharp": "That Span bends more than %s° through an Arm",
