@@ -318,9 +318,9 @@ CARGO_ICON = [
     "WWWWWWWWWWWWWWWW",
     "WWWWWWWWWWWWWWWW",
     "WWWWWWWWWWWWWWWW",
-    "SSSSBBSBBSBBSSSS",
-    "SSSSBBSBBSBBSSSS",
-    "SSSSSSSSSSSSSSSS",
+    "SSSBBBBBBBBBBSSS",
+    "SSSBBBBBBBBBBSSS",
+    "SSSBBBBBBBBBBSSS",
 ] + UNDERFRAME
 FLUID_ICON = [
     "................",
@@ -375,6 +375,26 @@ BAND_SPRITE_ROWS = (2, 8, 13)
 def band(pixels):
     """A window band, three pixels high from BAND_TOP, each row its sprite's row there."""
     return lambda x, y: pixels[BAND_SPRITE_ROWS[y - BAND_TOP]][x][:3]
+
+
+# The Cargo car's crates on its icon: the row of them on rows 6 to 8, under the window band and down
+# to its floor, and each crate's first column and width along it, three blocks' worth of pixels split
+# where the car's own crates meet.
+CRATE_TOP = 6
+CRATE_HEIGHT = 3
+CRATE_COLUMNS = ((3, 3), (6, 4), (10, 3))
+
+
+def crates(pixels):
+    """The row of crates, each painted grained from its sprite laid whole across it, as the car lays
+    it on each crate's side."""
+    paint = grained(pixels)
+
+    def at(x, y):
+        start, width = next(c for c in CRATE_COLUMNS if c[0] <= x < c[0] + c[1])
+        return paint((x - start) * 16 // width, (y - CRATE_TOP) * 16 // CRATE_HEIGHT)
+
+    return at
 
 
 def flat(colour):
@@ -435,9 +455,9 @@ def electric_icon():
 
 
 def cargo_icon():
-    """The Cargo car: a crate in each of its three recesses."""
+    """The Cargo car: its row of three crates in one long recess, the window band over their tops."""
     panels = car_panels()
-    panels["B"] = grained(art("space_crate_sides.png"))
+    panels["B"] = crates(art("space_crate_top.png"))
     return icon(CARGO_ICON, panels)
 
 

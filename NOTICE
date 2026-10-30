@@ -87,7 +87,6 @@ Files:   data/art/space-plating-rivets-horizontal.png
          data/art/space-plating-stripe-yellow-horizontal-undamaged.png
          data/art/space-plating-stripe-orange-horizontal-undamaged.png
          data/art/metal_tank_copper_sides.png
-         data/art/space_crate_sides.png
          data/art/space_crate_top.png
          data/art/space_crate_bottom.png
          src/main/resources/assets/railworks/textures/block/car/{shell,roof,skirt,trim,window}.png
