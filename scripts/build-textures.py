@@ -249,6 +249,27 @@ def white():
     return [[[255, 255, 255, 255] for _ in range(16)] for _ in range(16)]
 
 
+def sight_glass():
+    """The inside of a Fluid car's Sight glass tube, seen through it: dark, and darker toward the top."""
+    out = []
+    for y in range(16):
+        line = []
+        for x in range(16):
+            k = 10 + y * 1.3 + (x * 7 + y * 13) % 5
+            line.append([round(k * 0.8), round(k * 1.05), round(k * 1.15), 255])
+        out.append(line)
+    return out
+
+
+def glint():
+    """The glint down a Sight glass tube, over its fluid: two pale streaks, the rest clear."""
+    out = [[[0, 0, 0, 0] for _ in range(16)] for _ in range(16)]
+    for y in range(16):
+        out[y][4] = out[y][5] = [214, 236, 242, 255]
+        out[y][10] = [150, 170, 178, 255]
+    return out
+
+
 # Every texture this script writes, by its path under textures/, with what builds it.
 TEXTURES_BUILT = {
     "block/station/top.png": station_top,
@@ -286,6 +307,8 @@ TEXTURES_BUILT = {
     "block/car/crate_top.png": unchanged("space_crate_top.png"),
     "block/car/crate_bottom.png": unchanged("space_crate_bottom.png"),
     "block/car/paint.png": white,
+    "block/car/sight_glass.png": sight_glass,
+    "block/car/glint.png": glint,
 }
 
 # The animations, by the texture they play, with their .mcmeta.

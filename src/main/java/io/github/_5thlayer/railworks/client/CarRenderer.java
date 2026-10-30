@@ -96,7 +96,9 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
                     : new Look(COIL_SPRITE, COIL_DIMMED, Lay.WHOLE, false);
             case STACK -> new Look(STEEL_SPRITE, STACK_TINT, Lay.TILED, false);
             case LAMP -> new Look(WHITE, 0xFFF2E59E, Lay.FLAT, false);
-            case GLASS -> new Look(WHITE, 0xFF0D0F12, Lay.FLAT, false);
+            case GLASS -> new Look(sprite("sight_glass"), -1, Lay.WHOLE, false);
+            case GLINT -> new Look(sprite("glint"), -1, Lay.WHOLE, false);
+            case MARK -> new Look(WHITE, 0xFFE6E0C8, Lay.FLAT, false);
         };
     }
 
@@ -208,9 +210,11 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     }
 
     /**
-     * The fluid in {@code glass} up to {@code surface}, on its pane's outer face: one quad per tile of
-     * a block, from the pane's bottom and its back end, the last row cropped at the surface and the
-     * last column at the pane's front end, each showing as much of the sprite as it covers.
+     * The fluid in {@code glass} up to {@code surface}, on its pane's outer face and its two ends: one
+     * quad per tile of a block, from the pane's bottom and its back end on the face, the last row cropped
+     * at the surface and the last column at the pane's end, each showing as much of the sprite as it
+     * covers. Each stands {@link SightGlassFluid#PROUD} off the pane and reaches as far past its edges,
+     * so the face and the ends meet at the pane's corners.
      */
     private static void fill(PoseStack.Pose pose, VertexConsumer buffer, CarBody.SightGlass glass, float surface,
                              SightGlassFluid fluid, int light) {
@@ -218,18 +222,22 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         float side = (float) glass.side();
         float x = side > 0 ? (float) pane.maxX() + SightGlassFluid.PROUD : (float) pane.minX() - SightGlassFluid.PROUD;
         float bottom = (float) pane.minY();
-        float back = (float) pane.minZ();
+        float back = (float) pane.minZ() - SightGlassFluid.PROUD;
+        float front = (float) pane.maxZ() + SightGlassFluid.PROUD;
+        // The ends run across the pane's depth, from its side toward the car's middle out to the face's quads.
+        float lowX = side > 0 ? (float) pane.minX() : x;
+        float highX = side > 0 ? x : (float) pane.maxX();
         for (float y0 = bottom; y0 < surface; y0 += 1.0F) {
             float y1 = Math.min(y0 + 1.0F, surface);
-            for (float z0 = back; z0 < pane.maxZ(); z0 += 1.0F) {
-                float z1 = Math.min(z0 + 1.0F, (float) pane.maxZ());
+            // The sprite's top is v 0: a cropped row shows its lower part, as a block's fluid shows its top cut off.
+            float v1 = 1.0F;
+            float v0 = 1.0F - (y1 - y0);
+            for (float z0 = back; z0 < front; z0 += 1.0F) {
+                float z1 = Math.min(z0 + 1.0F, front);
                 // The sprite runs along z from the tile's back end on both sides, so a cropped tile
                 // still meets the next at the sprite's edge.
                 float uBack = 0.0F;
                 float uFront = z1 - z0;
-                // The sprite's top is v 0: a cropped row shows its lower part, as a block's fluid shows its top cut off.
-                float v1 = 1.0F;
-                float v0 = 1.0F - (y1 - y0);
                 // Counter-clockwise as seen from the side it faces, from the bottom left, which is
                 // the tile's front end on the +x side and its back end on the -x side.
                 float left = side > 0 ? z1 : z0;
@@ -241,7 +249,25 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
                 fluid.vertex(pose, buffer, x, y1, right, uRight, v0, light, side, 0.0F, 0.0F);
                 fluid.vertex(pose, buffer, x, y1, left, uLeft, v0, light, side, 0.0F, 0.0F);
             }
+            end(pose, buffer, fluid, lowX, highX, front, 1.0F, y0, y1, v0, v1, light);
+            end(pose, buffer, fluid, lowX, highX, back, -1.0F, y0, y1, v0, v1, light);
         }
+    }
+
+    /**
+     * One row of the fluid on a pane's end at {@code z}, facing {@code normalZ}, across from {@code lowX}
+     * to {@code highX}, less than a block: counter-clockwise from the bottom left as seen from beyond it,
+     * which is the lower x on the front end and the higher on the back end.
+     */
+    private static void end(PoseStack.Pose pose, VertexConsumer buffer, SightGlassFluid fluid, float lowX, float highX,
+                            float z, float normalZ, float y0, float y1, float v0, float v1, int light) {
+        float left = normalZ > 0 ? lowX : highX;
+        float right = normalZ > 0 ? highX : lowX;
+        float u = highX - lowX;
+        fluid.vertex(pose, buffer, left, y0, z, 0.0F, v1, light, 0.0F, 0.0F, normalZ);
+        fluid.vertex(pose, buffer, right, y0, z, u, v1, light, 0.0F, 0.0F, normalZ);
+        fluid.vertex(pose, buffer, right, y1, z, u, v0, light, 0.0F, 0.0F, normalZ);
+        fluid.vertex(pose, buffer, left, y1, z, 0.0F, v0, light, 0.0F, 0.0F, normalZ);
     }
 
     /** A box with the whole of a sprite on each face, {@code sprite} giving each face's, tinted {@code colour}. */

@@ -60,8 +60,12 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         COIL,
         /** A Burner Locomotive's stack. */
         STACK,
-        /** A Sight glass above the fluid it shows. */
-        GLASS
+        /** A Sight glass's tube, dark above the fluid it shows. */
+        GLASS,
+        /** The glint down a Sight glass's tube, over the fluid. */
+        GLINT,
+        /** A pale mark beside a Sight glass, at each quarter of its height. */
+        MARK
     }
 
     /**
@@ -103,8 +107,9 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
     }
 
     /**
-     * A Sight glass along one side of a Fluid car's tank: its pane, dark {@link Panel#GLASS} among the
-     * body's parts, which the fluid fills from the bottom as far as the tank is full, on its outer face.
+     * A Sight glass up one side of a Fluid car's tank: its pane, the glass tube, dark {@link Panel#GLASS}
+     * among the body's parts, which the fluid fills from the bottom as far as the tank is full, on its
+     * outer face and its ends.
      */
     public record SightGlass(Box pane) {
 
@@ -175,8 +180,13 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
      */
     public static final Point BAY_SPOT = new Point(0.0, FLOOR_TOP, (BAY_FRONT - LOCOMOTIVE_LENGTH / 2.0) / 2.0);
 
-    /** How long a Fluid car's Sight glass is along z, across the car's middle. */
-    private static final double SIGHT_GLASS_LENGTH = 0.8;
+    /** Half the width along z of a Fluid car's Sight glass, a glass tube up the middle of each side of the belt. */
+    private static final double TUBE_HALF_WIDTH = 0.07;
+    /** The tube's bottom and top, where the caps it stands between cover its ends. */
+    private static final double TUBE_BOTTOM = 1.15;
+    private static final double TUBE_TOP = 2.15;
+    /** Half the width along z of the dark plate the tube stands on, which runs the belt's height. */
+    private static final double PLATE_HALF_WIDTH = 0.22;
 
     /** Where a Cargo car's crates are along z, one a side at each: over its three inner blocks. */
     private static final double[] CRATES_AT = {-1.0, 0.0, 1.0};
@@ -415,8 +425,9 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
     /**
      * The Fluid car: an open floor carrying a round tank along it, a cylinder stepped every half pixel
      * with a flat belt across its sides, on a saddle at each end, a ring round it near each end and a
-     * dome on top. Across the middle of each side of the belt, {@value #SIGHT_GLASS_LENGTH} long, a Sight
-     * glass: a dark pane standing just proud of a frame a little larger, which shows round it as a rim.
+     * dome on top. Up the middle of each side of the belt, a Sight glass: a glass tube between two dark
+     * caps, on a dark plate with a pale mark at each quarter of its height, all within the belt's height,
+     * so nothing of it stands past the tank where the tank curves away.
      */
     private static CarBody fluid() {
         double length = FluidCar.LENGTH - GAP;
@@ -445,10 +456,22 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         }
         parts.add(new Part(Panel.TANK, -0.15, 2.5, -0.2, 0.15, DOME_TOP, 0.2));
         ends(parts, new Part(Panel.SKIRT, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
-        double glassEnd = SIGHT_GLASS_LENGTH / 2.0;
-        sides(parts, new Part(Panel.TRIM, 0.94, BELT_BOTTOM, -glassEnd - 0.04, 0.96, BELT_TOP, glassEnd + 0.04));
-        Box pane = new Box(0.945, 1.12, -glassEnd, 0.965, 2.18, glassEnd);
+        // The plate, reaching into the belt and a hair short of its bottom and top; the tube, the marks and the caps each reaching into the
+        // plate, the caps over the tube's ends; and the glint just proud of the fluid on the tube's face.
+        sides(parts, new Part(Panel.TRIM, 0.925, BELT_BOTTOM + 0.001, -PLATE_HALF_WIDTH, 0.944, BELT_TOP - 0.001,
+                PLATE_HALF_WIDTH));
+        Box pane = new Box(0.943, TUBE_BOTTOM, -TUBE_HALF_WIDTH, 0.99, TUBE_TOP, TUBE_HALF_WIDTH);
         sides(parts, new Part(Panel.GLASS, pane));
+        sides(parts, new Part(Panel.GLINT, 0.9925, TUBE_BOTTOM, -TUBE_HALF_WIDTH, 0.993, TUBE_TOP, TUBE_HALF_WIDTH));
+        double capHalf = TUBE_HALF_WIDTH + 0.04;
+        sides(parts, new Part(Panel.TRIM, 0.94, BELT_BOTTOM + 0.01, -capHalf, 0.998, TUBE_BOTTOM + 0.01, capHalf));
+        sides(parts, new Part(Panel.TRIM, 0.94, TUBE_TOP - 0.01, -capHalf, 0.998, BELT_TOP - 0.01, capHalf));
+        for (double quarter : new double[] {0.25, 0.5, 0.75}) {
+            double y = TUBE_BOTTOM + (TUBE_TOP - TUBE_BOTTOM) * quarter;
+            double reach = quarter == 0.5 ? 0.2 : 0.16;
+            sides(parts, new Part(Panel.MARK, 0.9435, y - 0.012, TUBE_HALF_WIDTH + 0.03, 0.95, y + 0.012, reach));
+            sides(parts, new Part(Panel.MARK, 0.9435, y - 0.012, -reach, 0.95, y + 0.012, -TUBE_HALF_WIDTH - 0.03));
+        }
         List<SightGlass> glasses = List.of(new SightGlass(pane), new SightGlass(pane.mirrored()));
         return new CarBody(length, List.copyOf(parts), List.of(), glasses);
     }
