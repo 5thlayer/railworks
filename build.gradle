@@ -23,7 +23,7 @@ libworks {
     }
     // Nested by jar-in-jar: the Works tab the whole suite shares, and from 0.1.8 libworks-gametest on
     // the game tests' classpath (5thlayer/libworks ADR 0008).
-    runtime = '0.1.12'
+    runtime = '0.1.13'
 }
 
 // libworks-runtime and libworks-gametest come from ~/.m2, the one repository the plugin gives every

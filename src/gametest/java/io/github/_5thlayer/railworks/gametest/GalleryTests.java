@@ -10,6 +10,7 @@ import java.util.function.BiConsumer;
 import io.github._5thlayer.libworks.gallery.GalleryPack;
 import io.github._5thlayer.libworks.testkit.GalleryCheck;
 import io.github._5thlayer.libworks.testkit.GalleryCheck.Layout;
+import io.github._5thlayer.libworks.testkit.GalleryCheck.PlotSize;
 import io.github._5thlayer.libworks.testkit.GalleryCheck.Scene;
 import io.github._5thlayer.railworks.LevelChargers;
 import io.github._5thlayer.railworks.LevelHatches;
@@ -29,11 +30,9 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestSequence;
-import net.minecraft.gametest.framework.StructureUtils;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
@@ -60,22 +59,13 @@ import net.minecraft.world.phys.Vec3;
 final class GalleryTests {
 
     /**
-     * One scene a row, each row 16 blocks north of the last, as {@code gallery/build} lays them: a
-     * Layout lays a row's plots {@link GalleryCheck#PLOT_WIDTH} apart, too close for plots of
-     * {@link #PLOT_WIDTH}.
+     * One scene a row, each row 16 blocks north of the last, as {@code gallery/build} lays them, on
+     * plots 40 wide from {@link GalleryCheck#FIRST_PLOT_EAST} east of where each is run and 15 deep.
+     * {@code gallery/clear} clears a block past a plot's west end and two past its east end too: the
+     * Clearance of a line ending at an Arm on the plot's second or last block reaches two blocks past
+     * that Arm.
      */
-    private static final Layout ROWS = new Layout(1, 16);
-    /** A scene's plot, along its row from {@link GalleryCheck#FIRST_PLOT_EAST} east of where it is run. */
-    private static final int PLOT_WIDTH = 40;
-    /**
-     * How far past its plot's west end {@code gallery/clear} clears too: the Clearance of a line
-     * ending at an Arm on the plot's second block reaches two blocks past that Arm.
-     */
-    private static final int REACH_WEST = 1;
-    /** How far past its plot's east end {@code gallery/clear} clears too: two blocks past a line's end Arm on its last block. */
-    private static final int REACH_EAST = 2;
-    /** A scene's plot, from its sign's row at the origin's z to 14 blocks north. */
-    private static final int PLOT_DEPTH = 15;
+    private static final Layout ROWS = new Layout(1, 16, new PlotSize(40, 15, 1, 2));
 
     /** Where the gallery is run from: the platform's south-west corner, the plots spilling north and east of it. */
     private static final BlockPos ORIGIN = new BlockPos(0, 1, 8);
@@ -129,7 +119,7 @@ final class GalleryTests {
 
     /**
      * The scenes in the order {@code build} lays them, each with a key block and where its function
-     * places it, inside libworks' narrower plot, which {@link GalleryCheck#assertKeyBlocks} asks of it.
+     * places it, inside its plot, which {@link GalleryCheck#assertKeyBlocks} asks of it.
      */
     private static List<Scene> scenes() {
         var pylon = RailworksRegistries.PYLON.get();
@@ -153,7 +143,7 @@ final class GalleryTests {
         tests.testOnItsOwn("gallery_pack_is_offered_and_off_and_its_build_lays_every_scene_with_no_failing_command",
                 GalleryCheck.TICKS, GalleryTests::builds);
         tests.testOnItsOwn("gallery_clear_clears_its_plot_and_its_lines_reach_past_its_ends",
-                GalleryCheck.TICKS, GalleryTests::clearsReach);
+                GalleryCheck.TICKS, helper -> GalleryCheck.clears(helper, Railworks.MOD_ID, ORIGIN, ROWS));
         tests.testOnItsOwn("gallery_coupling_sign_clicked_builds_the_scene_again_with_one_train",
                 GalleryCheck.TICKS, GalleryTests::signReplays);
         tests.testOnItsOwn("gallery_logistics_scenes_deliver_what_each_requester_asks_for",
@@ -192,7 +182,7 @@ final class GalleryTests {
                     GalleryCheck.assertKeyBlocks(helper, at, ROWS, scenes);
                     // On the build's tick, before a neighbouring test strings a line of its own across a plot.
                     for (int index = 0; index < scenes.size(); index++) {
-                        reachCleared(helper, scenes.get(index).name(), plot(ROWS.sceneOrigin(at, index)));
+                        reachCleared(helper, scenes.get(index).name(), ROWS.plot(ROWS.sceneOrigin(at, index)));
                     }
                     var low = arms(flyover, LOW_LINE);
                     var high = arms(flyover, HIGH_LINE);
@@ -211,37 +201,16 @@ final class GalleryTests {
                     helper.assertTrue(Platform.overlapping(network, quarry, List.of(smelter)).isEmpty(),
                             "the Stations scene's two platforms overlap");
                     for (int index = 0; index < scenes.size(); index++) {
-                        inRow(helper, scenes.get(index).name(), plot(ROWS.sceneOrigin(at, index)));
+                        inRow(helper, scenes.get(index).name(), ROWS.plot(ROWS.sceneOrigin(at, index)));
                     }
                 })).thenSucceed();
-    }
-
-    /**
-     * {@code gallery/clear}, run on a plot filled with stone, leaves air above a stone floor across
-     * the whole of {@link #plot}, the two blocks past a line's end Arm at either end included, where
-     * a block left from earlier would refuse the line's Span.
-     */
-    private static void clearsReach(GameTestHelper helper) {
-        var at = helper.absolutePos(ORIGIN);
-        var plot = plot(at);
-        var level = helper.getLevel();
-        var cells = BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ());
-        withPack(helper, ONE_SCENE, (source, steps) -> steps.thenExecute(() -> {
-            cells.forEach(pos -> level.setBlock(pos, Blocks.STONE.defaultBlockState(), Block.UPDATE_CLIENTS));
-            GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "clear"));
-            for (var pos : cells) {
-                var expected = pos.getY() == plot.minY() ? Blocks.STONE : Blocks.AIR;
-                helper.assertTrue(level.getBlockState(pos).is(expected),
-                        "gallery/clear left " + level.getBlockState(pos) + " at " + pos.toShortString() + ", not " + expected);
-            }
-        })).thenSucceed();
     }
 
     /** The coupling scene's sign, clicked, builds the scene again: the one Train of three cars, and nothing loose. */
     private static void signReplays(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
         var sign = at.offset(SIGN);
-        var plot = plot(at);
+        var plot = ROWS.plot(at);
         withPack(helper, ONE_SCENE, (source, steps) -> steps.thenExecute(() -> {
             GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "coupling"));
             helper.assertTrue(helper.getLevel().getBlockEntity(sign) instanceof SignBlockEntity entity
@@ -341,7 +310,7 @@ final class GalleryTests {
      */
     private static void farAwayDelivers(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
-        var plot = plot(at);
+        var plot = ROWS.plot(at);
         var strip = farStrip(at);
         // Generated now, as a world played in would have them: the runner ticks faster than chunks
         // generate off the server thread, and the scene would wait on them for longer than it runs.
@@ -434,37 +403,9 @@ final class GalleryTests {
                 "the far-away scene's Train fell off its line");
     }
 
-    /**
-     * libworks' {@link GalleryCheck#withPack} over the first {@code plots} plots, as {@code build} lays
-     * them, with the parts of each plot its own narrower plot leaves out loaded and cleared before and
-     * cleared after: it force-loads, and sets to air, only the {@link GalleryCheck#PLOT_WIDTH} by
-     * {@link GalleryCheck#PLOT_DEPTH} of each plot by the scene's origin. The runner lets the chunks
-     * go once the batch ends.
-     */
+    /** libworks' {@link GalleryCheck#withPack} over the first {@code plots} plots, as {@code build} lays them, their reach included. */
     private static GameTestSequence withPack(GameTestHelper helper, int plots, BiConsumer<CommandSourceStack, GameTestSequence> steps) {
-        var at = helper.absolutePos(ORIGIN);
-        var level = helper.getLevel();
-        for (int index = 0; index < plots; index++) {
-            plot(ROWS.sceneOrigin(at, index)).intersectingChunks().forEach(chunk -> {
-                level.getChunk(chunk.x(), chunk.z());
-                level.setChunkForced(chunk.x(), chunk.z(), true);
-            });
-            StructureUtils.clearSpaceForStructure(plot(ROWS.sceneOrigin(at, index)), level);
-        }
-        return GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, plots, steps).thenExecute(() -> {
-            for (int index = 0; index < plots; index++) {
-                StructureUtils.clearSpaceForStructure(plot(ROWS.sceneOrigin(at, index)), level);
-            }
-        });
-    }
-
-    /**
-     * The plot of a scene run from {@code at}, absolute, its floor and its lines' reach past its west
-     * and east ends included, as {@code gallery/clear} clears it.
-     */
-    private static BoundingBox plot(BlockPos at) {
-        return new BoundingBox(at.getX() + GalleryCheck.FIRST_PLOT_EAST - REACH_WEST, at.getY() - 1, at.getZ() - PLOT_DEPTH + 1,
-                at.getX() + GalleryCheck.FIRST_PLOT_EAST + PLOT_WIDTH - 1 + REACH_EAST, at.getY() + GalleryCheck.PLOT_HEIGHT - 1, at.getZ());
+        return GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, plots, steps);
     }
 
     /** The strip the far-away scene run from {@code at} builds its line along, from inside its plot out to Mine, absolute. */
