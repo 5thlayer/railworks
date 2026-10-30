@@ -20,4 +20,4 @@ Railworks carries a gallery of its features: Pylons and Rail, the grade and bend
 
 ## Art
 
-The Station's sprites are by Malcolm Riley ([unused-textures](https://github.com/malcolmriley/unused-textures)), under CC BY 4.0: his small stone tiles, with the Station's arrow painted on, his terminal and his concrete paver. `scripts/build-textures.py` builds them from his unmodified files in `data/art/`, and `NOTICE` and `REUSE.toml` record each file.
+The Station's, the Rail's and the Pylon's sprites are by Malcolm Riley ([unused-textures](https://github.com/malcolmriley/unused-textures)), under CC BY 4.0: his small stone tiles, with the Station's arrow painted on, his terminal and his concrete paver, his grey cement, concrete slabs and steel block. `scripts/build-textures.py` builds them from his unmodified files in `data/art/`, and `NOTICE` and `REUSE.toml` record each file.
