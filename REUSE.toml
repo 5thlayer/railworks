@@ -47,6 +47,12 @@ path = [
     "src/main/resources/assets/railworks/textures/block/charger/bottom.png",
     "src/main/resources/assets/railworks/textures/block/burner_generator/*.png",
     "src/main/resources/assets/railworks/textures/block/burner_generator/*.png.mcmeta",
+    "src/main/resources/assets/railworks/textures/block/car/shell.png",
+    "src/main/resources/assets/railworks/textures/block/car/roof.png",
+    "src/main/resources/assets/railworks/textures/block/car/window.png",
+    "src/main/resources/assets/railworks/textures/block/car/burner_nose.png",
+    "src/main/resources/assets/railworks/textures/block/car/electric_nose.png",
+    "src/main/resources/assets/railworks/textures/block/car/tank.png",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "Malcolm Riley"
@@ -60,6 +66,8 @@ path = [
     "src/main/resources/assets/railworks/textures/block/fluid_hatch/*.png",
     "src/main/resources/assets/railworks/textures/block/charger/sides.png",
     "src/main/resources/assets/railworks/textures/block/creative_charger/*.png",
+    "src/main/resources/assets/railworks/textures/block/car/skirt.png",
+    "src/main/resources/assets/railworks/textures/block/car/trim.png",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = ["Malcolm Riley", "2026 5thlayer"]

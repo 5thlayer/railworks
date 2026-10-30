@@ -11,8 +11,8 @@ import java.util.List;
  * skirts down both sides of the web, the chests set into a Cargo car's sides, and a Fluid car's tank
  * with a Sight glass along each side. Coordinates are
  * the car's own: x across, y up from the floor's underside on the flange's top, z along the car with
- * +z the end it faces, the car's middle block from -0.5 to 0.5. Placeholder art, so {@code CarRenderer} only paints these and nothing else
- * decides their sizes. It also holds the car's size and where the Locomotive's Driver sits in it and
+ * +z the end it faces, the car's middle block from -0.5 to 0.5. Each box is a kind of {@link Panel},
+ * which {@code CarRenderer} draws as a tiled texture, and nothing else decides the boxes' sizes. It also holds the car's size and where the Locomotive's Driver sits in it and
  * its Rider stands, so the boxes, the seats and the Driver's view out of the cab are checked together. A body is
  * {@link #length()} long, from {@code -length / 2} to {@code length / 2} along z.
  *
@@ -34,34 +34,28 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
      */
     public static final double GAP = 0.2;
 
-    /** What colour a part is drawn in, red, green and blue. */
-    public enum Paint {
-        /** The shell, rust red as the Rail is. */
-        SHELL(0.62F, 0.27F, 0.18F),
-        /** The skirts and the gangway doors, a darker rust than the shell. */
-        DARK_RUST(0.40F, 0.17F, 0.12F),
-        /** The window bands and the cab's frame, near black. */
-        TRIM(0.13F, 0.08F, 0.07F),
-        /** The band across the Locomotive's front, deep red. */
-        DEEP_RED(0.30F, 0.10F, 0.08F),
+    /** What kind of panel a part is, which says how it is drawn. */
+    public enum Panel {
+        /** The shell's walls. */
+        SHELL,
+        /** A roof. */
+        ROOF,
+        /** The skirts, and the gangway doors, the Engine room's low band and the Fluid car's saddles. */
+        SKIRT,
+        /** The cab's frame and the window's, the louvres, the bay's rail and the tank's bands. */
+        TRIM,
+        /** A window band. */
+        WINDOW,
+        /** The band across the Burner Locomotive's front. */
+        BURNER_NOSE,
+        /** The band across the Electric Locomotive's front. */
+        ELECTRIC_NOSE,
         /** A headlight. */
-        LAMP(0.95F, 0.90F, 0.62F),
-        /** The Electric Locomotive's nose band, copper. */
-        COPPER(0.78F, 0.45F, 0.28F),
-        /** A Fluid car's tank, a paler rust than the shell. */
-        TANK(0.72F, 0.42F, 0.33F),
-        /** A Sight glass above the fluid it shows, dark. */
-        GLASS(0.05F, 0.06F, 0.07F);
-
-        public final float red;
-        public final float green;
-        public final float blue;
-
-        Paint(float red, float green, float blue) {
-            this.red = red;
-            this.green = green;
-            this.blue = blue;
-        }
+        LAMP,
+        /** A Fluid car's tank. */
+        TANK,
+        /** A Sight glass above the fluid it shows. */
+        GLASS
     }
 
     /**
@@ -82,25 +76,25 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         }
     }
 
-    /** A painted box of the car's. */
-    public record Part(Paint paint, Box box) {
+    /** A box of the car's, and the kind of panel it is. */
+    public record Part(Panel panel, Box box) {
 
-        Part(Paint paint, double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
-            this(paint, new Box(minX, minY, minZ, maxX, maxY, maxZ));
+        Part(Panel panel, double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+            this(panel, new Box(minX, minY, minZ, maxX, maxY, maxZ));
         }
 
         Part mirrored() {
-            return new Part(paint, box.mirrored());
+            return new Part(panel, box.mirrored());
         }
 
         Part turned() {
-            return new Part(paint, box.turned());
+            return new Part(panel, box.turned());
         }
     }
 
     /**
-     * A Sight glass along one side of a Fluid car's tank: its pane, painted dark among the body's
-     * parts, which the fluid fills from the bottom as far as the tank is full, on its outer face.
+     * A Sight glass along one side of a Fluid car's tank: its pane, dark {@link Panel#GLASS} among the
+     * body's parts, which the fluid fills from the bottom as far as the tank is full, on its outer face.
      */
     public record SightGlass(Box pane) {
 
@@ -191,20 +185,63 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
     private static List<Part> shell(double length) {
         double half = length / 2.0;
         List<Part> parts = new ArrayList<>();
-        sides(parts, new Part(Paint.DARK_RUST, 0.17, 0.0, -half + 0.01, 0.49, 0.62, half - 0.01));
-        parts.add(new Part(Paint.SHELL, -1.0, 0.55, -half, 1.0, FLOOR_TOP, half));
+        sides(parts, new Part(Panel.SKIRT, 0.17, 0.0, -half + 0.01, 0.49, 0.62, half - 0.01));
+        parts.add(new Part(Panel.SHELL, -1.0, 0.55, -half, 1.0, FLOOR_TOP, half));
         return parts;
     }
 
-    /** A roof from {@code back} to {@code front}. */
-    private static Part roof(double back, double front) {
-        return new Part(Paint.SHELL, -1.0, 2.6, back, 1.0, 2.75, front);
+    /** The radius a roof's edges are rounded on. */
+    static final double ROOF_ROUNDING = 4.0 / 32.0;
+    /** The steps a roof's edges are rounded in: half a pixel, up and in. */
+    static final double ROUNDING_STEP = 1.0 / 32.0;
+    /**
+     * How far each step of a rounded roof reaches down into the one under it, and how far short of an
+     * end left square each stops of the one under it, so no two share a plane.
+     */
+    private static final double STEP_OVERLAP = 0.002;
+    private static final double STEP_SHORT = 0.001;
+
+    /** A roof from {@code back} to {@code front}, its long edges rounded, and its front's when {@code roundFront}. */
+    private static void roof(List<Part> parts, double back, double front, boolean roundFront) {
+        rounded(parts, 1.0, 2.6, 2.75, back, front, false, roundFront);
+    }
+
+    /**
+     * A {@link Panel#ROOF} {@code halfWidth} either side of the middle, from {@code bottom} to
+     * {@code top} and {@code back} to {@code front}, its long top edges, and the ends asked for,
+     * rounded on a radius of {@link #ROOF_ROUNDING} in rows {@link #ROUNDING_STEP} high: each row drawn in by
+     * how far a quarter circle of that radius falls short of the edge at the row's middle, to the
+     * nearest step. The rows that stay full width are one box with the slab under them, so the rows
+     * all differ in width; each stands a hair down into the one under it.
+     */
+    private static void rounded(List<Part> parts, double halfWidth, double bottom, double top, double back, double front,
+                                boolean roundBack, boolean roundFront) {
+        int rows = (int) Math.round(ROOF_ROUNDING / ROUNDING_STEP);
+        double[] insets = new double[rows];
+        int full = 0;
+        for (int row = 0; row < rows; row++) {
+            double up = (row + 0.5) * ROUNDING_STEP;
+            double reach = Math.sqrt(Math.max(0.0, ROOF_ROUNDING * ROOF_ROUNDING - up * up));
+            insets[row] = ROOF_ROUNDING - Math.round(reach / ROUNDING_STEP) * ROUNDING_STEP;
+            if (insets[row] == 0.0 && full == row) {
+                full++;
+            }
+        }
+        double rowsFrom = top - ROOF_ROUNDING;
+        parts.add(new Part(Panel.ROOF, -halfWidth, bottom, back, halfWidth, rowsFrom + full * ROUNDING_STEP, front));
+        for (int row = full; row < rows; row++) {
+            double inset = insets[row];
+            double shortOfEnd = STEP_SHORT * (row - full + 1);
+            double lo = rowsFrom + row * ROUNDING_STEP;
+            parts.add(new Part(Panel.ROOF, -halfWidth + inset, lo - STEP_OVERLAP, back + (roundBack ? inset : shortOfEnd),
+                    halfWidth - inset, lo + ROUNDING_STEP, front - (roundFront ? inset : shortOfEnd)));
+        }
     }
 
     /**
      * The Locomotive: a cab at the front, a closed Engine room over its middle block, and an open bay
      * at its back. The cab has a closed back with a door, an open front framed in dark by the roof's
-     * edge, two corner pillars and a low dash, with a deep red nose and two headlights under it, and
+     * edge, two corner pillars and a low dash, with a nose band and two headlights under it, and
      * an open window in each side, framed by the band. The Engine room is lower than the cab, with
      * louvres down its sides; it is only drawn. The bay has no roof, only a low wall with a dark rail
      * along its sides and back, the Engine room closing it at the front.
@@ -214,48 +251,48 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         double windowBack = CAB_BACK + WINDOW_FROM_CAB_BACK;
         double windowFront = half - WINDOW_FROM_FRONT;
         List<Part> parts = shell(LOCOMOTIVE_LENGTH);
-        parts.add(roof(CAB_BACK, half));
+        roof(parts, CAB_BACK, half, true);
         // The cab's side wall below and above the window, then behind and ahead of it; the band runs
         // on behind and ahead of the window and frames it above and below.
-        sides(parts, new Part(Paint.SHELL, 0.92, 0.68, CAB_BACK + 0.015, 0.99, WINDOW_SILL - 0.005, half - 0.06));
-        sides(parts, new Part(Paint.SHELL, 0.92, WINDOW_HEAD + 0.005, CAB_BACK + 0.015, 0.99, 2.62, half - 0.06));
-        sides(parts, new Part(Paint.SHELL, 0.925, BAND_BOTTOM + 0.05, CAB_BACK + 0.02, 0.985, BAND_TOP - 0.05, windowBack + 0.005));
-        sides(parts, new Part(Paint.SHELL, 0.925, BAND_BOTTOM + 0.05, windowFront - 0.005, 0.985, BAND_TOP - 0.05, half - 0.065));
-        sides(parts, new Part(Paint.TRIM, 0.97, BAND_BOTTOM, CAB_BACK, 1.0, BAND_TOP, windowBack));
-        sides(parts, new Part(Paint.TRIM, 0.97, BAND_BOTTOM, windowFront, 1.0, BAND_TOP, half));
-        sides(parts, new Part(Paint.TRIM, 0.972, BAND_BOTTOM + 0.005, windowBack - 0.005, 0.998, WINDOW_SILL, windowFront + 0.005));
-        sides(parts, new Part(Paint.TRIM, 0.972, WINDOW_HEAD, windowBack - 0.005, 0.998, BAND_TOP - 0.005, windowFront + 0.005));
+        sides(parts, new Part(Panel.SHELL, 0.92, 0.68, CAB_BACK + 0.015, 0.99, WINDOW_SILL - 0.005, half - 0.06));
+        sides(parts, new Part(Panel.SHELL, 0.92, WINDOW_HEAD + 0.005, CAB_BACK + 0.015, 0.99, 2.62, half - 0.06));
+        sides(parts, new Part(Panel.SHELL, 0.925, BAND_BOTTOM + 0.05, CAB_BACK + 0.02, 0.985, BAND_TOP - 0.05, windowBack + 0.005));
+        sides(parts, new Part(Panel.SHELL, 0.925, BAND_BOTTOM + 0.05, windowFront - 0.005, 0.985, BAND_TOP - 0.05, half - 0.065));
+        sides(parts, new Part(Panel.WINDOW, 0.97, BAND_BOTTOM, CAB_BACK, 1.0, BAND_TOP, windowBack));
+        sides(parts, new Part(Panel.WINDOW, 0.97, BAND_BOTTOM, windowFront, 1.0, BAND_TOP, half));
+        sides(parts, new Part(Panel.TRIM, 0.972, BAND_BOTTOM + 0.005, windowBack - 0.005, 0.998, WINDOW_SILL, windowFront + 0.005));
+        sides(parts, new Part(Panel.TRIM, 0.972, WINDOW_HEAD, windowBack - 0.005, 0.998, BAND_TOP - 0.005, windowFront + 0.005));
         // The cab's back wall, and its door, a door's width whatever the car's.
-        parts.add(new Part(Paint.SHELL, -0.95, 0.67, CAB_BACK + 0.01, 0.95, 2.63, CAB_BACK + 0.08));
-        parts.add(new Part(Paint.DARK_RUST, -0.25, 0.75, CAB_BACK, 0.25, 2.35, CAB_BACK + 0.03));
+        parts.add(new Part(Panel.SHELL, -0.95, 0.67, CAB_BACK + 0.01, 0.95, 2.63, CAB_BACK + 0.08));
+        parts.add(new Part(Panel.SKIRT, -0.25, 0.75, CAB_BACK, 0.25, 2.35, CAB_BACK + 0.03));
         // The cab's front.
-        sides(parts, new Part(Paint.TRIM, 0.8, 0.66, half - 0.14, 0.995, 2.64, half - 0.015));
-        parts.add(new Part(Paint.TRIM, -0.99, 2.45, half - 0.05, 0.99, 2.65, half - 0.005));
-        parts.add(new Part(Paint.TRIM, -0.81, 0.65, half - 0.12, 0.81, 1.6, half - 0.02));
-        parts.add(new Part(Paint.DEEP_RED, -1.0, 0.72, half - 0.04, 1.0, 1.45, half - 0.01));
-        sides(parts, new Part(Paint.LAMP, 0.72, 1.1, half - 0.025, 0.86, 1.3, half));
+        sides(parts, new Part(Panel.TRIM, 0.8, 0.66, half - 0.14, 0.995, 2.64, half - 0.015));
+        parts.add(new Part(Panel.TRIM, -0.99, 2.45, half - 0.05, 0.99, 2.65, half - 0.005));
+        parts.add(new Part(Panel.TRIM, -0.81, 0.65, half - 0.12, 0.81, 1.6, half - 0.02));
+        parts.add(new Part(Panel.BURNER_NOSE, -1.0, 0.72, half - 0.04, 1.0, 1.45, half - 0.01));
+        sides(parts, new Part(Panel.LAMP, 0.72, 1.1, half - 0.025, 0.86, 1.3, half));
         // The Engine room, stopping just short of the cab's door, its roof reaching just under the
         // cab's back wall, and its louvres and a dark band low down its sides, set into its walls.
-        parts.add(new Part(Paint.SHELL, -0.95, 0.69, BAY_FRONT, 0.95, 2.2, CAB_BACK - 0.005));
-        parts.add(new Part(Paint.SHELL, -0.99, ENGINE_ROOM_TOP - 0.15, BAY_FRONT - 0.02, 0.99, ENGINE_ROOM_TOP, CAB_BACK + 0.005));
+        parts.add(new Part(Panel.SHELL, -0.95, 0.69, BAY_FRONT, 0.95, 2.2, CAB_BACK - 0.005));
+        rounded(parts, 0.99, ENGINE_ROOM_TOP - 0.15, ENGINE_ROOM_TOP, BAY_FRONT - 0.02, CAB_BACK + 0.005, true, false);
         for (double z = BAY_FRONT + 0.2; z + 0.12 < CAB_BACK - 0.1; z += 0.3) {
-            sides(parts, new Part(Paint.TRIM, 0.94, 1.2, z, 0.97, 2.05, z + 0.12));
+            sides(parts, new Part(Panel.TRIM, 0.94, 1.2, z, 0.97, 2.05, z + 0.12));
         }
-        sides(parts, new Part(Paint.DARK_RUST, 0.945, 0.75, BAY_FRONT + 0.1, 0.98, 1.1, CAB_BACK - 0.1));
+        sides(parts, new Part(Panel.SKIRT, 0.945, 0.75, BAY_FRONT + 0.1, 0.98, 1.1, CAB_BACK - 0.1));
         // The bay's low wall along each side and across the back, reaching into the Engine room, and
         // the rail along its top.
-        sides(parts, new Part(Paint.SHELL, 0.925, 0.685, -half + 0.015, 0.985, BAY_WALL_TOP, BAY_FRONT + 0.02));
-        parts.add(new Part(Paint.SHELL, -0.95, 0.69, -half + 0.01, 0.95, BAY_WALL_TOP - 0.01, -half + 0.07));
-        sides(parts, new Part(Paint.TRIM, 0.91, BAY_WALL_TOP - 0.005, -half, 1.0, BAY_WALL_TOP + 0.08, BAY_FRONT + 0.03));
-        parts.add(new Part(Paint.TRIM, -0.995, BAY_WALL_TOP - 0.015, -half + 0.005, 0.995, BAY_WALL_TOP + 0.075, -half + 0.065));
+        sides(parts, new Part(Panel.SHELL, 0.925, 0.685, -half + 0.015, 0.985, BAY_WALL_TOP, BAY_FRONT + 0.02));
+        parts.add(new Part(Panel.SHELL, -0.95, 0.69, -half + 0.01, 0.95, BAY_WALL_TOP - 0.01, -half + 0.07));
+        sides(parts, new Part(Panel.TRIM, 0.91, BAY_WALL_TOP - 0.005, -half, 1.0, BAY_WALL_TOP + 0.08, BAY_FRONT + 0.03));
+        parts.add(new Part(Panel.TRIM, -0.995, BAY_WALL_TOP - 0.015, -half + 0.005, 0.995, BAY_WALL_TOP + 0.075, -half + 0.065));
         return new CarBody(LOCOMOTIVE_LENGTH, List.copyOf(parts), List.of(), List.of());
     }
 
-    /** The Electric Locomotive: the Burner's body, its nose band copper rather than deep red. Placeholder. */
+    /** The Electric Locomotive: the Burner's body, with its own nose band. */
     private static CarBody electric() {
         List<Part> parts = new ArrayList<>();
         for (Part part : LOCOMOTIVE.parts()) {
-            parts.add(part.paint() == Paint.DEEP_RED ? new Part(Paint.COPPER, part.box()) : part);
+            parts.add(part.panel() == Panel.BURNER_NOSE ? new Part(Panel.ELECTRIC_NOSE, part.box()) : part);
         }
         return new CarBody(LOCOMOTIVE.length(), List.copyOf(parts), List.of(), List.of());
     }
@@ -268,13 +305,13 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         double length = CargoCar.LENGTH - GAP;
         double half = length / 2.0;
         List<Part> parts = shell(length);
-        parts.add(roof(-half, half));
-        sides(parts, new Part(Paint.TRIM, 0.97, BAND_BOTTOM, -half, 1.0, BAND_TOP, half));
-        ends(parts, new Part(Paint.SHELL, -0.95, 0.67, half - 0.08, 0.95, 2.63, half - 0.01));
-        ends(parts, new Part(Paint.DARK_RUST, -0.25, 0.75, half - 0.03, 0.25, 2.35, half));
+        roof(parts, -half, half, false);
+        sides(parts, new Part(Panel.WINDOW, 0.97, BAND_BOTTOM, -half, 1.0, BAND_TOP, half));
+        ends(parts, new Part(Panel.SHELL, -0.95, 0.67, half - 0.08, 0.95, 2.63, half - 0.01));
+        ends(parts, new Part(Panel.SKIRT, -0.25, 0.75, half - 0.03, 0.25, 2.35, half));
         // The side's inner wall, then the facing between and around the recesses, which stands proud
         // of the wall by the recess's depth, and the facing above and below each recess.
-        sides(parts, new Part(Paint.SHELL, 0.83, 0.68, -half + 0.015, 0.89, 2.62, half - 0.015));
+        sides(parts, new Part(Panel.SHELL, 0.83, 0.68, -half + 0.015, 0.89, 2.62, half - 0.015));
         List<Double> edges = new ArrayList<>(List.of(-half + 0.02));
         for (double at : CHESTS_AT) {
             edges.add(at - HALF_RECESS + 0.01);
@@ -282,12 +319,12 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         }
         edges.add(half - 0.02);
         for (int i = 0; i < edges.size(); i += 2) {
-            sides(parts, new Part(Paint.SHELL, 0.88, 0.665, edges.get(i), 0.99, 2.635, edges.get(i + 1)));
+            sides(parts, new Part(Panel.SHELL, 0.88, 0.665, edges.get(i), 0.99, 2.635, edges.get(i + 1)));
         }
         List<Box> chests = new ArrayList<>();
         for (double at : CHESTS_AT) {
-            sides(parts, new Part(Paint.SHELL, 0.882, 1.48, at - HALF_RECESS, 0.988, 2.625, at + HALF_RECESS));
-            sides(parts, new Part(Paint.SHELL, 0.882, 0.675, at - HALF_RECESS, 0.988, 1.07, at + HALF_RECESS));
+            sides(parts, new Part(Panel.SHELL, 0.882, 1.48, at - HALF_RECESS, 0.988, 2.625, at + HALF_RECESS));
+            sides(parts, new Part(Panel.SHELL, 0.882, 0.675, at - HALF_RECESS, 0.988, 1.07, at + HALF_RECESS));
             // The chest fills a cube in the recess, its lock just behind the facing.
             Box chest = new Box(0.55, 1.075, at - 0.195, 0.94, 1.465, at + 0.195);
             chests.add(chest);
@@ -306,15 +343,15 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         double length = FluidCar.LENGTH - GAP;
         double half = length / 2.0;
         List<Part> parts = shell(length);
-        parts.add(new Part(Paint.TANK, -0.95, 1.0, -half + 0.07, 0.95, 2.3, half - 0.07));
-        parts.add(new Part(Paint.TANK, -0.7, 0.72, -half + 0.06, 0.7, 2.58, half - 0.06));
-        parts.add(new Part(Paint.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
-        ends(parts, new Part(Paint.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
-        ends(parts, new Part(Paint.DARK_RUST, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
+        parts.add(new Part(Panel.TANK, -0.95, 1.0, -half + 0.07, 0.95, 2.3, half - 0.07));
+        parts.add(new Part(Panel.TANK, -0.7, 0.72, -half + 0.06, 0.7, 2.58, half - 0.06));
+        parts.add(new Part(Panel.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
+        ends(parts, new Part(Panel.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
+        ends(parts, new Part(Panel.SKIRT, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
         double glassEnd = SIGHT_GLASS_LENGTH / 2.0;
-        sides(parts, new Part(Paint.TRIM, 0.94, 1.08, -glassEnd - 0.04, 0.96, 2.22, glassEnd + 0.04));
+        sides(parts, new Part(Panel.TRIM, 0.94, 1.08, -glassEnd - 0.04, 0.96, 2.22, glassEnd + 0.04));
         Box pane = new Box(0.945, 1.12, -glassEnd, 0.965, 2.18, glassEnd);
-        sides(parts, new Part(Paint.GLASS, pane));
+        sides(parts, new Part(Panel.GLASS, pane));
         List<SightGlass> glasses = List.of(new SightGlass(pane), new SightGlass(pane.mirrored()));
         return new CarBody(length, List.copyOf(parts), List.of(), glasses);
     }
