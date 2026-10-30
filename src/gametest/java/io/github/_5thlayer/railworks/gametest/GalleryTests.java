@@ -110,6 +110,8 @@ final class GalleryTests {
     /** The ends of the strip its line runs along, out past its plot, from where it is run. */
     private static final BlockPos FAR_WEST = new BlockPos(22, 0, -8);
     private static final BlockPos FAR_EAST = new BlockPos(262, 0, -4);
+    /** How high above the strip's foot the scene builds, its Station and hatch on their pillars, as {@code far_away/laid} clears it. */
+    private static final int FAR_HEIGHT = 6;
     /** The flyover's Arms, from where it is run: the low line's, west to east, and the high line's, south to north. */
     private static final List<BlockPos> LOW_LINE = List.of(
             new BlockPos(3, 1, -6), new BlockPos(11, 1, -6), new BlockPos(19, 1, -6), new BlockPos(27, 1, -6),
@@ -387,7 +389,44 @@ final class GalleryTests {
                     var loose = helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
                             net.minecraft.world.phys.AABB.encapsulatingFullBlocks(at.offset(FAR_WEST), at.offset(FAR_EAST).above(8)));
                     helper.assertTrue(loose.isEmpty(), "building again left items along the line: " + loose.stream().map(ItemEntity::getItem).toList());
-                })).thenSucceed();
+                })
+                // Off the line, so cutting it derails nothing out of view.
+                .thenWaitUntil(() -> helper.assertTrue(trainsIn(helper, farStrip(at)).isEmpty(), "the Train is still out on the line"))
+                .thenExecute(() -> clearFarStrip(helper, farStrip(at)))
+                .thenExecute(() -> farStripCleared(helper, farStrip(at), train.getFirst()))).thenSucceed();
+    }
+
+    /**
+     * Breaks what the far-away scene built along its line, {@code strip}, as {@code gallery/clear}
+     * breaks a plot, its Pylons cutting their Spans and its Station and hatch taking their records with
+     * them, then takes what that dropped. The plot's own clear stops at the plot, and the test grid lays
+     * the next tests along the line, where a second Station named Mine would stop their Trains.
+     */
+    private static void clearFarStrip(GameTestHelper helper, BoundingBox strip) {
+        var level = helper.getLevel();
+        for (var pos : BlockPos.betweenClosed(strip.minX(), strip.minY(), strip.minZ(), strip.maxX(), strip.maxY(), strip.maxZ())) {
+            if (!level.getBlockState(pos).isAir()) {
+                level.destroyBlock(pos, false);
+            }
+        }
+        level.getEntitiesOfClass(ItemEntity.class, AABB.of(strip)).forEach(ItemEntity::discard);
+    }
+
+    /** Asserts nothing of the far-away scene is left along its line, {@code strip}: no Station, hatch, Span or Train, nor a car of its {@code train} fallen off it. */
+    private static void farStripCleared(GameTestHelper helper, BoundingBox strip, Train train) {
+        var level = helper.getLevel();
+        var rails = LevelRails.of(level);
+        var stations = LevelStations.of(level).stations().all().stream()
+                .filter(station -> strip.isInside(station.x(), station.y(), station.z())).toList();
+        helper.assertTrue(stations.isEmpty(), "the far-away scene left Stations along its line: " + stations);
+        var hatches = LevelHatches.of(level).all().stream().filter(hatch -> strip.isInside(hatch.pos())).toList();
+        helper.assertTrue(hatches.isEmpty(), "the far-away scene left hatches along its line at "
+                + hatches.stream().map(hatch -> hatch.pos().toShortString()).toList());
+        var spans = rails.network().all().stream().filter(span -> inside(strip, span.a()) || inside(strip, span.b())).toList();
+        helper.assertTrue(spans.isEmpty(), "the far-away scene left Spans along its line: " + spans);
+        helper.assertTrue(trainsIn(helper, strip).isEmpty(), "the far-away scene left a Train along its line");
+        helper.assertTrue(train.cars().stream().noneMatch(car -> rails.fallen().contains(car.id())),
+                "the far-away scene's Train fell off its line");
     }
 
     /**
@@ -421,6 +460,11 @@ final class GalleryTests {
     private static BoundingBox plot(BlockPos at) {
         return new BoundingBox(at.getX() + GalleryCheck.FIRST_PLOT_EAST - REACH_WEST, at.getY() - 1, at.getZ() - PLOT_DEPTH + 1,
                 at.getX() + GalleryCheck.FIRST_PLOT_EAST + PLOT_WIDTH - 1 + REACH_EAST, at.getY() + GalleryCheck.PLOT_HEIGHT - 1, at.getZ());
+    }
+
+    /** The strip the far-away scene run from {@code at} builds its line along, from inside its plot out to Mine, absolute. */
+    private static BoundingBox farStrip(BlockPos at) {
+        return BoundingBox.fromCorners(at.offset(FAR_WEST), at.offset(FAR_EAST).above(FAR_HEIGHT));
     }
 
     /** The Arms at {@code line}, from {@code origin}. */
