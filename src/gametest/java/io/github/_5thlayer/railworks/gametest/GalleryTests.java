@@ -20,6 +20,7 @@ import io.github._5thlayer.railworks.PylonColumn;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.RailworksRegistries;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.Clearance;
 import io.github._5thlayer.railworks.rail.Logistics;
 import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.Station;
@@ -43,8 +44,9 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The Gallery pack (libworks ADR 0010), through libworks' {@link GalleryCheck}: offered and off, its
  * build running every command without failing, and each scene's key block where it stands, the
- * Stations scene's Stations in the level's Stations under their names, and the flyover's two lines
- * strung and not joined. Beyond the build, the coupling scene's sign, clicked, builds it again,
+ * Stations scene's Stations in the level's Stations under their names, the flyover's two lines
+ * strung and not joined, and every scene's Clearance inside what {@code gallery/clear} clears, which
+ * reaches past a plot's ends as far as its lines' does. Beyond the build, the coupling scene's sign, clicked, builds it again,
  * leaving one Train and nothing loose, and the two logistics scenes are built working: each
  * requester's chest gets what it asks for, as the refuel scene's does once its dry Train is fuelled,
  * the charge scene's once its Train is charged, by a Creative Charger and by a Charger its Burner
@@ -61,10 +63,14 @@ final class GalleryTests {
      * {@link #PLOT_WIDTH}.
      */
     private static final Layout ROWS = new Layout(1, 16);
-    /** A scene's plot, along its row from {@link GalleryCheck#FIRST_PLOT_EAST} east of where it is run, as {@code gallery/clear} clears it. */
+    /** A scene's plot, along its row from {@link GalleryCheck#FIRST_PLOT_EAST} east of where it is run. */
     private static final int PLOT_WIDTH = 40;
-    /** How far a car reaches east of its plot, on a Span ending at the plot's east end: half a car's length, and a block. */
-    private static final int PAST_PLOT = 4;
+    /**
+     * How far past its plot's west and east ends {@code gallery/clear} clears too: the Clearance of a
+     * line ending at an Arm at the plot's second block or its last reaches two blocks past it.
+     */
+    private static final int REACH_WEST = 1;
+    private static final int REACH_EAST = 2;
     /** A scene's plot, from its sign's row at the origin's z to 14 blocks north. */
     private static final int PLOT_DEPTH = 15;
 
@@ -105,7 +111,7 @@ final class GalleryTests {
     private static final List<BlockPos> LOW_LINE = List.of(
             new BlockPos(3, 1, -6), new BlockPos(11, 1, -6), new BlockPos(19, 1, -6), new BlockPos(27, 1, -6),
             new BlockPos(35, 1, -6), new BlockPos(41, 1, -6));
-    private static final List<BlockPos> HIGH_LINE = List.of(new BlockPos(23, 6, -1), new BlockPos(23, 6, -14));
+    private static final List<BlockPos> HIGH_LINE = List.of(new BlockPos(23, 6, -2), new BlockPos(23, 6, -12));
 
     /** The stacks the logistics scene's provider holds once built. */
     private static final int PROVIDED_STACKS = 8;
@@ -141,6 +147,8 @@ final class GalleryTests {
     static void register(RailworksGameTests.Registrar tests) {
         tests.testOnItsOwn("gallery_pack_is_offered_and_off_and_its_build_lays_every_scene_with_no_failing_command",
                 GalleryCheck.TICKS, GalleryTests::builds);
+        tests.testOnItsOwn("gallery_clear_clears_its_plot_and_its_lines_reach_past_its_ends",
+                GalleryCheck.TICKS, GalleryTests::clearsReach);
         tests.testOnItsOwn("gallery_coupling_sign_clicked_builds_the_scene_again_with_one_train",
                 GalleryCheck.TICKS, GalleryTests::signReplays);
         tests.testOnItsOwn("gallery_logistics_scenes_deliver_what_each_requester_asks_for",
@@ -159,7 +167,8 @@ final class GalleryTests {
     /**
      * libworks' build check, written out to add what no key block shows: the Stations scene's
      * Stations, registered by name, the flyover's two lines, each strung and neither joined to the
-     * other, and every scene's Stations, hatches and Chargers in the row beside the Rail.
+     * other, every scene's Clearance inside what {@code gallery/clear} clears, and every scene's
+     * Stations, hatches and Chargers in the row beside the Rail.
      */
     private static void builds(GameTestHelper helper) {
         var scenes = scenes();
@@ -176,6 +185,10 @@ final class GalleryTests {
                     }
                     GalleryCheck.assertRuns(helper, source, GalleryPack.build(Railworks.MOD_ID));
                     GalleryCheck.assertKeyBlocks(helper, at, ROWS, scenes);
+                    // On the build's tick, before a neighbouring test strings a line of its own across a plot.
+                    for (int index = 0; index < scenes.size(); index++) {
+                        reachCleared(helper, scenes.get(index).name(), plot(ROWS.sceneOrigin(at, index)));
+                    }
                     var low = arms(flyover, LOW_LINE);
                     var high = arms(flyover, HIGH_LINE);
                     strung(helper, low);
@@ -196,6 +209,27 @@ final class GalleryTests {
                         inRow(helper, scenes.get(index).name(), plot(ROWS.sceneOrigin(at, index)));
                     }
                 })).thenSucceed();
+    }
+
+    /**
+     * {@code gallery/clear}, run on a plot filled with stone, leaves air above a stone floor across
+     * the whole of {@link #plot}, the two blocks past a line's end Arm at either end included, where
+     * a block left from earlier would refuse the line's Span.
+     */
+    private static void clearsReach(GameTestHelper helper) {
+        var at = helper.absolutePos(ORIGIN);
+        var plot = plot(at);
+        var level = helper.getLevel();
+        withPack(helper, ONE_SCENE, (source, steps) -> steps.thenExecute(() -> {
+            BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ())
+                    .forEach(pos -> level.setBlock(pos, Blocks.STONE.defaultBlockState(), 2));
+            GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "clear"));
+            for (var pos : BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ())) {
+                var expected = pos.getY() == plot.minY() ? Blocks.STONE : Blocks.AIR;
+                helper.assertTrue(level.getBlockState(pos).is(expected),
+                        "gallery/clear left " + level.getBlockState(pos) + " at " + pos.toShortString() + ", not " + expected);
+            }
+        })).thenSucceed();
     }
 
     /** The coupling scene's sign, clicked, builds the scene again: the one Train of three cars, and nothing loose. */
@@ -357,10 +391,8 @@ final class GalleryTests {
      * libworks' {@link GalleryCheck#withPack} over the first {@code plots} plots, as {@code build} lays
      * them, with the parts of each plot its own narrower plot leaves out loaded and cleared before and
      * cleared after: it force-loads, and sets to air, only the {@link GalleryCheck#PLOT_WIDTH} by
-     * {@link GalleryCheck#PLOT_DEPTH} of each plot by the scene's origin. Before, it also clears
-     * {@link #PAST_PLOT} east of each plot, where a Train on a Span ending at the plot's east end
-     * stands: the test grid's neighbouring tests, five blocks off, may have left blocks in either.
-     * The runner lets the chunks go once the batch ends.
+     * {@link GalleryCheck#PLOT_DEPTH} of each plot by the scene's origin. The runner lets the chunks
+     * go once the batch ends.
      */
     private static GameTestSequence withPack(GameTestHelper helper, int plots, BiConsumer<CommandSourceStack, GameTestSequence> steps) {
         var at = helper.absolutePos(ORIGIN);
@@ -370,9 +402,7 @@ final class GalleryTests {
                 level.getChunk(chunk.x(), chunk.z());
                 level.setChunkForced(chunk.x(), chunk.z(), true);
             });
-            BoundingBox plot = plot(ROWS.sceneOrigin(at, index));
-            StructureUtils.clearSpaceForStructure(new BoundingBox(plot.minX(), plot.minY(), plot.minZ(),
-                    plot.maxX() + PAST_PLOT, plot.maxY(), plot.maxZ()), level);
+            StructureUtils.clearSpaceForStructure(plot(ROWS.sceneOrigin(at, index)), level);
         }
         return GalleryCheck.withPack(helper, Railworks.MOD_ID, ORIGIN, ROWS, plots, steps).thenExecute(() -> {
             for (int index = 0; index < plots; index++) {
@@ -381,10 +411,13 @@ final class GalleryTests {
         });
     }
 
-    /** The plot of a scene run from {@code at}, absolute, its floor included, as {@code gallery/clear} clears it. */
+    /**
+     * The plot of a scene run from {@code at}, absolute, its floor and its lines' reach past its west
+     * and east ends included, as {@code gallery/clear} clears it.
+     */
     private static BoundingBox plot(BlockPos at) {
-        return new BoundingBox(at.getX() + GalleryCheck.FIRST_PLOT_EAST, at.getY() - 1, at.getZ() - PLOT_DEPTH + 1,
-                at.getX() + GalleryCheck.FIRST_PLOT_EAST + PLOT_WIDTH - 1, at.getY() + GalleryCheck.PLOT_HEIGHT - 1, at.getZ());
+        return new BoundingBox(at.getX() + GalleryCheck.FIRST_PLOT_EAST - REACH_WEST, at.getY() - 1, at.getZ() - PLOT_DEPTH + 1,
+                at.getX() + GalleryCheck.FIRST_PLOT_EAST + PLOT_WIDTH - 1 + REACH_EAST, at.getY() + GalleryCheck.PLOT_HEIGHT - 1, at.getZ());
     }
 
     /** The Arms at {@code line}, from {@code origin}. */
@@ -434,6 +467,28 @@ final class GalleryTests {
                         "the " + scene + " scene's " + block.getName().getString() + " at " + pos.toShortString() + " joins no Station");
             }
         }
+    }
+
+    /**
+     * Asserts the Clearance of each Span between two Pylons on {@code plot} lies in it, where
+     * {@code gallery/clear} clears before a build: a block an earlier visit left past it would refuse
+     * the Span. The far-away scene's line, running on out of its plot, clears its own way.
+     */
+    private static void reachCleared(GameTestHelper helper, String scene, BoundingBox plot) {
+        var network = LevelRails.of(helper.getLevel()).network();
+        for (var span : network.all()) {
+            if (pylonOn(helper, plot, span.a()) && pylonOn(helper, plot, span.b())) {
+                for (var cell : Clearance.along(network.curve(span))) {
+                    helper.assertTrue(plot.isInside(cell.x(), cell.y(), cell.z()),
+                            "the " + scene + " scene's Span " + span + " keeps clear " + cell + ", past what gallery/clear clears");
+                }
+            }
+        }
+    }
+
+    /** Whether a Pylon stands at {@code arm} on {@code plot}, not a Span's stale end a neighbouring test left under the floor. */
+    private static boolean pylonOn(GameTestHelper helper, BoundingBox plot, Arm arm) {
+        return inside(plot, arm) && helper.getLevel().getBlockState(PylonColumn.block(arm)).is(RailworksRegistries.PYLON.get());
     }
 
     /** Asserts the chest at {@code pos}, absolute, holds some {@code item}. */
