@@ -16,6 +16,8 @@ import io.github._5thlayer.railworks.HatchBlockEntity;
 import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.Goods;
+import io.github._5thlayer.railworks.rail.Platform;
+import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.SightGlassFill;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.client.Minecraft;
@@ -46,12 +48,13 @@ import org.jspecify.annotations.Nullable;
  * tank's fluid as the server last sent it ({@link SightGlassFluid}), just proud of the face, on all
  * four sides, the one facing a car too, with nothing in front of it. A requester's bucket, the filled
  * bucket of what it asks for, lies flat on its top instead, as an item rests on a shelf, lit as the
- * block above is.
+ * block above is, unless its Loading arm rises from there.
  *
  * <p>While a car of its kind stands at its spot in a Train stopped at its Station
  * ({@link PlatformsNear#facingCar}), a hatch of items draws its Bellows, an accordion sleeve,
- * across the half block of air to the Cargo car's side, and a Fluid hatch its Loading arm, a pipe
- * dropping to a nozzle on the Fluid car's tank, in place of the item on that side. Neither is a
+ * across the half block of air to the Cargo car's side, in place of the item on that side, and a
+ * Fluid hatch its Loading arm, a pipe rising from its top, over the car and down into the top of the
+ * Fluid car's tank, in place of the bucket there. Neither is a
  * block: each is worked out afresh from the cars the client sees, every {@link #REFRESH_TICKS},
  * and goes as the car leaves.
  */
@@ -77,13 +80,24 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     /**
      * How far a hatch's side is from the car's beside it, in blocks: a hatch stands two off the
      * Rail's line, its side half a block nearer, and a car's side {@link CarBody#WIDTH} / 2 off it. The
-     * Bellows and the Loading arm reach a little past, into the car's facing or its tank.
+     * Bellows reach a little past, into the car's facing.
      */
     private static final float ACROSS = (float) (Station.ROW_OFF - 0.5 - CarBody.WIDTH / 2);
     /** How far into the car's side the Bellows reach: through a Cargo car's facing, 0.11 deep. */
     private static final float INTO_FACING = 0.02F;
-    /** How far into the Fluid car's tank, which stands 0.05 inside the car's side, the Loading arm reaches. */
-    private static final float INTO_TANK = 0.06F;
+    /**
+     * Where the floor's underside of a car beside a hatch is, up from the hatch's middle: the hatch's
+     * block starts a block above the flange's underside, and the floor rests on the flange's top.
+     */
+    private static final float FLOOR = (float) (RailGeometry.FLANGE_HEIGHT - 1.5);
+    /** How high the Loading arm's pipe runs over the car, up from the hatch's middle: just clear of its top. */
+    private static final float OVER_CAR = FLOOR + (float) CarBody.HEIGHT + 0.12F;
+    /** The Loading arm's pipe's half width. */
+    private static final float PIPE = 0.07F;
+    /** The Loading arm's elbows' half width. */
+    private static final float ELBOW = 0.1F;
+    /** The Loading arm's collar's half width, on the tank's top, inside the dome's. */
+    private static final float COLLAR = 0.13F;
     /** A side's pixels, as its texture's, across and up. */
     private static final float PIXELS = 16.0F;
     /** How often whether a car stands at the hatch's spot is worked out again, in ticks. */
@@ -117,7 +131,8 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     /** Each hatch's side facing a car, as last worked out, and when; dropped with the hatch. */
     private final Map<HatchBlockEntity, Facing> facing = new WeakHashMap<>();
 
-    private record Facing(long at, @Nullable Direction side) {
+    /** {@code middle}: whether the hatch stands beside the middle block of its spot, where the Fluid car's dome is. */
+    private record Facing(long at, @Nullable Direction side, boolean middle) {
     }
 
     @Override
@@ -138,7 +153,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         }
         state.serves = CarKind.carrying(
                 hatch.getBlockState().getBlock() instanceof HatchBlock block ? block.holds() : Goods.Kind.ITEMS);
-        state.toCar = facingCar(hatch, level, state.serves);
+        Facing facing = facingCar(hatch, level, state.serves);
+        state.toCar = facing.side();
+        state.toDome = facing.middle();
         for (Direction side : Direction.Plane.HORIZONTAL) {
             state.light[side.get2DDataValue()] = LevelRenderer.getLightCoords(level, hatch.getBlockPos().relative(side));
         }
@@ -159,19 +176,23 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
      * The side facing the car of kind {@code serves} at the hatch's spot, worked out again once
      * {@link #REFRESH_TICKS} have passed.
      */
-    private @Nullable Direction facingCar(HatchBlockEntity hatch, Level level, CarKind serves) {
+    private Facing facingCar(HatchBlockEntity hatch, Level level, CarKind serves) {
         long now = level.getGameTime();
         Facing last = facing.get(hatch);
         if (last == null || now - last.at() >= REFRESH_TICKS || now < last.at()) {
-            last = new Facing(now, PlatformsNear.facingCar(level, hatch.getBlockPos(), serves).orElse(null));
+            var pos = hatch.getBlockPos();
+            // A car's middle block is its spot's, the one an Engine room stands in.
+            last = new Facing(now, PlatformsNear.facingCar(level, pos, serves).orElse(null),
+                    PlatformsNear.joined(level, pos).map(Platform.Joined::engineRoom).orElse(false));
             facing.put(hatch, last);
         }
-        return last.side();
+        return last;
     }
 
     /**
      * On each side, turned as an item frame on that side would turn it, so its own front faces out;
-     * on the side facing a car, its Bellows or Loading arm instead.
+     * on the side facing a car, its Bellows instead; a Fluid hatch's bucket on its top, or its Loading
+     * arm there.
      */
     @Override
     public void submit(RenderState state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState cameraRenderState) {
@@ -185,7 +206,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
             return;
         }
         if (state.serves == CarKind.FLUID) {
-            submitOnTop(state.item, state.topLight, poseStack, collector);
+            if (state.toCar == null) {
+                submitOnTop(state.item, state.topLight, poseStack, collector);
+            }
             return;
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
@@ -251,9 +274,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     }
 
     /**
-     * The Bellows or the Loading arm, out of the side facing the car, in that side's frame: across
-     * the block from -0.5 to 0.5 along x, up it from -0.5 to 0.5 along y, and out from its face at
-     * -0.5 along -z, to the car's side at {@link #ACROSS} further.
+     * The Bellows or the Loading arm, toward the car, in the frame of the side facing it: across the
+     * block from -0.5 to 0.5 along x, up it from -0.5 to 0.5 along y, and out from its face at -0.5
+     * along -z, to the car's side at {@link #ACROSS} further and its middle at {@link Station#ROW_OFF}.
      */
     private static void submitToCar(RenderState state, PoseStack poseStack, SubmitNodeCollector collector) {
         int light = state.light[state.toCar.get2DDataValue()];
@@ -265,7 +288,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
             if (bellows) {
                 bellows(pose.pose(), buffer, light);
             } else {
-                loadingArm(pose.pose(), buffer, light);
+                loadingArm(pose.pose(), buffer, state.toDome, light);
             }
         });
         poseStack.popPose();
@@ -298,24 +321,25 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     }
 
     /**
-     * A pipe out of a flange on the face, which drops at an elbow and turns into a nozzle on the
-     * Fluid car's tank, its end in the tank's side.
+     * A pipe up out of a flange on the top, which turns at an elbow over the Fluid car, runs out to
+     * above its middle and drops at a second elbow into a collar on the tank's top: on the dome when
+     * {@code toDome}, the hatch beside the car's middle block, and on the tank straight across
+     * from the hatch otherwise.
      */
-    private static void loadingArm(Matrix4f pose, VertexConsumer buffer, int light) {
-        float face = -0.5F;
-        float tank = face - ACROSS - INTO_TANK;
-        float high = 0.18F;
-        float low = -0.12F;
-        float pipe = 0.07F;
-        float elbow = face - 0.3F;
-        // The flange on the hatch, the pipe out to the elbow, down, then on into the nozzle.
-        // Each pipe starts and ends inside what it joins, so no two faces share a plane.
-        box(pose, buffer, 0.15F, high, face + 0.01F, face - 0.05F, Paint.IRON, light);
-        box(pose, buffer, pipe, high, face - 0.04F, elbow, Paint.PIPE, light);
-        box(pose, buffer, 0.1F, high, elbow + 0.1F, elbow - 0.1F, Paint.IRON, light);
-        boxY(pose, buffer, pipe - 0.005F, elbow, high, low, Paint.PIPE, light);
-        box(pose, buffer, pipe + 0.005F, low, elbow + pipe + 0.01F, tank + 0.07F, Paint.PIPE, light);
-        box(pose, buffer, 0.13F, low, tank + 0.08F, tank, Paint.IRON, light);
+    private static void loadingArm(Matrix4f pose, VertexConsumer buffer, boolean toDome, int light) {
+        float top = 0.5F;
+        float car = (float) -Station.ROW_OFF;
+        float landing = FLOOR + (float) (toDome ? CarBody.DOME_TOP : CarBody.TANK_TOP);
+        // The flange on the hatch, the pipe up to the first elbow, out to the second, then down into the
+        // collar. Each pipe starts and ends inside what it joins, and no two are as wide, so no two
+        // faces share a plane.
+        boxY(pose, buffer, 0.15F, 0, top - 0.01F, top + 0.05F, Paint.IRON, light);
+        boxY(pose, buffer, PIPE, 0, top + 0.04F, OVER_CAR, Paint.PIPE, light);
+        box(pose, buffer, ELBOW, OVER_CAR, ELBOW, -ELBOW, Paint.IRON, light);
+        box(pose, buffer, PIPE + 0.005F, OVER_CAR, -ELBOW + 0.01F, car + ELBOW - 0.01F, Paint.PIPE, light);
+        box(pose, buffer, ELBOW, OVER_CAR, car + ELBOW, car - ELBOW, Paint.IRON, light);
+        boxY(pose, buffer, PIPE - 0.005F, car, OVER_CAR - ELBOW + 0.01F, landing + 0.07F, Paint.PIPE, light);
+        boxY(pose, buffer, COLLAR, car, landing + 0.08F, landing - 0.01F, Paint.IRON, light);
     }
 
     /**
@@ -344,15 +368,18 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
      */
     @Override
     public AABB getRenderBoundingBox(HatchBlockEntity hatch) {
-        double reach = Math.max(REACH, ACROSS + INTO_TANK);
-        // A bucket on the top reaches no further above it than an item on a side reaches out of it.
-        return new AABB(hatch.getBlockPos()).inflate(reach, 0, reach).expandTowards(0, REACH, 0);
+        // The Loading arm reaches out to the car's middle, past its collar, and up to its elbows.
+        double reach = Math.max(REACH, Station.ROW_OFF - 0.5 + COLLAR);
+        double above = Math.max(REACH, OVER_CAR + ELBOW - 0.5);
+        return new AABB(hatch.getBlockPos()).inflate(reach, 0, reach).expandTowards(0, above, 0);
     }
 
     static final class RenderState extends BlockEntityRenderState {
         private @Nullable ItemStackRenderState item;
         /** The side facing the car at its spot, which its Bellows or Loading arm reaches out of; null for none. */
         private @Nullable Direction toCar;
+        /** Whether a Loading arm drops onto the car's dome, the hatch beside its middle block. */
+        private boolean toDome;
         /** The kind of car the hatch serves, which says whether it draws its Bellows or its Loading arm. */
         private CarKind serves = CarKind.CARGO;
         /** A Fluid hatch's fluid; null for none, or a hatch of items. */

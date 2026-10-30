@@ -148,6 +148,10 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
     private static final double ENGINE_ROOM_TOP = 2.32;
     /** The top of every car's floor, over its underside. */
     public static final double FLOOR_TOP = 0.7;
+    /** The top of a Fluid car's tank, over the floor's underside. */
+    public static final double TANK_TOP = 2.58;
+    /** The top of the dome on a Fluid car's tank, over its middle block, over the floor's underside. */
+    public static final double DOME_TOP = 2.72;
 
     /**
      * Where the Locomotive's cab ends and its Engine room begins, and where the Engine room ends and
@@ -307,8 +311,8 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         double half = length / 2.0;
         List<Part> parts = shell(length);
         parts.add(new Part(Paint.TANK, -0.95, 1.0, -half + 0.07, 0.95, 2.3, half - 0.07));
-        parts.add(new Part(Paint.TANK, -0.7, 0.72, -half + 0.06, 0.7, 2.58, half - 0.06));
-        parts.add(new Part(Paint.TANK, -0.15, 2.57, -0.2, 0.15, 2.72, 0.2));
+        parts.add(new Part(Paint.TANK, -0.7, 0.72, -half + 0.06, 0.7, TANK_TOP, half - 0.06));
+        parts.add(new Part(Paint.TANK, -0.15, TANK_TOP - 0.01, -0.2, 0.15, DOME_TOP, 0.2));
         ends(parts, new Part(Paint.TRIM, -0.96, 0.99, half - 0.5, 0.96, 2.31, half - 0.44));
         ends(parts, new Part(Paint.DARK_RUST, -0.8, 0.69, half - 0.35, 0.8, 0.8, half - 0.2));
         double glassEnd = SIGHT_GLASS_LENGTH / 2.0;

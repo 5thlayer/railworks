@@ -139,7 +139,7 @@ What a hatch of items stretches across the half block to the Cargo car standing 
 _Avoid_: chute (Create's), coupling (cars'), gangway, dock seal
 
 **Loading arm**:
-What a Fluid hatch swings across the half block to the Fluid car standing at its spot, shown while the car stands there in a Train stopped at the Station, as a hatch of items stretches its Bellows. Not a Pylon's Arm.
+The pipe a Fluid hatch raises from its top and reaches over to the top of the tank of the Fluid car standing at its spot, at the car's dome when the hatch stands beside the car's middle, shown while the car stands there in a Train stopped at the Station, as a hatch of items stretches its Bellows. Not a Pylon's Arm.
 _Avoid_: pump (Pipeworks' Pump), hose, transfer hose, Bellows (for a Fluid hatch)
 
 **Charger**:
