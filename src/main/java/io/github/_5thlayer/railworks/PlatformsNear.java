@@ -91,6 +91,15 @@ public final class PlatformsNear {
      * sent beyond them.
      */
     public static Optional<Direction> facingCar(Level level, BlockPos pos, CarKind kind) {
+        return carFacing(level, pos, kind).map(CarFacing::side);
+    }
+
+    /** The car a hatch reaches across to, and the side of the hatch facing it. */
+    public record CarFacing(Direction side, CarEntity car) {
+    }
+
+    /** As {@link #facingCar}, with the car. */
+    public static Optional<CarFacing> carFacing(Level level, BlockPos pos, CarKind kind) {
         Optional<Platform.Joined> joined = joined(level, pos);
         if (joined.isEmpty()) {
             return Optional.empty();
@@ -113,7 +122,7 @@ public final class PlatformsNear {
         }
         return platform.get().standingAt(network, joined.get().spot(), List.copyOf(atRest.keySet()))
                 .filter(standing -> atRest.get(standing).carKind() == kind)
-                .map(standing -> toward(pos, standing.place(), network));
+                .map(standing -> new CarFacing(toward(pos, standing.place(), network), atRest.get(standing)));
     }
 
     /** The side of the block at {@code pos} toward the Rail under {@code place}, on a Straight leg, square to the blocks. */

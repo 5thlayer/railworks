@@ -103,13 +103,19 @@ public final class HatchBlock extends Block implements EntityBlock {
         return new HatchBlockEntity(pos, state);
     }
 
-    /** Ticks on the server only, working out the item its watchers draw on its sides. */
+    /**
+     * Ticks on the server, working out the item its watchers draw on its sides, and on a client,
+     * reaching its Bellows or Loading arm out to the car at its spot and folding it back.
+     */
     @Override
     public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        if (!(level instanceof ServerLevel) || type != RailworksRegistries.HATCH_ENTITY.get()) {
+        if (type != RailworksRegistries.HATCH_ENTITY.get()) {
             return null;
         }
-        return (world, pos, blockState, entity) -> ((HatchBlockEntity) entity).serverTick((ServerLevel) world);
+        if (level instanceof ServerLevel) {
+            return (world, pos, blockState, entity) -> ((HatchBlockEntity) entity).serverTick((ServerLevel) world);
+        }
+        return (world, pos, blockState, entity) -> ((HatchBlockEntity) entity).clientTick(world);
     }
 
     /** In the level's hatches at once, holding nothing; what a hatch removed with no side effects left there is dropped, not lost. */

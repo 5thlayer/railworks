@@ -3,6 +3,7 @@
 Written for Consumers: what a mod building against Railworks can use, or will see change. A published version never changes: a fix is the next patch (`docs/agents/releases.md`).
 
 ## Unreleased
+- A hatch's Bellows and a Fluid hatch's Loading arm now reach out as a car comes to rest at the hatch's spot and fold back the tick it moves off, instead of popping in and out. The Bellows' frame slides out to the Cargo car and its pleats unfold behind it; the Loading arm rises from the hatch, runs out over the Fluid car and drops onto its tank. Each makes a sound, vanilla's retuned under Railworks' own sound events (`railworks:hatch.bellows.reach`, `.fold`, `railworks:hatch.loading_arm.reach`, `.land`, `.fold`), each with a subtitle. A link already there when a client first sees the hatch is drawn reached, silently. Only drawn: trading and when a Train leaves are unchanged.
 - A Fluid hatch's Loading arm is now a pipe rising from the hatch's top, running over the Fluid car and dropping into the top of its tank: into the dome when the hatch stands beside the car's middle block, and into a collar straight across from the hatch otherwise. A requester's bucket on its top is hidden while the arm is drawn.
 
 ## 0.1.1

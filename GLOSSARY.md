@@ -135,7 +135,7 @@ A hatch holding one fluid in a tank, filled and emptied by any mod's pipes, whic
 _Avoid_: tank, fluid port, fluid loader
 
 **Bellows**:
-What a hatch of items stretches across the half block to the Cargo car standing at its spot, shown while the car stands there in a Train stopped at the Station: the car the hatch trades with, whether or not goods are moving.
+What a hatch of items stretches across the half block to the Cargo car standing at its spot, shown while the car stands there in a Train stopped at the Station: the car the hatch trades with, whether or not goods are moving. They stretch out as the car comes to rest there and fold back as it leaves, only drawn: the trading neither waits for them nor holds the Train.
 _Avoid_: chute (Create's), coupling (cars'), gangway, dock seal
 
 **Loading arm**:

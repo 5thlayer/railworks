@@ -169,5 +169,10 @@
   "railworks.gallery.fluid": "Fluid Car",
   "railworks.gallery.fluid.1": "A Fluid car",
   "railworks.gallery.fluid.2": "carries lava",
-  "railworks.gallery.fluid.3": "hatch to hatch"
+  "railworks.gallery.fluid.3": "hatch to hatch",
+  "subtitles.railworks.hatch.bellows.reach": "Bellows stretch",
+  "subtitles.railworks.hatch.bellows.fold": "Bellows fold",
+  "subtitles.railworks.hatch.loading_arm.reach": "Loading arm swings out",
+  "subtitles.railworks.hatch.loading_arm.land": "Loading arm seats",
+  "subtitles.railworks.hatch.loading_arm.fold": "Loading arm folds"
 }

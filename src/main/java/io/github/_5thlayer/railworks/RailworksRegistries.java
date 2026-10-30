@@ -11,6 +11,8 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.syncher.EntityDataSerializer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.flag.FeatureFlags;
@@ -31,7 +33,7 @@ import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
 
 /**
  * The Module's blocks, items, entity and block entity types, the held Span end, the synched data of a
- * Fluid car's tank, the hatch's and the Burner Generator's item handlers, the Fluid hatch's fluid
+ * Fluid car's tank, the sounds of a hatch's Bellows and Loading arm, the hatch's and the Burner Generator's item handlers, the Fluid hatch's fluid
  * handler, and the energy handlers of the Charger, the Burner Generator and the Electric Locomotive.
  */
 public final class RailworksRegistries {
@@ -46,6 +48,22 @@ public final class RailworksRegistries {
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, Railworks.MOD_ID);
     private static final DeferredRegister<EntityDataSerializer<?>> ENTITY_DATA_SERIALIZERS =
             DeferredRegister.create(NeoForgeRegistries.Keys.ENTITY_DATA_SERIALIZERS, Railworks.MOD_ID);
+    private static final DeferredRegister<SoundEvent> SOUNDS = DeferredRegister.create(Registries.SOUND_EVENT, Railworks.MOD_ID);
+
+    /**
+     * A hatch's Bellows reaching out to a Cargo car and folding back, and a Fluid hatch's Loading arm
+     * reaching out to a Fluid car, landing on its tank and folding back: each vanilla's sounds
+     * retuned in {@code sounds.json}, with a subtitle of its own.
+     */
+    public static final DeferredHolder<SoundEvent, SoundEvent> BELLOWS_REACH = sound("hatch.bellows.reach");
+    public static final DeferredHolder<SoundEvent, SoundEvent> BELLOWS_FOLD = sound("hatch.bellows.fold");
+    public static final DeferredHolder<SoundEvent, SoundEvent> LOADING_ARM_REACH = sound("hatch.loading_arm.reach");
+    public static final DeferredHolder<SoundEvent, SoundEvent> LOADING_ARM_LAND = sound("hatch.loading_arm.land");
+    public static final DeferredHolder<SoundEvent, SoundEvent> LOADING_ARM_FOLD = sound("hatch.loading_arm.fold");
+
+    private static DeferredHolder<SoundEvent, SoundEvent> sound(String name) {
+        return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(Railworks.MOD_ID, name)));
+    }
 
     /**
      * A fluid and its amount as synched entity data, which vanilla has no serializer for: a Fluid car's
@@ -203,6 +221,7 @@ public final class RailworksRegistries {
         BLOCK_ENTITIES.register(modBus);
         DATA_COMPONENTS.register(modBus);
         ENTITY_DATA_SERIALIZERS.register(modBus);
+        SOUNDS.register(modBus);
         modBus.addListener(RailworksRegistries::registerCapabilities);
     }
 

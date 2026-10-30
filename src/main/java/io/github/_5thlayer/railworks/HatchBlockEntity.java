@@ -6,7 +6,10 @@ package io.github._5thlayer.railworks;
 import java.util.Optional;
 
 import io.github._5thlayer.railworks.rail.Goods;
+import io.github._5thlayer.railworks.rail.Platform;
+import io.github._5thlayer.railworks.rail.Reach;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.Connection;
@@ -14,8 +17,11 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -41,6 +47,10 @@ import org.jspecify.annotations.Nullable;
  * holds. A Fluid hatch's watchers also see its tank, the fluid, its amount and the tank's capacity,
  * in the Sight glass on each side ({@link #tankSeen}). The server works both out from the record
  * each tick and sends them to the watchers as they change; the record stays the one truth.
+ *
+ * <p>A watcher also works out, itself, how far the hatch's Bellows or Loading arm is reached out to
+ * the car at its spot ({@link #reachOut}), from the cars it sees, and plays its sounds: only drawn,
+ * nothing about it is sent or saved.
  */
 public final class HatchBlockEntity extends BlockEntity {
 
@@ -52,6 +62,9 @@ public final class HatchBlockEntity extends BlockEntity {
     /** A watcher's fluid handler, with no tank, for the same reason. */
     private static final ResourceHandler<FluidResource> NO_TANK = new FluidStacksResourceHandler(0, 0);
 
+    /** How often a watcher asks again which car stands at its spot, in ticks. */
+    private static final int LOOK_TICKS = 10;
+
     private static final String SHOWN_KEY = "shown";
     private static final String TANK_KEY = "tank";
     private static final String TANK_CAPACITY_KEY = "tank_capacity";
@@ -59,6 +72,20 @@ public final class HatchBlockEntity extends BlockEntity {
     private ItemStack shown = ItemStack.EMPTY;
     private FluidStack tankSeen = FluidStack.EMPTY;
     private int tankCapacitySeen;
+
+    /** How far its Bellows or Loading arm is reached out, as a watcher sees it. */
+    private final Reach reach = new Reach();
+    /** The car it reaches to, while at rest there; null for none. */
+    private @Nullable CarEntity reachedCar;
+    /** The side it last reached out of, which it folds back into once the car is gone. */
+    private @Nullable Direction reachSide;
+    private boolean reachesDome;
+    /**
+     * Ticks since a watcher last asked which car stands at its spot. Its first look waits as long, as
+     * the cars of a chunk just loaded may come after its block entities.
+     */
+    private int sinceLooked;
+    private boolean looked;
 
     public HatchBlockEntity(BlockPos pos, BlockState state) {
         super(RailworksRegistries.HATCH_ENTITY.get(), pos, state);
@@ -138,6 +165,62 @@ public final class HatchBlockEntity extends BlockEntity {
             tankCapacitySeen = capacity;
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
+    }
+
+    /**
+     * A watcher's tick: which car of its kind stands at its spot in a Train stopped at its Station,
+     * asked again every {@link #LOOK_TICKS}, and whether that car is still at rest, every tick, so its
+     * Bellows or Loading arm folds back the tick the car moves off. Plays the sound of each reach,
+     * landing and fold.
+     */
+    void clientTick(Level level) {
+        CarKind serves = CarKind.carrying(holds());
+        if (++sinceLooked >= LOOK_TICKS) {
+            sinceLooked = 0;
+            looked = true;
+            reachedCar = null;
+            PlatformsNear.carFacing(level, worldPosition, serves).ifPresent(facing -> {
+                reachedCar = facing.car();
+                reachSide = facing.side();
+                // The dome is over the car's middle block, its spot's, the one an Engine room stands in.
+                reachesDome = serves == CarKind.FLUID
+                        && PlatformsNear.joined(level, worldPosition).map(Platform.Joined::engineRoom).orElse(false);
+            });
+        }
+        if (!looked) {
+            return;
+        }
+        if (reachedCar != null && (reachedCar.isRemoved() || !reachedCar.seenAtRest())) {
+            reachedCar = null;
+        }
+        boolean fluid = serves == CarKind.FLUID;
+        SoundEvent sound = switch (reach.tick(reachedCar != null)) {
+            case NONE -> null;
+            case OUT -> (fluid ? RailworksRegistries.LOADING_ARM_REACH : RailworksRegistries.BELLOWS_REACH).get();
+            case LANDED -> fluid ? RailworksRegistries.LOADING_ARM_LAND.get() : null;
+            case BACK -> (fluid ? RailworksRegistries.LOADING_ARM_FOLD : RailworksRegistries.BELLOWS_FOLD).get();
+        };
+        if (sound != null) {
+            level.playLocalSound(worldPosition, sound, SoundSource.BLOCKS, 1.0F, 1.0F, false);
+        }
+    }
+
+    /**
+     * How far a watcher sees its Bellows or Loading arm reached out, from 0, folded, to 1, on the car,
+     * {@code partialTick} of the way through the tick.
+     */
+    public double reachOut(float partialTick) {
+        return reachSide == null ? 0.0 : reach.out(partialTick);
+    }
+
+    /** The side its Bellows or Loading arm reaches out of, while {@link #reachOut} is above 0; null before it first reached. */
+    public @Nullable Direction reachSide() {
+        return reachSide;
+    }
+
+    /** Whether its Loading arm drops onto the Fluid car's dome, the hatch standing beside the car's middle block. */
+    public boolean reachesDome() {
+        return reachesDome;
     }
 
     /** Only what its watchers draw, the item on its sides and its tank, never saved, which it works out again each tick. */

@@ -4,8 +4,6 @@
 package io.github._5thlayer.railworks.client;
 
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -13,10 +11,8 @@ import com.mojang.math.Axis;
 import io.github._5thlayer.railworks.CarKind;
 import io.github._5thlayer.railworks.HatchBlock;
 import io.github._5thlayer.railworks.HatchBlockEntity;
-import io.github._5thlayer.railworks.PlatformsNear;
 import io.github._5thlayer.railworks.rail.CarBody;
 import io.github._5thlayer.railworks.rail.Goods;
-import io.github._5thlayer.railworks.rail.Platform;
 import io.github._5thlayer.railworks.rail.RailGeometry;
 import io.github._5thlayer.railworks.rail.SightGlassFill;
 import io.github._5thlayer.railworks.rail.Station;
@@ -31,8 +27,8 @@ import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -50,13 +46,12 @@ import org.jspecify.annotations.Nullable;
  * bucket of what it asks for, lies flat on its top instead, as an item rests on a shelf, lit as the
  * block above is, unless its Loading arm rises from there.
  *
- * <p>While a car of its kind stands at its spot in a Train stopped at its Station
- * ({@link PlatformsNear#facingCar}), a hatch of items draws its Bellows, an accordion sleeve,
- * across the half block of air to the Cargo car's side, in place of the item on that side, and a
- * Fluid hatch its Loading arm, a pipe rising from its top, over the car and down into the top of the
- * Fluid car's tank, in place of the bucket there. Neither is a
- * block: each is worked out afresh from the cars the client sees, every {@link #REFRESH_TICKS},
- * and goes as the car leaves.
+ * <p>While a car of its kind stands at its spot in a Train stopped at its Station, a hatch of items
+ * draws its Bellows, an accordion sleeve, across the half block of air to the Cargo car's side, in
+ * place of the item on that side, and a Fluid hatch its Loading arm, a pipe rising from its top, over
+ * the car and down into the top of the Fluid car's tank, in place of the bucket there. Neither is a
+ * block: each is drawn as far out as the hatch sees it reached ({@link HatchBlockEntity#reachOut}),
+ * reaching out as the car comes to rest and folding back as it leaves.
  */
 final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, HatchRenderer.RenderState> {
 
@@ -103,8 +98,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     private static final float COLLAR = 0.13F;
     /** A side's pixels, as its texture's, across and up. */
     private static final float PIXELS = 16.0F;
-    /** How often whether a car stands at the hatch's spot is worked out again, in ticks. */
-    private static final int REFRESH_TICKS = 10;
+    /** How far along the Loading arm's reach its riser has risen, and then its run has reached out over the car. */
+    private static final double RISEN = 0.35;
+    private static final double RUN_OUT = 0.75;
 
     /**
      * What colour a part of the Bellows or the Loading arm is drawn in, red, green and blue, as
@@ -131,13 +127,6 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         }
     }
 
-    /** Each hatch's side facing a car, as last worked out, and when; dropped with the hatch. */
-    private final Map<HatchBlockEntity, Facing> facing = new WeakHashMap<>();
-
-    /** {@code toDome}: whether a Loading arm out of {@code side} drops onto the Fluid car's dome. */
-    private record Facing(long at, @Nullable Direction side, boolean toDome) {
-    }
-
     @Override
     public RenderState createRenderState() {
         return new RenderState();
@@ -156,9 +145,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         }
         state.serves = CarKind.carrying(
                 hatch.getBlockState().getBlock() instanceof HatchBlock block ? block.holds() : Goods.Kind.ITEMS);
-        Facing facing = facingCar(hatch, level, state.serves);
-        state.toCar = facing.side();
-        state.toDome = facing.toDome();
+        state.out = (float) hatch.reachOut(partialTicks);
+        state.toCar = state.out > 0.0F ? hatch.reachSide() : null;
+        state.toDome = hatch.reachesDome();
         for (Direction side : Direction.Plane.HORIZONTAL) {
             state.light[side.get2DDataValue()] = LevelRenderer.getLightCoords(level, hatch.getBlockPos().relative(side));
         }
@@ -173,25 +162,6 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         var item = new ItemStackRenderState();
         Minecraft.getInstance().getItemModelResolver().updateForTopItem(item, shown, ItemDisplayContext.FIXED, level, null, 0);
         state.item = item;
-    }
-
-    /**
-     * The side facing the car of kind {@code serves} at the hatch's spot, worked out again once
-     * {@link #REFRESH_TICKS} have passed.
-     */
-    private Facing facingCar(HatchBlockEntity hatch, Level level, CarKind serves) {
-        long now = level.getGameTime();
-        Facing last = facing.get(hatch);
-        if (last == null || now - last.at() >= REFRESH_TICKS || now < last.at()) {
-            var pos = hatch.getBlockPos();
-            Direction side = PlatformsNear.facingCar(level, pos, serves).orElse(null);
-            // The dome is over the car's middle block, its spot's, the one an Engine room stands in.
-            boolean toDome = side != null && serves == CarKind.FLUID
-                    && PlatformsNear.joined(level, pos).map(Platform.Joined::engineRoom).orElse(false);
-            last = new Facing(now, side, toDome);
-            facing.put(hatch, last);
-        }
-        return last;
     }
 
     /**
@@ -291,9 +261,9 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         poseStack.mulPose(Axis.YP.rotationDegrees(180 - state.toCar.toYRot()));
         collector.submitCustomGeometry(poseStack, RenderTypes.leash(), (pose, buffer) -> {
             if (bellows) {
-                bellows(pose.pose(), buffer, light);
+                bellows(pose.pose(), buffer, state.out, light);
             } else {
-                loadingArm(pose.pose(), buffer, state.toDome, light);
+                loadingArm(pose.pose(), buffer, state.out, state.toDome, light);
             }
         });
         poseStack.popPose();
@@ -301,18 +271,24 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
 
     /**
      * An accordion sleeve over the face, an iron frame at each end and leather pleats between,
-     * folding in and out, its middle at the height of a Cargo car's chests.
+     * folding in and out, its middle at the height of a Cargo car's chests: {@code out} of the way
+     * to the car, its car's frame sliding out from just past the hatch's and the pleats unfolding
+     * behind it.
      */
-    private static void bellows(Matrix4f pose, VertexConsumer buffer, int light) {
+    private static void bellows(Matrix4f pose, VertexConsumer buffer, float out, int light) {
         float face = -0.5F;
-        float car = face - ACROSS - INTO_FACING;
         float frame = 0.05F;
+        // Folded, the car's frame stands within the hatch's, a little further out, so no faces meet.
+        float car = Mth.lerp(out, face - frame - 0.01F, face - ACROSS - INTO_FACING);
         float y = -0.05F;
         box(pose, buffer, 0.42F, y, face + 0.01F, face - frame, Paint.IRON, light);
         box(pose, buffer, 0.40F, y, car + frame, car, Paint.IRON, light);
         int pleats = 8;
         float from = face - frame;
         float step = (from - (car + frame)) / pleats;
+        if (step <= 0.0F) {
+            return;
+        }
         for (int i = 0; i < pleats; i++) {
             float near = from - i * step;
             // Each reaches a little into what is either side, the folds further, so no two faces
@@ -329,22 +305,48 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
      * A pipe up out of a flange on the top, which turns at an elbow over the Fluid car, runs out to
      * above its middle and drops at a second elbow into a collar on the tank's top: on the dome when
      * {@code toDome}, the hatch beside the car's middle block, and on the tank straight across
-     * from the hatch otherwise.
+     * from the hatch otherwise. {@code out} of the way there, in turn: the first elbow rises out of
+     * the hatch on its pipe until {@link #RISEN}, the second runs out of it over the car until
+     * {@link #RUN_OUT}, and the collar drops from it onto the tank.
      */
-    private static void loadingArm(Matrix4f pose, VertexConsumer buffer, boolean toDome, int light) {
+    private static void loadingArm(Matrix4f pose, VertexConsumer buffer, float out, boolean toDome, int light) {
         float top = 0.5F;
         float car = (float) -Station.ROW_OFF;
         float landing = FLOOR + (float) (toDome ? CarBody.DOME_TOP : CarBody.TANK_TOP);
+        float risen = stage(out, 0.0, RISEN);
+        float run = stage(out, RISEN, RUN_OUT);
+        float drop = stage(out, RUN_OUT, 1.0);
+        // The first elbow starts inside the hatch, under its top; the second, a little smaller, inside the first.
+        float rise = Mth.lerp(risen, top - ELBOW - 0.02F, OVER_CAR);
+        float second = ELBOW - 0.01F;
+        float reach = Mth.lerp(run, 0.0F, car);
+        float under = OVER_CAR - second;
+        float end = Mth.lerp(drop, under, landing + 0.07F);
         // The flange on the hatch, the pipe up to the first elbow, out to the second, then down into the
         // collar. Each pipe starts and ends inside what it joins, and no two are as wide, so no two
         // faces share a plane.
         boxY(pose, buffer, 0.15F, 0F, top - 0.01F, top + 0.05F, Paint.IRON, light);
-        boxY(pose, buffer, PIPE, 0, top + 0.04F, OVER_CAR, Paint.PIPE, light);
-        box(pose, buffer, ELBOW, OVER_CAR, ELBOW, -ELBOW, Paint.IRON, light);
-        box(pose, buffer, PIPE + 0.005F, OVER_CAR, -ELBOW + 0.01F, car + ELBOW - 0.01F, Paint.PIPE, light);
-        box(pose, buffer, ELBOW, OVER_CAR, car + ELBOW, car - ELBOW, Paint.IRON, light);
-        boxY(pose, buffer, PIPE - 0.005F, car, OVER_CAR - ELBOW + 0.01F, landing + 0.07F, Paint.PIPE, light);
-        boxY(pose, buffer, COLLAR, car, landing + 0.08F, landing - 0.01F, Paint.IRON, light);
+        if (rise > top + 0.04F) {
+            boxY(pose, buffer, PIPE, 0F, top + 0.04F, rise, Paint.PIPE, light);
+        }
+        box(pose, buffer, ELBOW, rise, ELBOW, -ELBOW, Paint.IRON, light);
+        if (run <= 0.0F) {
+            return;
+        }
+        if (reach + second - 0.01F < -ELBOW + 0.01F) {
+            box(pose, buffer, PIPE + 0.005F, OVER_CAR, -ELBOW + 0.01F, reach + second - 0.01F, Paint.PIPE, light);
+        }
+        box(pose, buffer, second, OVER_CAR, reach + second, reach - second, Paint.IRON, light);
+        if (drop <= 0.0F) {
+            return;
+        }
+        boxY(pose, buffer, PIPE - 0.005F, car, under + 0.01F, end, Paint.PIPE, light);
+        boxY(pose, buffer, COLLAR, car, end + 0.01F, end - 0.08F, Paint.IRON, light);
+    }
+
+    /** How far through the stage from {@code from} to {@code to} of the reach {@code out} is, from 0 to 1. */
+    private static float stage(float out, double from, double to) {
+        return (float) Math.clamp((out - from) / (to - from), 0.0, 1.0);
     }
 
     /**
@@ -383,6 +385,8 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         private @Nullable ItemStackRenderState item;
         /** The side facing the car at its spot, which its Bellows or Loading arm reaches out of; null for none. */
         private @Nullable Direction toCar;
+        /** How far its Bellows or Loading arm is reached out, from 0 to 1. */
+        private float out;
         /** Whether a Loading arm drops onto the car's dome, the hatch beside its middle block. */
         private boolean toDome;
         /** The kind of car the hatch serves, which says whether it draws its Bellows or its Loading arm. */
