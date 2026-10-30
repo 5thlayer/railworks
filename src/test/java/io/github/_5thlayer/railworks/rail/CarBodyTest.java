@@ -325,34 +325,53 @@ class CarBodyTest {
     }
 
     @Test
-    void theCargoCarShowsACrateSetIntoEachSideOverEachOfItsThreeInnerBlocks() {
+    void theCargoCarShowsARowOfThreeCratesSetIntoEachSideOverItsThreeInnerBlocks() {
         List<CarBody.Box> crates = CarBody.CARGO.crates();
         assertEquals(6, crates.size(), "three crates a side");
-        for (double at : new double[] {-1.0, 0.0, 1.0}) {
-            for (double side : new double[] {1.0, -1.0}) {
-                assertEquals(1, crates.stream().filter(crate -> (crate.minZ() + crate.maxZ()) / 2.0 == at
-                        && Math.signum(crate.minX() + crate.maxX()) == side).count(), "a crate on side " + side + " at " + at);
+        for (double side : new double[] {1.0, -1.0}) {
+            List<CarBody.Box> row = crates.stream().filter(crate -> Math.signum(crate.minX() + crate.maxX()) == side)
+                    .sorted(Comparator.comparingDouble(CarBody.Box::minZ)).toList();
+            assertEquals(3, row.size(), "three crates on side " + side);
+            // One over each inner block, a hair apart so no two share a plane.
+            double[] at = {-1.01, 0.0, 1.01};
+            for (int i = 0; i < 3; i++) {
+                assertEquals(at[i], (row.get(i).minZ() + row.get(i).maxZ()) / 2.0, 1e-9, "a crate on side " + side + " at " + at[i]);
             }
-        }
-        for (CarBody.Box crate : crates) {
-            assertEquals(crate.maxY() - crate.minY(), crate.maxX() - crate.minX(), 1e-9, crate + " is not a cube");
-            assertEquals(crate.maxY() - crate.minY(), crate.maxZ() - crate.minZ(), 1e-9, crate + " is not a cube");
-            // Looking at the car square on from beside it, at the crate's middle, the crate is the first
-            // thing seen, and something stands proud of it around the recess.
-            double side = Math.signum(crate.minX() + crate.maxX());
-            double y = (crate.minY() + crate.maxY()) / 2.0;
-            double z = (crate.minZ() + crate.maxZ()) / 2.0;
+            for (int i = 0; i < 2; i++) {
+                assertTrue(row.get(i).maxZ() < row.get(i + 1).minZ(), row.get(i) + " meets the crate after it");
+            }
+            for (int i = 0; i < 3; i++) {
+                CarBody.Box crate = row.get(i);
+                // Its outer face a block square, so the crate's sprite, laid whole on it, is 16 px per block.
+                assertEquals(1.0, crate.maxY() - crate.minY(), 1e-9, crate + "'s face is not a block high");
+                assertEquals(1.0, crate.maxZ() - crate.minZ(), 1e-9, crate + "'s face is not a block across");
+                // Its face just behind the facing, and as deep as fits short of the other side's crate.
+                assertEquals(0.94, side > 0 ? crate.maxX() : -crate.minX(), 1e-9, crate + "'s face is not at 0.94");
+                assertEquals(0.93, crate.maxX() - crate.minX(), 1e-9, crate + " is not 0.93 deep");
+                // Looking at the car square on from beside it, at the crate's middle, the crate is the first
+                // thing seen, and something stands proud of it above it and at the row's two ends.
+                double y = (crate.minY() + crate.maxY()) / 2.0;
+                double z = (crate.minZ() + crate.maxZ()) / 2.0;
+                double[] inward = {-side, 0.0, 0.0};
+                assertEquals(crate, firstHit(boxes(CarBody.CARGO), new double[] {side, y, z}, inward), "the crate is hidden");
+                assertProud(firstHit(boxes(CarBody.CARGO), new double[] {side, crate.maxY() + 0.03, z}, inward), crate, side,
+                        "nothing frames the crate above it");
+            }
+            CarBody.Box back = row.get(0);
+            CarBody.Box front = row.get(2);
+            double y = (back.minY() + back.maxY()) / 2.0;
             double[] inward = {-side, 0.0, 0.0};
-            assertEquals(crate, firstHit(boxes(CarBody.CARGO), new double[] {side, y, z}, inward), "the crate is hidden");
-            CarBody.Box frame = firstHit(boxes(CarBody.CARGO), new double[] {side, crate.maxY() + 0.03, z}, inward);
-            assertTrue(frame != null && Math.abs(side > 0 ? frame.maxX() : frame.minX()) > Math.abs(side > 0 ? crate.maxX() : crate.minX()),
-                    "nothing frames the crate above it");
-            for (double along : new double[] {crate.minZ() - 0.1, crate.maxZ() + 0.1}) {
-                CarBody.Box beside = firstHit(boxes(CarBody.CARGO), new double[] {side, y, along}, inward);
-                assertTrue(beside != null && Math.abs(side > 0 ? beside.maxX() : beside.minX()) > Math.abs(side > 0 ? crate.maxX() : crate.minX()),
-                        "nothing frames the crate beside it");
-            }
+            assertProud(firstHit(boxes(CarBody.CARGO), new double[] {side, y, back.minZ() - 0.1}, inward), back, side,
+                    "nothing frames the row's back end");
+            assertProud(firstHit(boxes(CarBody.CARGO), new double[] {side, y, front.maxZ() + 0.1}, inward), front, side,
+                    "nothing frames the row's front end");
         }
+    }
+
+    /** That {@code frame} stands out past {@code crate}'s outer face, on the side {@code side}. */
+    private static void assertProud(CarBody.Box frame, CarBody.Box crate, double side, String message) {
+        assertTrue(frame != null && Math.abs(side > 0 ? frame.maxX() : frame.minX()) > Math.abs(side > 0 ? crate.maxX() : crate.minX()),
+                message);
     }
 
     @Test

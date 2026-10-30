@@ -188,12 +188,21 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
     /** Half the width along z of the dark plate the tube stands on, which runs the belt's height. */
     private static final double PLATE_HALF_WIDTH = 0.22;
 
-    /** Where a Cargo car's crates are along z, one a side at each: over its three inner blocks. */
-    private static final double[] CRATES_AT = {-1.0, 0.0, 1.0};
+    /** Where a Cargo car's crates are along z, one a side at each: over its three inner blocks, a hair apart. */
+    private static final double[] CRATES_AT = {-1.01, 0.0, 1.01};
     /** The height the Locomotive's chin is turned upside down about. */
     private static final double CHIN_MIDDLE = 0.6;
-    /** Half a crate's recess along z. */
-    private static final double HALF_RECESS = 0.23;
+    /** Half a crate's outer face on a side: a block square, so its sprite is laid at 16 px per block. */
+    private static final double HALF_CRATE = 0.5;
+    /** How far the crate's outer face is out from the car's middle, just behind the facing and the band. */
+    private static final double CRATE_FACE = 0.94;
+    /** How deep the crate runs in from its face: to just short of the car's middle and the other side's crate. */
+    private static final double CRATE_DEPTH = 0.93;
+    /** The crate's bottom, just above the floor, whose edge stands in front of it. */
+    private static final double CRATE_BOTTOM = FLOOR_TOP + 0.005;
+    /** Half the recess the row of crates is set into along z, and its top, behind the window band. */
+    private static final double HALF_RECESS = CRATES_AT[2] + HALF_CRATE + 0.015;
+    private static final double RECESS_TOP = CRATE_BOTTOM + 2 * HALF_CRATE + 0.01;
 
     public static final CarBody LOCOMOTIVE = locomotive(false);
     public static final CarBody ELECTRIC = locomotive(true);
@@ -388,7 +397,8 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
 
     /**
      * The Cargo car: closed, of the Locomotive's height and roof line, a gangway door at both ends,
-     * and a crate set into a framed recess in each side over each of its three inner blocks.
+     * and a row of three crates set into a framed recess in each side, one over each of its three inner
+     * blocks, the window band running on over their tops.
      */
     private static CarBody cargo() {
         double length = CargoCar.LENGTH - GAP;
@@ -398,24 +408,17 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         sides(parts, new Part(Panel.WINDOW, 0.97, BAND_BOTTOM, -half, 1.0, BAND_TOP, half));
         ends(parts, new Part(Panel.SHELL, -0.95, 0.67, half - 0.08, 0.95, 2.63, half - 0.01));
         ends(parts, new Part(Panel.SKIRT, -0.25, 0.75, half - 0.03, 0.25, 2.35, half));
-        // The side's inner wall, then the facing between and around the recesses, which stands proud
-        // of the wall by the recess's depth, and the facing above and below each recess.
+        // The side's inner wall, then the facing either end of the recess, which stands proud of the
+        // wall by the recess's depth, and the facing above it; the floor's edge stands below it.
         sides(parts, new Part(Panel.SHELL, 0.83, 0.68, -half + 0.015, 0.89, 2.62, half - 0.015));
-        List<Double> edges = new ArrayList<>(List.of(-half + 0.02));
-        for (double at : CRATES_AT) {
-            edges.add(at - HALF_RECESS + 0.01);
-            edges.add(at + HALF_RECESS - 0.01);
-        }
-        edges.add(half - 0.02);
-        for (int i = 0; i < edges.size(); i += 2) {
-            sides(parts, new Part(Panel.SHELL, 0.88, 0.665, edges.get(i), 0.99, 2.635, edges.get(i + 1)));
-        }
+        sides(parts, new Part(Panel.SHELL, 0.88, 0.665, -half + 0.02, 0.99, 2.635, -HALF_RECESS + 0.01));
+        sides(parts, new Part(Panel.SHELL, 0.88, 0.665, HALF_RECESS - 0.01, 0.99, 2.635, half - 0.02));
+        sides(parts, new Part(Panel.SHELL, 0.882, RECESS_TOP, -HALF_RECESS, 0.988, 2.625, HALF_RECESS));
         List<Box> crates = new ArrayList<>();
         for (double at : CRATES_AT) {
-            sides(parts, new Part(Panel.SHELL, 0.882, 1.48, at - HALF_RECESS, 0.988, 2.625, at + HALF_RECESS));
-            sides(parts, new Part(Panel.SHELL, 0.882, 0.675, at - HALF_RECESS, 0.988, 1.07, at + HALF_RECESS));
-            // The crate fills a cube in the recess, its face just behind the facing.
-            Box crate = new Box(0.55, 1.075, at - 0.195, 0.94, 1.465, at + 0.195);
+            // The crate's face a block square in the recess, just behind the facing, the band over its top.
+            Box crate = new Box(CRATE_FACE - CRATE_DEPTH, CRATE_BOTTOM, at - HALF_CRATE,
+                    CRATE_FACE, CRATE_BOTTOM + 2 * HALF_CRATE, at + HALF_CRATE);
             crates.add(crate);
             crates.add(crate.mirrored());
         }
