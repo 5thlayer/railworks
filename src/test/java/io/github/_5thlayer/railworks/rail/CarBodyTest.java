@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -355,13 +356,57 @@ class CarBodyTest {
     }
 
     @Test
+    void theFluidCarsTankIsACylinderSteppedEveryHalfPixelWithinItsOldOutlineFlatAcrossItsBelt() {
+        double row = 1.0 / 32.0;
+        // The tank's own rows, the dome on top left out: along most of the car.
+        List<CarBody.Box> tank = CarBody.FLUID.parts().stream().filter(part -> part.panel() == CarBody.Panel.TANK)
+                .map(CarBody.Part::box).filter(box -> box.maxZ() - box.minZ() > 4.0).sorted(Comparator.comparingDouble(CarBody.Box::minY))
+                .toList();
+        assertTrue(tank.size() > 10, "the tank is not stepped: " + tank.size() + " rows");
+        CarBody.Box belt = tank.stream().max(Comparator.comparingDouble(CarBody.Box::maxX)).orElseThrow();
+        assertTrue(belt.minY() <= 1.12 && belt.maxY() >= 2.18, "the belt does not carry the Sight glasses: " + belt);
+        for (int i = 0; i < tank.size(); i++) {
+            CarBody.Box box = tank.get(i);
+            // Within the old tank: a wide box from 1.0 to 2.3 up, 0.95 either side, crossing a tall one
+            // from 0.72 to 2.58, 0.7 either side.
+            boolean inWide = box.maxX() <= 0.95 && box.minY() >= 1.0 - 0.002 && box.maxY() <= 2.3 + 0.002;
+            boolean inTall = box.maxX() <= 0.7 && box.minY() >= 0.72 - 0.002 && box.maxY() <= 2.58 + 0.002;
+            assertTrue(inWide || inTall, box + " leaves the old tank's outline");
+            assertEquals(Math.round((box.maxY() - box.minY()) / row), (box.maxY() - box.minY()) / row, 0.1,
+                    box + " is not a whole number of half-pixel rows");
+            // Widening up to the belt and narrowing above it.
+            if (i > 0) {
+                CarBody.Box under = tank.get(i - 1);
+                if (box.maxY() <= belt.maxY()) {
+                    assertTrue(box.maxX() > under.maxX(), box + " does not widen over " + under);
+                } else {
+                    assertTrue(box.maxX() < under.maxX(), box + " does not narrow over " + under);
+                }
+            }
+        }
+        // Each ring stands out round the tank all the way round: past every row of the tank it covers.
+        double front = CarBody.FLUID.length() / 2.0;
+        List<CarBody.Box> ring = CarBody.FLUID.parts().stream().filter(part -> part.panel() == CarBody.Panel.TRIM)
+                .map(CarBody.Part::box).filter(box -> box.minZ() > front - 0.6 && box.maxZ() < front - 0.4).toList();
+        assertTrue(ring.size() == tank.size(), "the ring is not round the tank");
+        for (CarBody.Box tankRow : tank) {
+            for (CarBody.Box ringRow : ring) {
+                // Past the hair each reaches into the next.
+                if (ringRow.minY() < tankRow.maxY() - 0.01 && ringRow.maxY() > tankRow.minY() + 0.01) {
+                    assertTrue(ringRow.maxX() > tankRow.maxX(), ringRow + " leaves " + tankRow + " showing through it");
+                }
+            }
+        }
+    }
+
+    @Test
     void theFluidCarHasASightGlass0Point8LongAcrossTheMiddleOfEachSideOfItsTank() {
         List<CarBody.SightGlass> glasses = CarBody.FLUID.sightGlasses();
         assertEquals(2, glasses.size(), "a Sight glass a side");
         for (double side : new double[] {1.0, -1.0}) {
             assertEquals(1, glasses.stream().filter(glass -> glass.side() == side).count(), "a Sight glass on side " + side);
         }
-        // The tank's wide box runs from 1.0 to 2.3 up, and its end trims stand 0.44 to 0.5 in from its ends.
+        // The tank's belt runs from 1.08 to 2.22 up, and its rings stand 0.44 to 0.5 in from its ends.
         double trims = CarBody.FLUID.length() / 2.0 - 0.5;
         for (CarBody.SightGlass glass : glasses) {
             CarBody.Box pane = glass.pane();
