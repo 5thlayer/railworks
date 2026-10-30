@@ -1,0 +1,385 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway: the Fluid car's Sight glass reads as a screen. Four variants of the glass
+     on the real stepped tank (#93), switchable from the bottom bar and the URL
+     (?variant=&fill=&fluid=&metal=). Built by build.py, which inlines the textures.
+     Everything a variant draws is opaque or cutout, as the car's entityCutout pass can draw it. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sight Glass Prototype</title>
+<style>
+  :root { --bar: rgba(20,22,26,.88); --ink: #f1f1f1; --dim: #9aa0a8; --sky: #9fc8ef; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); font: 13px/1.2 system-ui, sans-serif; }
+  canvas { display: block; }
+  #bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 6px;
+         background: var(--bar); color: var(--ink); border-radius: 999px; padding: 5px 8px;
+         box-shadow: 0 4px 18px rgba(0,0,0,.3); user-select: none; max-width: calc(100vw - 32px);
+         flex-wrap: wrap; justify-content: center; }
+  .grp { display: flex; align-items: center; gap: 2px; }
+  .grp button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 999px; color: var(--dim); }
+  .grp button:hover { color: var(--ink); background: rgba(255,255,255,.08); }
+  .grp span { min-width: 64px; text-align: center; white-space: nowrap; }
+  #variant { min-width: 190px; font-weight: 600; }
+  .sep { width: 1px; background: rgba(255,255,255,.15); margin: 3px 2px; }
+  #help { position: fixed; right: 12px; top: 12px; background: var(--bar); color: var(--ink); border-radius: 10px;
+          padding: 8px 12px; line-height: 1.6; }
+  #help kbd { color: #ffd37a; font: inherit; }
+  #credit { position: fixed; left: 10px; bottom: 6px; color: rgba(0,0,0,.45); font-size: 10px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="bar">
+  <div class="grp"><button data-k="variant" data-d="-1">‹</button><span id="variant"></span><button data-k="variant" data-d="1">›</button></div>
+  <div class="sep"></div>
+  <div class="grp"><button data-k="fill" data-d="-1">‹</button><span id="fill"></span><button data-k="fill" data-d="1">›</button></div>
+  <div class="sep"></div>
+  <div class="grp"><button data-k="fluid" data-d="-1">‹</button><span id="fluid"></span><button data-k="fluid" data-d="1">›</button></div>
+  <div class="sep"></div>
+  <div class="grp"><button data-k="metal" data-d="-1">‹</button><span id="metal"></span><button data-k="metal" data-d="1">›</button></div>
+</div>
+<div id="help"><kbd>← →</kbd> variant · <kbd>↑ ↓</kbd> fill · <kbd>F</kbd> fluid · <kbd>M</kbd> bezel · <kbd>V</kbd> view · drag to orbit</div>
+<div id="credit">Textures: Malcolm Riley, unused-textures, CC BY 4.0 · prototype</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const TEX = /*TEXTURES*/{};
+
+// ---------------------------------------------------------------- options
+const VARIANTS = [
+  ['A', 'Today: flat pane'],
+  ['B', 'Recessed window'],
+  ['C', 'Gauge tube'],
+  ['D', 'Porthole'],
+];
+const FILLS = [['0', 'Empty'], ['25', '25%'], ['62', '62%'], ['100', 'Full']];
+const FLUIDS = [['water', 'Water'], ['lava', 'Lava']];
+const METALS = [['brass', 'Brass bezel'], ['copper', 'Copper bezel'], ['dark', 'Dark bezel']];
+
+const params = new URLSearchParams(location.search);
+const pick = (list, key, dflt) => Math.max(0, list.findIndex(([k]) => k === (params.get(key) ?? dflt)));
+const state = {
+  variant: pick(VARIANTS, 'variant', 'B'), fill: pick(FILLS, 'fill', '62'),
+  fluid: pick(FLUIDS, 'fluid', 'water'), metal: pick(METALS, 'metal', 'brass'),
+};
+const LISTS = { variant: VARIANTS, fill: FILLS, fluid: FLUIDS, metal: METALS };
+
+// ---------------------------------------------------------------- textures
+function imageTexture(key) {
+  const t = new THREE.Texture();
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  const img = new Image();
+  img.onload = () => { t.image = img; t.needsUpdate = true; };
+  img.src = TEX[key];
+  return t;
+}
+function canvasTexture(draw) {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  draw(c.getContext('2d'), 0); t.needsUpdate = true;
+  t.redraw = frame => { draw(c.getContext('2d'), frame); t.needsUpdate = true; };
+  return t;
+}
+const rnd = (x, y) => { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return s - Math.floor(s); };
+// The tank's dark inside, seen through the glass: darker toward the top, under the tank's roof.
+const INSIDE = canvasTexture(g => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const k = 10 + y * 1.3 + rnd(x, y) * 5;
+    g.fillStyle = `rgb(${k * .8 | 0},${k * 1.05 | 0},${k * 1.15 | 0})`; g.fillRect(x, y, 1, 1);
+  }
+});
+// Glints: pale streaks across the glass, cutout (every other pixel is clear).
+const GLINT = canvasTexture(g => {
+  g.clearRect(0, 0, 16, 16);
+  for (let i = 0; i < 16; i++) {
+    // Two thin streaks, broken, in the glass's upper left, as a window catches the sky.
+    for (const [off, from, to] of [[-4, 3, 12], [-1, 6, 10]]) {
+      const x = i + off, y = 15 - i;
+      if (x >= 0 && x < 16 && i >= from && i <= to) { g.fillStyle = 'rgba(214,236,242,.9)'; g.fillRect(x, y, 1, 1); }
+    }
+  }
+});
+// A narrow glint up a tube.
+const TUBE_GLINT = canvasTexture(g => {
+  g.clearRect(0, 0, 16, 16);
+  g.fillStyle = 'rgba(214,236,242,.8)'; g.fillRect(4, 0, 2, 16);
+  g.fillStyle = 'rgba(214,236,242,.45)'; g.fillRect(10, 0, 1, 16);
+});
+const FLUID_TEX = {
+  water: canvasTexture((g, f) => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const w = Math.sin((x + y * .5) * .8 + f * .4) * .5 + .5, n = rnd(x, (y + f) % 16) * .25;
+      g.fillStyle = `rgb(${40 + 30 * w | 0},${80 + 50 * w + 30 * n | 0},${170 + 50 * w | 0})`; g.fillRect(x, y, 1, 1);
+    }
+  }),
+  lava: canvasTexture((g, f) => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const w = Math.sin((x * .7 - y * .4) + f * .25) * .5 + .5, n = rnd(x, (y + f) % 16) * .3;
+      g.fillStyle = `rgb(${200 + 55 * w | 0},${70 + 90 * w * (1 - n) | 0},${10 + 20 * n | 0})`; g.fillRect(x, y, 1, 1);
+    }
+  }),
+};
+const IMG = {};
+const img = k => (IMG[k] ??= imageTexture(k));
+
+// ---------------------------------------------------------------- looks
+// {tex, tint, fit, glow, flat, cutout}: a tiled texture (16 px a block, by the box's coordinates),
+// fit maps the whole texture onto each face, flat is a plain colour.
+const METAL_TINT = { brass: 0xffd98a, copper: 0xffa880, dark: 0x5a5a60 };
+const look = {
+  TANK: { tex: () => img('car/tank') },
+  TRIM: { tex: () => img('car/trim') },
+  SHELL: { tex: () => img('car/shell') },
+  SKIRT: { tex: () => img('car/skirt') },
+  GLASS: { flat: 0x0d0f12 },
+  INSIDE: { tex: () => INSIDE },
+  BEZEL: { tex: () => img('steel'), tint: () => METAL_TINT[METALS[state.metal][0]] },
+  BOLT: { tex: () => img('steel'), tint: () => (METAL_TINT[METALS[state.metal][0]] & 0xfefefe) >> 1 },
+  TICK: { flat: 0xe6e0c8 },
+};
+
+// ---------------------------------------------------------------- geometry
+// Minecraft's face shading: top 1, bottom .5, x faces .6, z faces .8.
+const FACES = [
+  { n: [1, 0, 0], shade: .6 }, { n: [-1, 0, 0], shade: .6 }, { n: [0, 0, 1], shade: .8 },
+  { n: [0, 0, -1], shade: .8 }, { n: [0, 1, 0], shade: 1 }, { n: [0, -1, 0], shade: .5 },
+];
+function faceCorners(b, i) {
+  const [x0, y0, z0, x1, y1, z1] = b;
+  switch (i) {
+    case 0: return [[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]];
+    case 1: return [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]];
+    case 2: return [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+    case 3: return [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]];
+    case 4: return [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]];
+    default: return [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]];
+  }
+}
+function tiledUv(p, i) {
+  const [x, y, z] = p;
+  switch (i) {
+    case 0: return [-z + .5, y]; case 1: return [z + .5, y]; case 2: return [x + .5, y];
+    case 3: return [-x + .5, y]; default: return [x + .5, -z + .5];
+  }
+}
+const FIT_UV = [[0, 0], [1, 0], [1, 1], [0, 1]];
+const materials = new Map();
+function material(lk, tex) {
+  const tint = typeof lk.tint === 'function' ? lk.tint() : lk.tint ?? 0xffffff;
+  const key = `${tex?.uuid ?? 'flat'}:${lk.flat ?? tint}:${!!lk.cutout}`;
+  if (!materials.has(key)) {
+    materials.set(key, new THREE.MeshBasicMaterial({
+      map: tex ?? null, color: lk.flat ?? tint, vertexColors: true, side: THREE.DoubleSide,
+      alphaTest: lk.cutout ? .1 : 0, transparent: false,
+    }));
+  }
+  return materials.get(key);
+}
+/** A box in the car's coordinates, +x the side toward the camera. faces: which of the six to draw. */
+function box(group, lk, b, { faces = [0, 1, 2, 3, 4, 5], fit = lk.fit, glow = lk.glow, tex } = {}) {
+  const t = tex ?? (lk.tex ? lk.tex() : null);
+  const pos = [], uv = [], col = [], idx = [];
+  for (const i of faces) {
+    const cs = faceCorners(b, i), base = pos.length / 3, s = glow ? 1 : FACES[i].shade;
+    cs.forEach((p, k) => {
+      pos.push(...p); col.push(s, s, s);
+      uv.push(...(fit ? FIT_UV[k] : tiledUv(p, i)));
+    });
+    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  group.add(new THREE.Mesh(g, material(lk, t)));
+}
+/** A flat quad on the +x face of b only, at x, with a texture tiled or fitted. */
+function pane(group, lk, x, y0, y1, z0, z1, opts = {}) {
+  box(group, lk, [x - 1e-4, y0, z0, x, y1, z1], { faces: [0], ...opts });
+}
+/** The part on the +x side and its mirror on -x. */
+function sides(group, fn) {
+  const right = new THREE.Group(); fn(right); group.add(right);
+  const left = new THREE.Group(); fn(left); left.scale.x = -1; group.add(left);
+}
+
+// The Fluid car as #93 builds it: CarBody.fluid().
+const STEP = 1 / 32, HALF = 2.4, TANK_RADIUS = .93, TANK_MIDDLE = 1.65;
+const BELT_BOTTOM = 1.08, BELT_TOP = 2.22, BELT = .93;
+const stepped = (r, up) => Math.round(Math.sqrt(Math.max(0, r * r - up * up)) / STEP) * STEP;
+function tankRuns() {
+  const rows = Math.floor(2 * TANK_RADIUS / STEP), bottom = TANK_MIDDLE - TANK_RADIUS, runs = [];
+  for (let r = 0; r < rows; r++) {
+    const lo = bottom + r * STEP, hi = lo + STEP;
+    const hw = hi > BELT_BOTTOM && lo < BELT_TOP ? BELT : stepped(TANK_RADIUS, (lo + hi) / 2 - TANK_MIDDLE);
+    const last = runs.at(-1);
+    if (last && last.hw === hw) last.hi = hi; else runs.push({ lo, hi, hw });
+  }
+  return runs;
+}
+function fluidCar(group) {
+  for (const s of [1, -1]) box(group, look.SKIRT, s > 0 ? [.17, 0, -HALF + .01, .49, .62, HALF - .01] : [-.49, 0, -HALF + .01, -.17, .62, HALF - .01]);
+  box(group, look.SHELL, [-1, .55, -HALF, 1, .7, HALF]);
+  for (const run of tankRuns()) {
+    box(group, look.TANK, [-run.hw, run.lo, -HALF + .07, run.hw, run.hi, HALF - .07]);
+    const ring = run.hw + 1 / 64;
+    for (const z of [HALF - .5, -HALF + .44]) box(group, look.TRIM, [-ring, run.lo - .001, z, ring, run.hi + .001, z + .06]);
+  }
+  box(group, look.TANK, [-.15, 2.5, -.2, .15, 2.72, .2]);
+  for (const z of [HALF - .35, -HALF + .2]) box(group, look.SKIRT, [-.8, .69, z, .8, .8, z + .15]);
+}
+
+// ---------------------------------------------------------------- the variants
+// Each draws one side's Sight glass at +x; the fill is `amount` of the glass's height, 0..1.
+const FLUID = () => ({ tex: () => FLUID_TEX[FLUIDS[state.fluid][0]], glow: FLUIDS[state.fluid][0] === 'lava' });
+
+/** A: today. A dark frame, a flat black pane just proud of it, the fluid on the pane's face. */
+function variantA(g, amount) {
+  box(g, look.TRIM, [.94, 1.08, -.44, .96, 2.22, .44]);
+  box(g, look.GLASS, [.945, 1.12, -.4, .965, 2.18, .4]);
+  if (amount > 0) pane(g, FLUID(), .967, 1.12, 1.12 + 1.06 * amount, -.4, .4);
+}
+
+/** Bolts round a frame: small heads standing proud of its face. */
+function bolt(g, y, z, x = .985) {
+  box(g, look.BOLT, [x, y - .025, z - .025, x + .012, y + .025, z + .025]);
+}
+
+/**
+ * B: the glass set back. A thick bezel stands proud of the belt, the glass lies a pixel behind its
+ * face, on the belt, showing the tank's dark inside, the fluid over it, and glints over both.
+ */
+function variantB(g, amount) {
+  const out = .985, y0 = 1.12, y1 = 2.18, z = .4, rim = .08;
+  box(g, look.BEZEL, [.93, y1, -z - rim, out, y1 + rim, z + rim]);
+  box(g, look.BEZEL, [.93, y0 - rim, -z - rim, out, y0, z + rim]);
+  box(g, look.BEZEL, [.93, y0, z, out, y1, z + rim]);
+  box(g, look.BEZEL, [.93, y0, -z - rim, out, y1, -z]);
+  pane(g, look.INSIDE, .932, y0, y1, -z, z);
+  if (amount > 0) pane(g, FLUID(), .933, y0, y0 + (y1 - y0) * amount, -z, z);
+  pane(g, { cutout: true }, .934, y0, y1, -z, z, { fit: true, tex: GLINT, glow: true });
+  for (const zz of [-z - rim / 2, 0, z + rim / 2]) { bolt(g, y1 + rim / 2, zz); bolt(g, y0 - rim / 2, zz); }
+  for (const yy of [(y0 + y1) / 2]) { bolt(g, yy, z + rim / 2); bolt(g, yy, -z - rim / 2); }
+}
+
+/**
+ * C: a level gauge. A narrow glass tube up the belt between two metal caps, on a dark backing plate
+ * with marks at each quarter; the fluid stands in the tube.
+ */
+function variantC(g, amount) {
+  const y0 = 1.12, y1 = 2.18, w = .07;
+  box(g, look.TRIM, [.93, 1.0, -.22, .945, 2.3, .22]);
+  for (const q of [.25, .5, .75]) {
+    const y = y0 + (y1 - y0) * q;
+    box(g, look.TICK, [.945, y - .012, .1, .95, y + .012, q === .5 ? .2 : .16]);
+    box(g, look.TICK, [.945, y - .012, q === .5 ? -.2 : -.16, .95, y + .012, -.1]);
+  }
+  // The tube: its inside, the fluid up its faces, and a glint down its front.
+  const tube = [.945, y0, -w, .99, y1, w];
+  box(g, look.INSIDE, tube, { faces: [0, 2, 3] });
+  if (amount > 0) {
+    const top = y0 + (y1 - y0) * amount;
+    box(g, FLUID(), [.9449, y0, -w - 1e-4, .9901, top, w + 1e-4], { faces: [0, 2, 3] });
+  }
+  pane(g, { cutout: true }, .9902, y0, y1, -w, w, { fit: true, tex: TUBE_GLINT, glow: true });
+  for (const [a, b] of [[y0 - .08, y0], [y1, y1 + .08]]) box(g, look.BEZEL, [.94, a, -w - .04, .998, b, w + .04]);
+}
+
+/**
+ * D: a porthole. A round window, stepped every half pixel, in a ring of metal standing proud of the
+ * belt, bolted round; the glass lies behind the ring's face, the fluid filling its rows from the bottom.
+ */
+function variantD(g, amount) {
+  const mid = 1.65, inner = .5, outer = .59, out = .985;
+  const bottom = mid - inner, top = mid + inner, surface = bottom + (top - bottom) * amount;
+  for (let y = mid - outer; y < mid + outer - 1e-9; y += STEP) {
+    const up = y + STEP / 2 - mid, wo = stepped(outer, up), wi = Math.abs(up) < inner ? stepped(inner, up) : 0;
+    if (wo <= 0) continue;
+    if (wi > 0) {
+      box(g, look.BEZEL, [.93, y, wi, out, y + STEP, wo]);
+      box(g, look.BEZEL, [.93, y, -wo, out, y + STEP, -wi]);
+      pane(g, look.INSIDE, .932, y, y + STEP, -wi, wi);
+      if (y < surface) pane(g, FLUID(), .933, y, Math.min(y + STEP, surface), -wi, wi);
+      pane(g, { cutout: true }, .934, y, y + STEP, -wi, wi, { tex: GLINT, glow: true });
+    } else {
+      box(g, look.BEZEL, [.93, y, -wo, out, y + STEP, wo]);
+    }
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI / 4 + Math.PI / 8, r = (inner + outer) / 2;
+    bolt(g, mid + Math.sin(a) * r, Math.cos(a) * r);
+  }
+}
+const DRAW = { A: variantA, B: variantB, C: variantC, D: variantD };
+
+// ---------------------------------------------------------------- the scene
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fc8ef);
+const camera = new THREE.PerspectiveCamera(55, 1, .02, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+const VIEWS = [
+  { pos: [3.4, 1.75, .9], target: [.95, 1.65, 0] },     // standing on the platform beside it
+  { pos: [2.2, 1.9, 2.6], target: [.9, 1.6, 0] },       // along the car
+  { pos: [7, 3.2, 5.5], target: [0, 1.3, 0] },          // the whole car
+];
+let view = 0;
+function setView(i) {
+  view = (i + VIEWS.length) % VIEWS.length;
+  camera.position.set(...VIEWS[view].pos); controls.target.set(...VIEWS[view].target); controls.update();
+}
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ color: 0x8b8f93 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -.6; scene.add(ground);
+// The platform the player stands on, two off the Rail: a row of grey blocks.
+const platform = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 12), new THREE.MeshBasicMaterial({ color: 0xa9adb1 }));
+platform.position.set(2.5, .2, 0); scene.add(platform);
+
+let car = null;
+function rebuild() {
+  if (car) scene.remove(car);
+  materials.clear();
+  car = new THREE.Group();
+  fluidCar(car);
+  const amount = Number(FILLS[state.fill][0]) / 100;
+  sides(car, g => DRAW[VARIANTS[state.variant][0]](g, amount));
+  scene.add(car);
+  for (const k of Object.keys(LISTS)) document.getElementById(k).textContent =
+    k === 'variant' ? `${VARIANTS[state.variant][0]} (${VARIANTS[state.variant][1]})` : LISTS[k][state[k]][1];
+  const q = new URLSearchParams();
+  for (const k of Object.keys(LISTS)) q.set(k, LISTS[k][state[k]][0]);
+  try { history.replaceState(null, '', '?' + q); } catch { /* a data: or file: page keeps no URL */ }
+}
+function step(k, d) { state[k] = (state[k] + d + LISTS[k].length) % LISTS[k].length; rebuild(); }
+document.querySelectorAll('#bar button').forEach(b => b.onclick = () => step(b.dataset.k, +b.dataset.d));
+addEventListener('keydown', e => {
+  if (e.target.closest?.('input, textarea, [contenteditable]')) return;
+  const k = { ArrowLeft: ['variant', -1], ArrowRight: ['variant', 1], ArrowUp: ['fill', 1], ArrowDown: ['fill', -1],
+    f: ['fluid', 1], F: ['fluid', 1], m: ['metal', 1], M: ['metal', 1] }[e.key];
+  if (k) { e.preventDefault(); step(...k); }
+  if (e.key === 'v' || e.key === 'V') setView(view + 1);
+});
+function resize() {
+  renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize(); setView(0); rebuild();
+let frame = 0;
+setInterval(() => { frame++; for (const t of Object.values(FLUID_TEX)) t.redraw(frame); }, 120);
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
