@@ -111,7 +111,7 @@ final class ClearanceTests {
     }
 
     /**
-     * A block in the row two off the Rail at the height of a Cargo car's chests, where Stations,
+     * A block in the row two off the Rail at the height of a Cargo car's crates, where Stations,
      * hatches and Chargers stand (ADR 0010): it is outside the Clearance.
      */
     private static void blockBesideStays(GameTestHelper helper) {

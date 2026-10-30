@@ -84,7 +84,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * bucket, the tanks kept through a save, and automatic Trains carrying fluid between Fluid
  * hatches: a job, a leftover in a Fluid car, a Train mixing a Cargo car and a Fluid car, and a
  * provider Fluid hatch beside a Locomotive that fuels none. Stations and Fluid hatches stand in the row two blocks off the Rail at a
- * Cargo car's chests' height (#72), and a Fluid hatch places nowhere nearer. How fluid is planned, claimed and moved is {@code LogisticsTest}'s; a
+ * Cargo car's crates' height (#72), and a Fluid hatch places nowhere nearer. How fluid is planned, claimed and moved is {@code LogisticsTest}'s; a
  * Train carrying fluid out of view is {@code FarAwayTests}'. These tests share the {@code fluid_}
  * prefix.
  */
@@ -100,7 +100,7 @@ final class FluidTests {
     private static final int[] PYLONS = {-11, -1, 8, 19, 29, 37};
     private static final int Z = 3;
     /**
-     * South of the line in its row, two blocks off the Rail at a Cargo car's chests' height, serving
+     * South of the line in its row, two blocks off the Rail at a Cargo car's crates' height, serving
      * Trains heading east: its leading car's place beside x 7 to 11, its car spots back west from 2 to 6.
      */
     private static final BlockPos QUARRY = new BlockPos(11, 3, 5);
@@ -126,7 +126,7 @@ final class FluidTests {
     private static final BlockPos ROW_WEST = new BlockPos(-1, 1, 3);
     private static final BlockPos ROW_EAST = new BlockPos(11, 1, 3);
     private static final BlockPos ROW_STATION = new BlockPos(11, 3, 5);
-    /** Beside the first car spot's first block in the row: two blocks off the Rail at a Cargo car's chests' height. */
+    /** Beside the first car spot's first block in the row: two blocks off the Rail at a Cargo car's crates' height. */
     private static final BlockPos IN_ROW = new BlockPos(6, 3, 5);
     /** One block off the Rail at the chests' height, between the row and the Rail. */
     private static final BlockPos ONE_OFF = new BlockPos(6, 3, 4);
@@ -583,7 +583,7 @@ final class FluidTests {
 
     /**
      * {@code item}, a hatch's or a Charger's, beside a Station's first car spot: one block off the Rail
-     * at a Cargo car's chests' height and in the old row, one off at a car's floor, the Placement
+     * at a Cargo car's crates' height and in the old row, one off at a car's floor, the Placement
      * Preview's plan is refused {@code refusal} and a click places nothing; in the row, two blocks off
      * at the chests' height, it plans and places {@code block}, joining the first car spot. Shared with
      * {@code HatchTests} and {@code ElectricTests}.

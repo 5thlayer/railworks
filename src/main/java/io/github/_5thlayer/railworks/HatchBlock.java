@@ -38,7 +38,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A hatch: a container beside a Station's platform, two off the Rail at a Cargo car's chests'
+ * A hatch: a container beside a Station's platform, two off the Rail at a Cargo car's crates'
  * height, joining that Station, which trades with the Cargo car standing at its car spot or the
  * leading car's place, and, a provider, fuels the Locomotive standing there (ADR 0008). What it holds is its record in the level's
  * {@link LevelHatches}, filled and emptied by hoppers and pipes through its block

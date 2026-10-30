@@ -2,7 +2,7 @@
 # standing at the sign has loaded, to Mine, whose provider holds eight stacks of iron ore. By the
 # plot, beside Smelter's first car spot, a requester asks for two, and a hopper under it empties it
 # into a chest, so it keeps asking. Stations and hatches stand on pillars, in the row two blocks off
-# the Rail at a Cargo car's chests' height. The automatic Train runs out to the Mine with no chunk
+# the Rail at a Cargo car's crates' height. The automatic Train runs out to the Mine with no chunk
 # of its way loaded, and comes back with the ore, again and again until the Mine runs dry. Commands
 # build only in loaded chunks, so the line's chunks are force-loaded, the far part is built once
 # they have loaded (far_away/far, far_away/lay), and they are let go again (far_away/sweep): no

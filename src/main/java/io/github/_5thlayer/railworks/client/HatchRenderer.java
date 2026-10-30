@@ -270,7 +270,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
 
     /**
      * An accordion sleeve over the face, an iron frame at each end and leather pleats between,
-     * folding in and out, its middle at the height of a Cargo car's chests: {@code out} of the way
+     * folding in and out, its middle at the height of a Cargo car's crates: {@code out} of the way
      * to the car, its car's frame sliding out from just past the hatch's and the pleats unfolding
      * behind it.
      */

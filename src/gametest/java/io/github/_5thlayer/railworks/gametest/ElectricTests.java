@@ -46,7 +46,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * The Electric Locomotive, the Charger and the Burner Generator in a world (#9): their recipes, the
  * energy handlers each shows Jade, a Charger taking FE in and filling a Locomotive beside it, the
  * Creative Charger filling one at once, a Charger placing only in the row two blocks off the Rail
- * at a Cargo car's chests' height (#72), and a Burner Generator fed by a hopper charging a Charger set
+ * at a Cargo car's crates' height (#72), and a Burner Generator fed by a hopper charging a Charger set
  * against it. Which Trains a Charger serves and when a Train waits on it are {@code LogisticsTest}'s,
  * in the model. Prefixed {@code electric_}, but for a Charger beside a Locomotive's cab rather than
  * its Engine room charging nothing (#74), prefixed {@code engine_room_}.

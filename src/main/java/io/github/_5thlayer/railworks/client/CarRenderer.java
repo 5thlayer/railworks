@@ -10,8 +10,6 @@ import io.github._5thlayer.railworks.CarEntity;
 import io.github._5thlayer.railworks.FluidCarEntity;
 import io.github._5thlayer.railworks.Railworks;
 import io.github._5thlayer.railworks.rail.CarBody;
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.model.object.chest.ChestModel;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -26,17 +24,16 @@ import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.client.resources.model.sprite.SpriteId;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.state.properties.ChestType;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A car, drawn from its {@link CarBody}: a boxy car straddling the Rail, on a Cargo car a vanilla chest
- * set into each side, and on a Fluid car a tank. Each box is drawn in its {@link CarBody.Panel}'s
+ * A car, drawn from its {@link CarBody}: a boxy car straddling the Rail, on a Cargo car a crate set into
+ * each side, and on a Fluid car a tank. Each box is drawn in its {@link CarBody.Panel}'s
  * texture, Riley's steel plating, tiled at 16 px per block with its UVs taken from the car's own
  * coordinates, so a panel's pattern runs on from one box to the next without a seam; a face is cut at
- * every whole block, so no quad wraps past its sprite on the block atlas. The lamps and the Sight
- * glasses' panes stay flat colours.
+ * every whole block, so no quad wraps past its sprite on the block atlas. A crate is drawn in Riley's
+ * crate sprites, each face the whole of one. The lamps and the Sight glasses' panes stay flat colours.
  *
  * <p>A Fluid car's Sight glasses are filled, on their panes' outer faces, with its tank's fluid as
  * the server last synced it ({@link SightGlassFluid}), tiled a block to a tile from the pane's bottom,
@@ -79,6 +76,11 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     }
 
     private static final SpriteId WHITE = sprite("paint");
+    private static final SpriteId CRATE_SIDE = sprite("crate_side");
+    private static final SpriteId CRATE_TOP = sprite("crate_top");
+    private static final SpriteId CRATE_BOTTOM = sprite("crate_bottom");
+    /** The whole sprite's u and v at a face's corners, from its bottom left round it; the sprite's top is v 0. */
+    private static final float[][] WHOLE_SPRITE = {{0.0F, 1.0F}, {1.0F, 1.0F}, {1.0F, 0.0F}, {0.0F, 0.0F}};
     /**
      * Where a panel's tiles are laid from, in the car's coordinates: its x and z on block edges,
      * since a car's middle block runs from -0.5 to 0.5, so a stopped car's tiles line up with the blocks.
@@ -86,13 +88,11 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
     private static final float TILE_X = 0.5F;
     private static final float TILE_Z = 0.5F;
     private final CarBody body;
-    private final ChestModel chest;
     private final SpriteGetter sprites;
 
     private CarRenderer(EntityRendererProvider.Context context, CarBody body) {
         super(context);
         this.body = body;
-        this.chest = new ChestModel(context.bakeLayer(ModelLayers.CHEST));
         this.sprites = context.getSprites();
         this.shadowRadius = 0.0F;
     }
@@ -150,10 +150,10 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
                     tiledBox(pose, buffer, part.box(), sprite, look.centred(), light);
                 }
             }
+            for (CarBody.Box crate : body.crates()) {
+                crate(pose, buffer, crate, light);
+            }
         });
-        for (CarBody.Box chest : body.chests()) {
-            submitChest(chest, poseStack, collector, light);
-        }
         SightGlassFluid fluid = state.fluid;
         if (fluid != null) {
             int fluidLight = fluid.light(light);
@@ -203,19 +203,22 @@ public final class CarRenderer<T extends CarEntity> extends EntityRenderer<T, Ca
         }
     }
 
-    /** A closed chest filling the cube as it would a block, its front out of the car's nearer side. */
-    private void submitChest(CarBody.Box cube, PoseStack poseStack, SubmitNodeCollector collector, int light) {
-        float size = (float) (cube.maxY() - cube.minY());
-        boolean right = cube.minX() + cube.maxX() > 0.0;
-        poseStack.pushPose();
-        poseStack.translate((cube.minX() + cube.maxX()) / 2.0, cube.minY(), (cube.minZ() + cube.maxZ()) / 2.0);
-        // The chest's model faces +z; turn it to face out of its side.
-        poseStack.mulPose(Axis.YP.rotationDegrees(right ? 90.0F : -90.0F));
-        poseStack.scale(size, size, size);
-        poseStack.translate(-0.5F, 0.0F, -0.5F);
-        collector.submitModel(chest, 0.0F, poseStack, light, OverlayTexture.NO_OVERLAY, -1,
-                Sheets.CHEST_REGULAR.select(ChestType.SINGLE), sprites, 0, null);
-        poseStack.popPose();
+    /** A crate filling {@code b}: each face the whole of its sprite, the side's on all four sides. */
+    private void crate(PoseStack.Pose pose, VertexConsumer buffer, CarBody.Box b, int light) {
+        for (Face face : Face.values()) {
+            TextureAtlasSprite sprite = sprites.get(switch (face) {
+                case EAST, WEST, SOUTH, NORTH -> CRATE_SIDE;
+                case UP -> CRATE_TOP;
+                case DOWN -> CRATE_BOTTOM;
+            });
+            float[][] corners = face.corners(b);
+            for (int i = 0; i < 4; i++) {
+                buffer.addVertex(pose, corners[i][0], corners[i][1], corners[i][2]).setColor(-1)
+                        .setUv(sprite.getU(WHOLE_SPRITE[i][0]), sprite.getV(WHOLE_SPRITE[i][1]))
+                        .setOverlay(OverlayTexture.NO_OVERLAY).setLight(light)
+                        .setNormal(pose, face.normalX, face.normalY, face.normalZ);
+            }
+        }
     }
 
     private static SpriteId sprite(String name) {

@@ -302,7 +302,7 @@ public final class Platform {
     /**
      * Which car spot the block at {@code x}, {@code y}, {@code z} is beside, or {@link #LEADING} for
      * the leading car's place: a block in the row beside the Rail where a Station stands, two off
-     * its line at the height of a Cargo car's chests ({@link Station#inRow}), and along the Line
+     * its line at the height of a Cargo car's crates ({@link Station#inRow}), and along the Line
      * within the spot. Empty for a block beside neither.
      */
     public OptionalInt spotBeside(int x, int y, int z) {
