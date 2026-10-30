@@ -13,6 +13,10 @@ paver on the other sides and the bottom. Its top keeps the arrow it has worn sin
 way the Trains it serves head: the arrow is inlaid in the tiles as yellow paint, the tiles' shading
 showing faintly through it.
 
+The Rail is his horizontal grey cement with a steel running strip, and the Pylon his vertical grey
+cement, its top segment capped with his concrete slabs under a steel bearing plate; the renderer
+draws the Rail and the cap from these.
+
     scripts/build-textures.py
     scripts/build-textures.py --check    # regenerate and diff
 """
@@ -131,6 +135,11 @@ TEXTURES_BUILT = {
     "block/station/top.png": station_top,
     "block/station/front.png": unchanged("device_terminal_front_on.png"),
     "block/station/side.png": unchanged("concrete_paver.png"),
+    "block/rail/cement.png": unchanged("gray_cement_horizontal.png"),
+    "block/pylon/post.png": unchanged("gray_cement_vertical.png"),
+    "block/pylon/cap.png": unchanged("concrete_slabs.png"),
+    # The Rail's running strip and the bearing plate it rests on.
+    "block/steel.png": unchanged("steel_block.png"),
 }
 
 

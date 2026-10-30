@@ -39,6 +39,9 @@ path = [
     "data/art/*.png",
     "src/main/resources/assets/railworks/textures/block/station/front.png",
     "src/main/resources/assets/railworks/textures/block/station/side.png",
+    "src/main/resources/assets/railworks/textures/block/rail/*.png",
+    "src/main/resources/assets/railworks/textures/block/pylon/*.png",
+    "src/main/resources/assets/railworks/textures/block/steel.png",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "Malcolm Riley"

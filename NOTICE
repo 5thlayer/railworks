@@ -22,3 +22,22 @@ Source:  https://github.com/malcolmriley/unused-textures
          Station's arrow painted on it in yellow.
 Licence: Creative Commons Attribution 4.0 International
          https://creativecommons.org/licenses/by/4.0/
+
+Rail and Pylon sprites
+----------------------
+
+Files:   data/art/gray_cement_horizontal.png
+         data/art/gray_cement_vertical.png
+         data/art/concrete_slabs.png
+         data/art/steel_block.png
+         src/main/resources/assets/railworks/textures/block/rail/cement.png
+         src/main/resources/assets/railworks/textures/block/pylon/{post,cap}.png
+         src/main/resources/assets/railworks/textures/block/steel.png
+Author:  Malcolm Riley
+Source:  https://github.com/malcolmriley/unused-textures
+         blocks/gray_cement_horizontal.png, blocks/gray_cement_vertical.png, blocks/concrete_slabs.png
+         and blocks/steel_block.png at commit 8b85ad732023174d9a9da74e6bf2272d6c0bef17. The files under
+         data/art/ are the unmodified copies. scripts/build-textures.py writes them unchanged as
+         rail/cement.png, pylon/post.png, pylon/cap.png and steel.png.
+Licence: Creative Commons Attribution 4.0 International
+         https://creativecommons.org/licenses/by/4.0/
