@@ -117,9 +117,9 @@ class CarBodyTest {
         }
     }
 
-    /** Every box drawn for the body: its painted parts and its chests. */
+    /** Every box drawn for the body: its painted parts and its crates. */
     private static List<CarBody.Box> boxes(CarBody body) {
-        return Stream.concat(body.parts().stream().map(CarBody.Part::box), body.chests().stream()).toList();
+        return Stream.concat(body.parts().stream().map(CarBody.Part::box), body.crates().stream()).toList();
     }
 
     /** The plane two boxes have faces in that overlap, by more than an edge, or null. */
@@ -255,32 +255,32 @@ class CarBodyTest {
     }
 
     @Test
-    void theCargoCarShowsAChestSetIntoEachSideOverEachOfItsThreeInnerBlocks() {
-        List<CarBody.Box> chests = CarBody.CARGO.chests();
-        assertEquals(6, chests.size(), "three chests a side");
+    void theCargoCarShowsACrateSetIntoEachSideOverEachOfItsThreeInnerBlocks() {
+        List<CarBody.Box> crates = CarBody.CARGO.crates();
+        assertEquals(6, crates.size(), "three crates a side");
         for (double at : new double[] {-1.0, 0.0, 1.0}) {
             for (double side : new double[] {1.0, -1.0}) {
-                assertEquals(1, chests.stream().filter(chest -> (chest.minZ() + chest.maxZ()) / 2.0 == at
-                        && Math.signum(chest.minX() + chest.maxX()) == side).count(), "a chest on side " + side + " at " + at);
+                assertEquals(1, crates.stream().filter(crate -> (crate.minZ() + crate.maxZ()) / 2.0 == at
+                        && Math.signum(crate.minX() + crate.maxX()) == side).count(), "a crate on side " + side + " at " + at);
             }
         }
-        for (CarBody.Box chest : chests) {
-            assertEquals(chest.maxY() - chest.minY(), chest.maxX() - chest.minX(), 1e-9, chest + " is not a cube");
-            assertEquals(chest.maxY() - chest.minY(), chest.maxZ() - chest.minZ(), 1e-9, chest + " is not a cube");
-            // Looking at the car square on from beside it, at the chest's middle, the chest is the first
+        for (CarBody.Box crate : crates) {
+            assertEquals(crate.maxY() - crate.minY(), crate.maxX() - crate.minX(), 1e-9, crate + " is not a cube");
+            assertEquals(crate.maxY() - crate.minY(), crate.maxZ() - crate.minZ(), 1e-9, crate + " is not a cube");
+            // Looking at the car square on from beside it, at the crate's middle, the crate is the first
             // thing seen, and something stands proud of it around the recess.
-            double side = Math.signum(chest.minX() + chest.maxX());
-            double y = (chest.minY() + chest.maxY()) / 2.0;
-            double z = (chest.minZ() + chest.maxZ()) / 2.0;
+            double side = Math.signum(crate.minX() + crate.maxX());
+            double y = (crate.minY() + crate.maxY()) / 2.0;
+            double z = (crate.minZ() + crate.maxZ()) / 2.0;
             double[] inward = {-side, 0.0, 0.0};
-            assertEquals(chest, firstHit(boxes(CarBody.CARGO), new double[] {side, y, z}, inward), "the chest is hidden");
-            CarBody.Box frame = firstHit(boxes(CarBody.CARGO), new double[] {side, chest.maxY() + 0.03, z}, inward);
-            assertTrue(frame != null && Math.abs(side > 0 ? frame.maxX() : frame.minX()) > Math.abs(side > 0 ? chest.maxX() : chest.minX()),
-                    "nothing frames the chest above it");
-            for (double along : new double[] {chest.minZ() - 0.1, chest.maxZ() + 0.1}) {
+            assertEquals(crate, firstHit(boxes(CarBody.CARGO), new double[] {side, y, z}, inward), "the crate is hidden");
+            CarBody.Box frame = firstHit(boxes(CarBody.CARGO), new double[] {side, crate.maxY() + 0.03, z}, inward);
+            assertTrue(frame != null && Math.abs(side > 0 ? frame.maxX() : frame.minX()) > Math.abs(side > 0 ? crate.maxX() : crate.minX()),
+                    "nothing frames the crate above it");
+            for (double along : new double[] {crate.minZ() - 0.1, crate.maxZ() + 0.1}) {
                 CarBody.Box beside = firstHit(boxes(CarBody.CARGO), new double[] {side, y, along}, inward);
-                assertTrue(beside != null && Math.abs(side > 0 ? beside.maxX() : beside.minX()) > Math.abs(side > 0 ? chest.maxX() : chest.minX()),
-                        "nothing frames the chest beside it");
+                assertTrue(beside != null && Math.abs(side > 0 ? beside.maxX() : beside.minX()) > Math.abs(side > 0 ? crate.maxX() : crate.minX()),
+                        "nothing frames the crate beside it");
             }
         }
     }

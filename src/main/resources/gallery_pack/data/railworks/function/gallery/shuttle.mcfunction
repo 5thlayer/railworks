@@ -1,7 +1,7 @@
 # The line the shuttle scenes share, a U of two-segment columns: its south leg runs east along ~-2
 # from its west end, turns north through four bends of 45 degrees at the plot's east side, and its
 # north leg runs back west along ~-12 to its own west end. A Station stands at each leg's west end,
-# on a pillar on the leg's north side, in the row two blocks off the Rail at a Cargo car's chests'
+# on a pillar on the leg's north side, in the row two blocks off the Rail at a Cargo car's crates'
 # height, so both serve Trains heading west: the $(south) on the south leg and the $(north) on the
 # north. Each platform runs back east from its Station along its leg's 21 blocks of Straight leg,
 # the leading car's place and three car spots, and ends where the leg's last Span bends into the U,

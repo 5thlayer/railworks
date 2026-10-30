@@ -25,7 +25,7 @@ public enum RailworksRefusal implements Refusal {
     LOCOMOTIVE_BETWEEN_CARS,
     /** A car that would sit in a block, so the Span's Clearance is not clear. */
     BLOCKED_CAR,
-    /** A Station by no Rail: not in the row beside a Span, two off it at the height of a Cargo car's chests. */
+    /** A Station by no Rail: not in the row beside a Span, two off it at the height of a Cargo car's crates. */
     STATION_OFF_RAIL,
     /** A Station by Rail that bends or runs on a diagonal along its stretch, where no Cargo car would load. */
     STATION_NOT_STRAIGHT,

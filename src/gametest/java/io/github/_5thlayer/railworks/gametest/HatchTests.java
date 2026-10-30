@@ -69,7 +69,7 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  * east of its north end serves Trains heading north, so its platform runs back south from it: the
  * leading car's place beside z -3 to 1, its first five-block car spot beside z 2 to 6 and its second
  * beside z 7 to 11 (#70). Station and hatches stand in the row (#72): two blocks either side of the
- * Rail's line, x 3 and x 7, at the height of a Cargo car's chests, y 3, the Pylons' Arms being at
+ * Rail's line, x 3 and x 7, at the height of a Cargo car's crates, y 3, the Pylons' Arms being at
  * y 1. A hatch places in the row beside any block of a car spot or the leading car's place (#53)
  * and nowhere else, keeps its mode, request and
  * contents in the level's {@link LevelHatches}, is reached by hoppers through its block, and joins

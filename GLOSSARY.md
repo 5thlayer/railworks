@@ -127,7 +127,7 @@ What automatic Trains carry between hatches, of two kinds: items, held by a hatc
 _Avoid_: freight, wares (for the domain; `Ware` is only the code's name for one good, an item's kind or a fluid)
 
 **Hatch**:
-A container beside a Station's platform, two blocks off the Rail at the height of a Cargo car's chests, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: a hatch of items trades with a Cargo car, and its provider fuels a Locomotive whose Engine room it stands beside; a **Fluid hatch** trades with a Fluid car. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
+A container beside a Station's platform, two blocks off the Rail at the height of a Cargo car's crates, joining that Station, which serves the car standing at the leading car's place or the car spot it is beside: a hatch of items trades with a Cargo car, and its provider fuels a Locomotive whose Engine room it stands beside; a **Fluid hatch** trades with a Fluid car. It is either a provider or a requester; one beside no platform joins nothing and is only a container.
 _Avoid_: Well hatch (Voidworks'), port, loader, inserter, hopper
 
 **Fluid hatch**:

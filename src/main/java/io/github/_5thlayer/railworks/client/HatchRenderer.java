@@ -272,7 +272,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
 
     /**
      * An accordion sleeve over the face, an iron frame at each end and leather pleats between,
-     * folding in and out, its middle at the height of a Cargo car's chests.
+     * folding in and out, its middle at the height of a Cargo car's crates.
      */
     private static void bellows(Matrix4f pose, VertexConsumer buffer, int light) {
         float face = -0.5F;

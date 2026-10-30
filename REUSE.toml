@@ -53,6 +53,7 @@ path = [
     "src/main/resources/assets/railworks/textures/block/car/burner_nose.png",
     "src/main/resources/assets/railworks/textures/block/car/electric_nose.png",
     "src/main/resources/assets/railworks/textures/block/car/tank.png",
+    "src/main/resources/assets/railworks/textures/block/car/crate_*.png",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "Malcolm Riley"

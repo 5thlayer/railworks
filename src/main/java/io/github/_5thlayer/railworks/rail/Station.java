@@ -11,7 +11,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
  * A Station: a named block beside the Rail (ADR 0007), in the {@link #inRow row} two blocks off its
- * line at the height of a Cargo car's chests, where hatches and Chargers stand too (ADR 0010). It
+ * line at the height of a Cargo car's crates, where hatches and Chargers stand too (ADR 0010). It
  * serves the one Span it is nearest of those it is in the row of, and is reached from
  * {@link #STRETCH} blocks either way of its foot, the point of the Span nearest it: a car whose
  * Place is in that stretch is at the Station. It serves only the Trains that have it on their
@@ -98,7 +98,7 @@ public record Station(int x, int y, int z, String name) {
     /**
      * Whether a block {@code off} its foot, as {@link #fromFoot} says, is in the row beside the Rail
      * where Stations, hatches and Chargers stand (ADR 0010): {@link #ROW_OFF} off the line seen from
-     * above, and in the block a Cargo car's chests sit in, whose bottom is a block above the
+     * above, and in the block a Cargo car's crates sit in, whose bottom is a block above the
      * flange's underside, the line from Arm to Arm.
      */
     static boolean inRow(Place.Point off) {

@@ -19,7 +19,7 @@ import java.util.SequencedSet;
  * so a straight Span's Clearance is three blocks across (ADR 0010), and two blocks past either Arm,
  * where a car's middle may stand. On a bend the body's ends swing out of the curve and its middle
  * cuts in, so a bent Span's Clearance is wider than three blocks there. A block that only touches the
- * body is outside it, so the row two off a Straight leg at a Cargo car's chests' height, where Stations,
+ * body is outside it, so the row two off a Straight leg at a Cargo car's crates' height, where Stations,
  * hatches and Chargers stand, is clear.
  * Another Span's Rail is no block, so one line passes over or under another at any height
  * (ADR 0002).
@@ -74,7 +74,7 @@ public final class Clearance {
 
     /**
      * The shortest bent Span a Straight leg may run on into, in line, with its row two off the Rail
-     * at a Cargo car's chests' height, where hatches, Stations and Chargers stand, left clear: on a
+     * at a Cargo car's crates' height, where hatches, Stations and Chargers stand, left clear: on a
      * shorter one, bending at {@link SpanRules#bendLimit()} at its far Arm, a car's body swings into
      * that row beside the leg's last blocks. At the default limit, 45 degrees, it is 4: a bent Span 3
      * long reaches one row block, 2 long two, 1 long three each side. Measured once for each bend limit

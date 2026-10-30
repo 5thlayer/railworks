@@ -1,5 +1,5 @@
 # Stations: a line of two-segment columns and two named Stations, one on each side, each on a pillar
-# in the row two blocks off the Rail at a Cargo car's chests' height. Each serves the Trains that have it on their drive side, so the
+# in the row two blocks off the Rail at a Cargo car's crates' height. Each serves the Trains that have it on their drive side, so the
 # two serve opposite ways, and its arrow points the way. They stand at either end of the line, each
 # platform running back from its Station the way it serves, the leading car's place and two car
 # spots, to where its Straight leg ends: the line steps north through two bends of 45 degrees in the

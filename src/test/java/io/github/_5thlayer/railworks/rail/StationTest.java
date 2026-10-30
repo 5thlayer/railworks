@@ -28,7 +28,7 @@ class StationTest {
         network.add(AB);
     }
 
-    /** In the row two blocks off the Rail, at the height of a Cargo car's chests, where hatches stand too (ADR 0010). */
+    /** In the row two blocks off the Rail, at the height of a Cargo car's crates, where hatches stand too (ADR 0010). */
     private static Station beside(int x) {
         return new Station(x, 7, 2, "Mine");
     }

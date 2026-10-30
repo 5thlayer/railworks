@@ -37,7 +37,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Stations through the item, the block and a real player: placing one in the row beside the Rail,
- * two blocks off it at a Cargo car's chests' height (ADR 0010), refused off it, in the old row one
+ * two blocks off it at a Cargo car's crates' height (ADR 0010), refused off it, in the old row one
  * off it, in its Clearance and by a bend or a diagonal, with the line it says why, naming it, and the
  * level's Stations following the blocks. Which stretch of a Span a Station serves is
  * {@code StationTest}'s, and where Rail is a Straight leg {@code StraightLegTest}'s; what only a
@@ -49,7 +49,7 @@ final class StationTests {
     /** Eight apart, one segment tall, with a Span strung between the tops at y 1. */
     private static final BlockPos A = new BlockPos(1, 1, 3);
     private static final BlockPos B = new BlockPos(9, 1, 3);
-    /** In the row beside the Rail, two blocks off it at the height of a Cargo car's chests: where a Station goes. */
+    /** In the row beside the Rail, two blocks off it at the height of a Cargo car's crates: where a Station goes. */
     private static final BlockPos BESIDE = new BlockPos(5, 3, 1);
     /** Under the Rail, between the Pylons, where a Station is refused, but a block can be clicked. */
     private static final BlockPos UNDER = new BlockPos(5, 1, 3);

@@ -37,7 +37,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 final class CargoAccessTests {
 
     /**
-     * In the row beside the Rail, two blocks off it at the car's chests' height, at the front end of
+     * In the row beside the Rail, two blocks off it at the car's crates' height, at the front end of
      * the coupled Cargo car, which leads a Train
      * heading west: it stands with its middle where a leading Locomotive's would, two blocks back
      * from the Station, its front at the Station block's front edge, in the block {@link #CAR}.

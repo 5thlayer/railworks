@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * The boxes a car is drawn from: a boxy car straddling the Rail, its shell riding on top with
- * skirts down both sides of the web, the chests set into a Cargo car's sides, and a Fluid car's tank
+ * skirts down both sides of the web, the crates set into a Cargo car's sides, and a Fluid car's tank
  * with a Sight glass along each side. Coordinates are
  * the car's own: x across, y up from the floor's underside on the flange's top, z along the car with
  * +z the end it faces, the car's middle block from -0.5 to 0.5. Each box is a kind of {@link Panel},
@@ -21,7 +21,7 @@ import java.util.List;
  *
  * <p>Pure: no Minecraft types.
  */
-public record CarBody(double length, List<Part> parts, List<Box> chests, List<SightGlass> sightGlasses) {
+public record CarBody(double length, List<Part> parts, List<Box> crates, List<SightGlass> sightGlasses) {
 
     /** A car's box across: two blocks, centred on the Rail (ADR 0010). */
     public static final double WIDTH = 2.0;
@@ -59,9 +59,8 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
     }
 
     /**
-     * An axis-aligned box in the car's coordinates. Among a body's {@link #chests()}, a cube a vanilla
-     * chest fills as it would a block, drawn with its own texture, its front out of the car's nearer
-     * side.
+     * An axis-aligned box in the car's coordinates. Among a body's {@link #crates()}, a cube a crate
+     * fills, each face drawn in the whole of its sprite.
      */
     public record Box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
 
@@ -166,9 +165,9 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
     /** How long a Fluid car's Sight glass is along z, across the car's middle. */
     private static final double SIGHT_GLASS_LENGTH = 0.8;
 
-    /** Where a Cargo car's chests are along z, one a side at each: over its three inner blocks. */
-    private static final double[] CHESTS_AT = {-1.0, 0.0, 1.0};
-    /** Half a chest's recess along z. */
+    /** Where a Cargo car's crates are along z, one a side at each: over its three inner blocks. */
+    private static final double[] CRATES_AT = {-1.0, 0.0, 1.0};
+    /** Half a crate's recess along z. */
     private static final double HALF_RECESS = 0.23;
 
     public static final CarBody LOCOMOTIVE = locomotive();
@@ -299,7 +298,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
 
     /**
      * The Cargo car: closed, of the Locomotive's height and roof line, a gangway door at both ends,
-     * and a chest set into a framed recess in each side over each of its three inner blocks.
+     * and a crate set into a framed recess in each side over each of its three inner blocks.
      */
     private static CarBody cargo() {
         double length = CargoCar.LENGTH - GAP;
@@ -313,7 +312,7 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         // of the wall by the recess's depth, and the facing above and below each recess.
         sides(parts, new Part(Panel.SHELL, 0.83, 0.68, -half + 0.015, 0.89, 2.62, half - 0.015));
         List<Double> edges = new ArrayList<>(List.of(-half + 0.02));
-        for (double at : CHESTS_AT) {
+        for (double at : CRATES_AT) {
             edges.add(at - HALF_RECESS + 0.01);
             edges.add(at + HALF_RECESS - 0.01);
         }
@@ -321,16 +320,16 @@ public record CarBody(double length, List<Part> parts, List<Box> chests, List<Si
         for (int i = 0; i < edges.size(); i += 2) {
             sides(parts, new Part(Panel.SHELL, 0.88, 0.665, edges.get(i), 0.99, 2.635, edges.get(i + 1)));
         }
-        List<Box> chests = new ArrayList<>();
-        for (double at : CHESTS_AT) {
+        List<Box> crates = new ArrayList<>();
+        for (double at : CRATES_AT) {
             sides(parts, new Part(Panel.SHELL, 0.882, 1.48, at - HALF_RECESS, 0.988, 2.625, at + HALF_RECESS));
             sides(parts, new Part(Panel.SHELL, 0.882, 0.675, at - HALF_RECESS, 0.988, 1.07, at + HALF_RECESS));
-            // The chest fills a cube in the recess, its lock just behind the facing.
-            Box chest = new Box(0.55, 1.075, at - 0.195, 0.94, 1.465, at + 0.195);
-            chests.add(chest);
-            chests.add(chest.mirrored());
+            // The crate fills a cube in the recess, its face just behind the facing.
+            Box crate = new Box(0.55, 1.075, at - 0.195, 0.94, 1.465, at + 0.195);
+            crates.add(crate);
+            crates.add(crate.mirrored());
         }
-        return new CarBody(length, List.copyOf(parts), List.copyOf(chests), List.of());
+        return new CarBody(length, List.copyOf(parts), List.copyOf(crates), List.of());
     }
 
     /**
