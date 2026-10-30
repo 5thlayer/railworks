@@ -121,3 +121,16 @@ Source:  https://github.com/malcolmriley/unused-textures
          stub of it, from gray_cement_horizontal.png and steel_block.png.
 Licence: Creative Commons Attribution 4.0 International
          https://creativecommons.org/licenses/by/4.0/
+
+Cover and icon
+--------------
+
+Files:   publish/railworks-cover.png
+         publish/railworks-icon.png
+Author:  Malcolm Riley
+Source:  https://github.com/malcolmriley/unused-textures
+         blocks/ at commit 8b85ad732023174d9a9da74e6bf2272d6c0bef17, through the Rail and Pylon, car
+         panel and smelter sprites above. publish/make-cover.py draws a row of Pylons carrying the Rail,
+         and a Train riding on it, from those sprites as Railworks' textures hold them.
+Licence: Creative Commons Attribution 4.0 International
+         https://creativecommons.org/licenses/by/4.0/
