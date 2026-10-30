@@ -115,6 +115,8 @@ LUMA = (0.299, 0.587, 0.114)
 # The tints the cars' darker panels are multiplied by: the skirts' inset plating a mid grey, as the
 # prototype has it, and the trim's plain plating near black.
 CAR_TINT = {"skirt": (138, 138, 138), "trim": (64, 64, 66)}
+# The Burner Locomotive's stack, as CarRenderer tints the steel for it.
+STACK_TINT = (0x55, 0x50, 0x4C)
 
 # The lit smelter's animation, at his own timing.
 SMELTER_LIT_ANIMATION = {"animation": {"frametime": 37, "interpolate": True}}
@@ -270,6 +272,203 @@ def glint():
     return out
 
 
+# The item icons: each car seen from its +x side, its front to the right, a car's 4.8 blocks across
+# the icon's 16 pixels and as many pixels a block up it from its roof on row 2, standing on a stub of
+# the Rail. Each letter is a panel the car wears, drawn from its sprite:
+#   R roof   S shell   K skirt   T trim   W window band   G an open window's dark inside
+#   M the Rail's cement   X the Burner's stack   F its lit firebox door   C the Electric's coil grille
+#   N a nose band   B a crate   A the Fluid car's tank   U the fluid in its Sight glass
+# Each car is drawn down to its floor's top; the floor, the skirts and the Rail under them are the same
+# for every car.
+UNDERFRAME = [
+    "SSSSSSSSSSSSSSSS",
+    "KKKKKKKKKKKKKKKK",
+    "MMMMMMMMMMMMMMMM",
+    "MMMMMMMMMMMMMMMM",
+    "................",
+    "................",
+    "................",
+]
+BURNER_ICON = [
+    "................",
+    "................",
+    ".......XX.RRRRRR",
+    "......RXXRWGGGGT",
+    "......STTSWGGGGT",
+    "......STTSWGGGGT",
+    "TTTTTTSFFSSSSSSN",
+    "SSSSSSSFFSSSSSSN",
+    "SSSSSSKKKKSSSSSN",
+] + UNDERFRAME
+ELECTRIC_ICON = [
+    "................",
+    "................",
+    "..........RRRRRR",
+    "......RRRRWGGGGT",
+    "......SCCSWGGGGT",
+    "......SCCSWGGGGT",
+    "TTTTTTSCCSSSSSSN",
+    "SSSSSSSCCSSSSSSN",
+    "SSSSSSKKKKSSSSSN",
+] + UNDERFRAME
+CARGO_ICON = [
+    "................",
+    "................",
+    "RRRRRRRRRRRRRRRR",
+    "WWWWWWWWWWWWWWWW",
+    "WWWWWWWWWWWWWWWW",
+    "WWWWWWWWWWWWWWWW",
+    "SSSSBBSBBSBBSSSS",
+    "SSSSBBSBBSBBSSSS",
+    "SSSSSSSSSSSSSSSS",
+] + UNDERFRAME
+FLUID_ICON = [
+    "................",
+    "................",
+    ".......AA.......",
+    "ATAAAAAAAAAAAATA",
+    "ATAAAAAGGAAAAATA",
+    "ATAAAAAGGAAAAATA",
+    "ATAAAAAUUAAAAATA",
+    "ATAAAAAUUAAAAATA",
+    "ATAAAAAAAAAAAATA",
+] + UNDERFRAME
+# How much of a panel's sprite shows through its mean colour on an icon, which sees a block in a few
+# pixels: enough to keep its grain, not its pattern.
+ICON_GRAIN = 0.35
+# The flat colours: an open window's dark inside, the fluid in a Sight glass and a lit firebox.
+ICON_DARK = (28, 30, 34)
+ICON_FLUID = (60, 110, 210)
+ICON_FIRE = (255, 150, 40)
+# How dark an icon's outline is drawn, its silhouette's edge pixels, and a seam under a panel where
+# another panel meets it from above, so the panels stand apart in so few pixels.
+ICON_OUTLINE = 0.6
+ICON_SEAM = 0.82
+# How much brighter the Rail icon's top face is than its side.
+ICON_TOP_LIGHT = 2.0
+
+
+def mean(pixels):
+    opaque = [p for row in pixels for p in row if p[3]]
+    return [sum(p[c] for p in opaque) / len(opaque) for c in range(3)]
+
+
+def grained(pixels):
+    """A panel as an icon paints it: each pixel its sprite's mean colour, with a little of the sprite's
+    own pixel there."""
+    m = mean(pixels)
+    return lambda x, y: [min(255, max(0, round(m[c] + (pixels[y][x][c] - m[c]) * ICON_GRAIN))) for c in range(3)]
+
+
+def stripe(pixels):
+    """A band's stripe, the middle row of its sprite, for a band an icon draws a pixel high."""
+    return lambda x, y: pixels[8][x][:3]
+
+
+# The window bands' rows on the icons, rows 3 to 5 of every mask that has one, and the rows of their
+# sprite each shows: the plating above the stripe, the stripe, and the plating below it, as the band is
+# drawn on the car.
+BAND_TOP = 3
+BAND_SPRITE_ROWS = (2, 8, 13)
+
+
+def band(pixels):
+    """A window band, three pixels high from BAND_TOP, each row its sprite's row there."""
+    return lambda x, y: pixels[BAND_SPRITE_ROWS[y - BAND_TOP]][x][:3]
+
+
+def flat(colour):
+    return lambda x, y: list(colour)
+
+
+def car_panels():
+    """The panels every car's icon paints: those it shares, and the Rail under it."""
+    return {
+        "R": grained(art("space-plating-plain.png")),
+        "S": grained(art("space-plating-rivets-horizontal.png")),
+        "K": grained(tinted(art("space-plating-inset-horizontal.png"), CAR_TINT["skirt"])),
+        "T": grained(tinted(art("space-plating-plain.png"), CAR_TINT["trim"])),
+        "W": band(art("space-plating-stripe-black-horizontal-undamaged.png")),
+        "G": flat(ICON_DARK),
+        "M": grained(art("gray_cement_horizontal.png")),
+    }
+
+
+def icon(mask, panels):
+    """An item icon from its mask, each letter painted by its panel and '.' clear, its silhouette's edge
+    darkened to an outline and a seam darkened where one panel meets another under it."""
+    def at(x, y):
+        return mask[y][x] if 0 <= x < 16 and 0 <= y < 16 else "."
+
+    out = []
+    for y, line in enumerate(mask):
+        row = []
+        for x, mark in enumerate(line):
+            if mark == ".":
+                row.append([0, 0, 0, 0])
+                continue
+            shade = 1.0
+            if "." in (at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)) or x in (0, 15):
+                shade = ICON_OUTLINE
+            elif at(x, y - 1) != mark:
+                shade = ICON_SEAM
+            row.append([round(c * shade) for c in panels[mark](x, y)] + [255])
+        out.append(row)
+    return out
+
+
+def burner_icon():
+    """The Burner Locomotive: its stack, its firebox door, lit, and its yellow nose band."""
+    panels = car_panels()
+    panels["X"] = grained(tinted(art("steel_block.png"), STACK_TINT))
+    panels["F"] = flat(ICON_FIRE)
+    panels["N"] = stripe(art("space-plating-stripe-yellow-horizontal-undamaged.png"))
+    return icon(BURNER_ICON, panels)
+
+
+def electric_icon():
+    """The Electric Locomotive: no stack, a coil grille and an orange nose band."""
+    panels = car_panels()
+    panels["C"] = grained(coil())
+    panels["N"] = stripe(art("space-plating-stripe-orange-horizontal-undamaged.png"))
+    return icon(ELECTRIC_ICON, panels)
+
+
+def cargo_icon():
+    """The Cargo car: a crate in each of its three recesses."""
+    panels = car_panels()
+    panels["B"] = grained(art("space_crate_sides.png"))
+    return icon(CARGO_ICON, panels)
+
+
+def fluid_icon():
+    """The Fluid car: its copper tank, ringed near each end, its dome and its Sight glass part full."""
+    panels = car_panels()
+    panels["A"] = grained(art("metal_tank_copper_sides.png"))
+    panels["U"] = flat(ICON_FLUID)
+    return icon(FLUID_ICON, panels)
+
+
+def rail_icon():
+    """The Rail: a stub of it laid corner to corner, its steel strip along its top face and grey cement
+    down its side, outlined."""
+    cement = grained(art("gray_cement_horizontal.png"))
+    steel = grained(art("steel_block.png"))
+    out = [[[0, 0, 0, 0] for _ in range(16)] for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            across = x + y
+            along = x - y
+            if abs(along) > 12 or not 13 <= across <= 19:
+                continue
+            edge = abs(along) == 12 or across in (13, 19)
+            pixel = steel(x, y) if across <= 15 else cement(x, y)
+            # The top face lit as a block's top is, over the side.
+            shade = ICON_OUTLINE if edge else (ICON_TOP_LIGHT if across <= 15 else 1.0)
+            out[y][x] = [min(255, round(c * shade)) for c in pixel] + [255]
+    return out
+
+
 # Every texture this script writes, by its path under textures/, with what builds it.
 TEXTURES_BUILT = {
     "block/station/top.png": station_top,
@@ -309,6 +508,11 @@ TEXTURES_BUILT = {
     "block/car/paint.png": white,
     "block/car/sight_glass.png": sight_glass,
     "block/car/glint.png": glint,
+    "item/burner_locomotive.png": burner_icon,
+    "item/electric_locomotive.png": electric_icon,
+    "item/cargo_car.png": cargo_icon,
+    "item/fluid_car.png": fluid_icon,
+    "item/rail.png": rail_icon,
 }
 
 # The animations, by the texture they play, with their .mcmeta.

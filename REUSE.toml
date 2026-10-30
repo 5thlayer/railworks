@@ -69,6 +69,7 @@ path = [
     "src/main/resources/assets/railworks/textures/block/creative_charger/*.png",
     "src/main/resources/assets/railworks/textures/block/car/skirt.png",
     "src/main/resources/assets/railworks/textures/block/car/trim.png",
+    "src/main/resources/assets/railworks/textures/item/*.png",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = ["Malcolm Riley", "2026 5thlayer"]
