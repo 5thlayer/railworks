@@ -33,6 +33,7 @@ import net.minecraft.gametest.framework.StructureUtils;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
@@ -46,14 +47,15 @@ import net.minecraft.world.phys.Vec3;
  * build running every command without failing, and each scene's key block where it stands, the
  * Stations scene's Stations in the level's Stations under their names, the flyover's two lines
  * strung and not joined, and every scene's Clearance inside what {@code gallery/clear} clears, which
- * reaches past a plot's ends as far as its lines' does. Beyond the build, the coupling scene's sign, clicked, builds it again,
- * leaving one Train and nothing loose, and the two logistics scenes are built working: each
- * requester's chest gets what it asks for, as the refuel scene's does once its dry Train is fuelled,
- * the charge scene's once its Train is charged, by a Creative Charger and by a Charger its Burner
- * Generator feeds, the far-away scene's Train fetches ore from its far end out of view, and the Fluid
- * car scene's carries its lava across. How a Train plans and runs its jobs is the mechanics' own
- * game tests' to check, never the Gallery's. Each test turns the pack on, which reloads the server's
- * data, and off again, passing or failing, so each runs in a batch of its own.
+ * reaches past a plot's ends as far as its lines' Clearance does. Beyond the build, the coupling
+ * scene's sign, clicked, builds it again, leaving one Train and nothing loose, and the two logistics
+ * scenes are built working: each requester's chest gets what it asks for, as the refuel scene's does
+ * once its dry Train is fuelled, the charge scene's once its Train is charged, by a Creative Charger
+ * and by a Charger its Burner Generator feeds, the far-away scene's Train fetches ore from its far
+ * end out of view, and the Fluid car scene's carries its lava across. How a Train plans and runs its
+ * jobs is the mechanics' own game tests' to check, never the Gallery's. Each test turns the pack on,
+ * which reloads the server's data, and off again, passing or failing, so each runs in a batch of its
+ * own.
  */
 final class GalleryTests {
 
@@ -66,10 +68,11 @@ final class GalleryTests {
     /** A scene's plot, along its row from {@link GalleryCheck#FIRST_PLOT_EAST} east of where it is run. */
     private static final int PLOT_WIDTH = 40;
     /**
-     * How far past its plot's west and east ends {@code gallery/clear} clears too: the Clearance of a
-     * line ending at an Arm at the plot's second block or its last reaches two blocks past it.
+     * How far past its plot's west end {@code gallery/clear} clears too: the Clearance of a line
+     * ending at an Arm on the plot's second block reaches two blocks past that Arm.
      */
     private static final int REACH_WEST = 1;
+    /** How far past its plot's east end {@code gallery/clear} clears too: two blocks past a line's end Arm on its last block. */
     private static final int REACH_EAST = 2;
     /** A scene's plot, from its sign's row at the origin's z to 14 blocks north. */
     private static final int PLOT_DEPTH = 15;
@@ -220,11 +223,11 @@ final class GalleryTests {
         var at = helper.absolutePos(ORIGIN);
         var plot = plot(at);
         var level = helper.getLevel();
+        var cells = BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ());
         withPack(helper, ONE_SCENE, (source, steps) -> steps.thenExecute(() -> {
-            BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ())
-                    .forEach(pos -> level.setBlock(pos, Blocks.STONE.defaultBlockState(), 2));
+            cells.forEach(pos -> level.setBlock(pos, Blocks.STONE.defaultBlockState(), Block.UPDATE_CLIENTS));
             GalleryCheck.assertRuns(helper, source, GalleryPack.scene(Railworks.MOD_ID, "clear"));
-            for (var pos : BlockPos.betweenClosed(plot.minX(), plot.minY(), plot.minZ(), plot.maxX(), plot.maxY(), plot.maxZ())) {
+            for (var pos : cells) {
                 var expected = pos.getY() == plot.minY() ? Blocks.STONE : Blocks.AIR;
                 helper.assertTrue(level.getBlockState(pos).is(expected),
                         "gallery/clear left " + level.getBlockState(pos) + " at " + pos.toShortString() + ", not " + expected);
