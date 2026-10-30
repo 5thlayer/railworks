@@ -90,13 +90,16 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
      * block starts a block above the flange's underside, and the floor rests on the flange's top.
      */
     private static final float FLOOR = (float) (RailGeometry.FLANGE_HEIGHT - 1.5);
-    /** How high the Loading arm's pipe runs over the car, up from the hatch's middle: just clear of its top. */
-    private static final float OVER_CAR = FLOOR + (float) CarBody.HEIGHT + 0.12F;
+    /**
+     * How high the Loading arm's pipe runs over the car, up from the hatch's middle: far enough over
+     * the dome that the pipe drops into it below the elbow, and clear of the car's top.
+     */
+    private static final float OVER_CAR = FLOOR + (float) CarBody.DOME_TOP + 0.3F;
     /** The Loading arm's pipe's half width. */
     private static final float PIPE = 0.07F;
     /** The Loading arm's elbows' half width. */
     private static final float ELBOW = 0.1F;
-    /** The Loading arm's collar's half width, on the tank's top, inside the dome's. */
+    /** The Loading arm's collar's half width, on the tank's top or its dome. */
     private static final float COLLAR = 0.13F;
     /** A side's pixels, as its texture's, across and up. */
     private static final float PIXELS = 16.0F;
@@ -131,8 +134,8 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
     /** Each hatch's side facing a car, as last worked out, and when; dropped with the hatch. */
     private final Map<HatchBlockEntity, Facing> facing = new WeakHashMap<>();
 
-    /** {@code middle}: whether the hatch stands beside the middle block of its spot, where the Fluid car's dome is. */
-    private record Facing(long at, @Nullable Direction side, boolean middle) {
+    /** {@code toDome}: whether a Loading arm out of {@code side} drops onto the Fluid car's dome. */
+    private record Facing(long at, @Nullable Direction side, boolean toDome) {
     }
 
     @Override
@@ -155,7 +158,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
                 hatch.getBlockState().getBlock() instanceof HatchBlock block ? block.holds() : Goods.Kind.ITEMS);
         Facing facing = facingCar(hatch, level, state.serves);
         state.toCar = facing.side();
-        state.toDome = facing.middle();
+        state.toDome = facing.toDome();
         for (Direction side : Direction.Plane.HORIZONTAL) {
             state.light[side.get2DDataValue()] = LevelRenderer.getLightCoords(level, hatch.getBlockPos().relative(side));
         }
@@ -181,9 +184,11 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         Facing last = facing.get(hatch);
         if (last == null || now - last.at() >= REFRESH_TICKS || now < last.at()) {
             var pos = hatch.getBlockPos();
-            // A car's middle block is its spot's, the one an Engine room stands in.
-            last = new Facing(now, PlatformsNear.facingCar(level, pos, serves).orElse(null),
-                    PlatformsNear.joined(level, pos).map(Platform.Joined::engineRoom).orElse(false));
+            Direction side = PlatformsNear.facingCar(level, pos, serves).orElse(null);
+            // The dome is over the car's middle block, its spot's, the one an Engine room stands in.
+            boolean toDome = side != null && serves == CarKind.FLUID
+                    && PlatformsNear.joined(level, pos).map(Platform.Joined::engineRoom).orElse(false);
+            last = new Facing(now, side, toDome);
             facing.put(hatch, last);
         }
         return last;
@@ -333,7 +338,7 @@ final class HatchRenderer implements BlockEntityRenderer<HatchBlockEntity, Hatch
         // The flange on the hatch, the pipe up to the first elbow, out to the second, then down into the
         // collar. Each pipe starts and ends inside what it joins, and no two are as wide, so no two
         // faces share a plane.
-        boxY(pose, buffer, 0.15F, 0, top - 0.01F, top + 0.05F, Paint.IRON, light);
+        boxY(pose, buffer, 0.15F, 0F, top - 0.01F, top + 0.05F, Paint.IRON, light);
         boxY(pose, buffer, PIPE, 0, top + 0.04F, OVER_CAR, Paint.PIPE, light);
         box(pose, buffer, ELBOW, OVER_CAR, ELBOW, -ELBOW, Paint.IRON, light);
         box(pose, buffer, PIPE + 0.005F, OVER_CAR, -ELBOW + 0.01F, car + ELBOW - 0.01F, Paint.PIPE, light);
