@@ -342,6 +342,7 @@ final class GalleryTests {
     private static void farAwayDelivers(GameTestHelper helper) {
         var at = helper.absolutePos(ORIGIN);
         var plot = plot(at);
+        var strip = farStrip(at);
         // Generated now, as a world played in would have them: the runner ticks faster than chunks
         // generate off the server thread, and the scene would wait on them for longer than it runs.
         var west = at.offset(FAR_WEST);
@@ -353,7 +354,7 @@ final class GalleryTests {
         }
         // Cleared before as after: what an earlier test left on the strip, failing before its own
         // clear, would hold this scene's Spans or stand a second Mine by it.
-        clearFarStrip(helper, farStrip(at));
+        clearFarStrip(helper, strip);
         List<Train> train = new java.util.ArrayList<>();
         boolean[] unseen = {false};
         helper.onEachTick(() -> {
@@ -394,16 +395,17 @@ final class GalleryTests {
                     helper.assertTrue(loose.isEmpty(), "building again left items along the line: " + loose.stream().map(ItemEntity::getItem).toList());
                 })
                 // Off the line, so cutting it derails nothing out of view.
-                .thenWaitUntil(() -> helper.assertTrue(trainsIn(helper, farStrip(at)).isEmpty(), "the Train is still out on the line"))
-                .thenExecute(() -> clearFarStrip(helper, farStrip(at)))
-                .thenExecute(() -> farStripCleared(helper, farStrip(at), train.getFirst()))).thenSucceed();
+                .thenWaitUntil(() -> helper.assertTrue(trainsIn(helper, strip).isEmpty(), "the Train is still out on the line"))
+                .thenExecute(() -> clearFarStrip(helper, strip))
+                .thenExecute(() -> farStripCleared(helper, strip, train.getFirst()))).thenSucceed();
     }
 
     /**
      * Breaks what stands along the far-away scene's line, {@code strip}, as {@code gallery/clear}
      * breaks a plot, its Pylons cutting their Spans and its Station and hatch taking their records with
-     * them, then takes what that dropped. The plot's own clear stops at the plot, and the test grid lays
-     * the next tests along the line, where a second Station named Mine would stop their Trains.
+     * them, then takes the items loose along it. The plot's own clear stops at the plot, and the test
+     * grid lays the next tests along the line, where a second Station named Mine would stop their
+     * Trains; run first, it breaks what an earlier test that failed before its own clear left there.
      */
     private static void clearFarStrip(GameTestHelper helper, BoundingBox strip) {
         var level = helper.getLevel();
