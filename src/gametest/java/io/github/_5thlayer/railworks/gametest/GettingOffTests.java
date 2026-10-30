@@ -184,7 +184,9 @@ final class GettingOffTests {
         LocomotiveEntity car = raised(helper);
         ServerPlayer driver = LocomotiveTests.board(helper, car);
         Pig pig = helper.spawn(EntityType.PIG, FLOOR);
-        pig.startRiding(car);
+        if (!pig.startRiding(car)) {
+            helper.fail("the pig could not be put in the bay", FLOOR);
+        }
         fillStrip(helper, 0, 8, Blocks.LAVA);
         ServerPlayer leader = player(helper);
         leader.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));

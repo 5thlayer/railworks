@@ -641,7 +641,8 @@ public abstract class CarEntity extends VehicleEntity implements HasCustomInvent
      * lava rules the spot out.
      */
     private @Nullable Vec3 floorBelow(LivingEntity passenger, Vec3 from, double top, double bottom) {
-        BlockPos.MutableBlockPos probe = BlockPos.containing(from.x, top, from.z).mutable();
+        // From no higher than the world's top, so a car at the build limit still finds a floor.
+        BlockPos.MutableBlockPos probe = BlockPos.containing(from.x, Math.min(top, level().getMaxY()), from.z).mutable();
         for (; probe.getY() + 1 >= bottom && !level().isOutsideBuildHeight(probe); probe.move(0, -1, 0)) {
             FluidState fluid = level().getFluidState(probe);
             if (fluid.is(FluidTags.LAVA)) {
