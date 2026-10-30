@@ -54,6 +54,12 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         LAMP,
         /** A Fluid car's tank. */
         TANK,
+        /** A Burner Locomotive's firebox door, lit while it holds fuel. */
+        FIREBOX,
+        /** An Electric Locomotive's coil grille, glowing while it holds charge. */
+        COIL,
+        /** A Burner Locomotive's stack. */
+        STACK,
         /** A Sight glass above the fluid it shows. */
         GLASS
     }
@@ -67,6 +73,11 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         /** The same box on the other side of the car. */
         Box mirrored() {
             return new Box(-maxX, minY, minZ, -minX, maxY, maxZ);
+        }
+
+        /** The same box upside down about {@code middle}. */
+        Box upsideDown(double middle) {
+            return new Box(minX, 2.0 * middle - maxY, minZ, maxX, 2.0 * middle - minY, maxZ);
         }
 
         /** The same box at the other end of the car. */
@@ -167,11 +178,13 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
 
     /** Where a Cargo car's crates are along z, one a side at each: over its three inner blocks. */
     private static final double[] CRATES_AT = {-1.0, 0.0, 1.0};
+    /** The height the Locomotive's chin is turned upside down about. */
+    private static final double CHIN_MIDDLE = 0.6;
     /** Half a crate's recess along z. */
     private static final double HALF_RECESS = 0.23;
 
-    public static final CarBody LOCOMOTIVE = locomotive();
-    public static final CarBody ELECTRIC = electric();
+    public static final CarBody LOCOMOTIVE = locomotive(false);
+    public static final CarBody ELECTRIC = locomotive(true);
     public static final CarBody CARGO = cargo();
     public static final CarBody FLUID = fluid();
 
@@ -202,18 +215,18 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
 
     /** A roof from {@code back} to {@code front}, its long edges rounded, and its front's when {@code roundFront}. */
     private static void roof(List<Part> parts, double back, double front, boolean roundFront) {
-        rounded(parts, 1.0, 2.6, 2.75, back, front, false, roundFront);
+        rounded(parts, Panel.ROOF, 1.0, 2.6, 2.75, back, front, false, roundFront);
     }
 
     /**
-     * A {@link Panel#ROOF} {@code halfWidth} either side of the middle, from {@code bottom} to
+     * A slab of {@code panel} {@code halfWidth} either side of the middle, from {@code bottom} to
      * {@code top} and {@code back} to {@code front}, its long top edges, and the ends asked for,
      * rounded on a radius of {@link #ROOF_ROUNDING} in rows {@link #ROUNDING_STEP} high: each row drawn in by
      * how far a quarter circle of that radius falls short of the edge at the row's middle, to the
      * nearest step. The rows that stay full width are one box with the slab under them, so the rows
      * all differ in width; each stands a hair down into the one under it.
      */
-    private static void rounded(List<Part> parts, double halfWidth, double bottom, double top, double back, double front,
+    private static void rounded(List<Part> parts, Panel panel, double halfWidth, double bottom, double top, double back, double front,
                                 boolean roundBack, boolean roundFront) {
         int rows = (int) Math.round(ROOF_ROUNDING / ROUNDING_STEP);
         double[] insets = new double[rows];
@@ -227,12 +240,12 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
             }
         }
         double rowsFrom = top - ROOF_ROUNDING;
-        parts.add(new Part(Panel.ROOF, -halfWidth, bottom, back, halfWidth, rowsFrom + full * ROUNDING_STEP, front));
+        parts.add(new Part(panel, -halfWidth, bottom, back, halfWidth, rowsFrom + full * ROUNDING_STEP, front));
         for (int row = full; row < rows; row++) {
             double inset = insets[row];
             double shortOfEnd = STEP_SHORT * (row - full + 1);
             double lo = rowsFrom + row * ROUNDING_STEP;
-            parts.add(new Part(Panel.ROOF, -halfWidth + inset, lo - STEP_OVERLAP, back + (roundBack ? inset : shortOfEnd),
+            parts.add(new Part(panel, -halfWidth + inset, lo - STEP_OVERLAP, back + (roundBack ? inset : shortOfEnd),
                     halfWidth - inset, lo + ROUNDING_STEP, front - (roundFront ? inset : shortOfEnd)));
         }
     }
@@ -241,11 +254,14 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
      * The Locomotive: a cab at the front, a closed Engine room over its middle block, and an open bay
      * at its back. The cab has a closed back with a door, an open front framed in dark by the roof's
      * edge, two corner pillars and a low dash, with a nose band and two headlights under it, and
-     * an open window in each side, framed by the band. The Engine room is lower than the cab, with
-     * louvres down its sides; it is only drawn. The bay has no roof, only a low wall with a dark rail
+     * an open window in each side, framed by the band. The band is rounded along its top edges and
+     * its front, and a dark chin under it along its bottom ones. The Engine room is lower than the
+     * cab; it is only drawn. On the Burner Locomotive it carries a stack on its roof and a firebox door
+     * in each side with louvres over it, and on the Electric a coil grille in each side, and no stack
+     * (the Rail carries no energy, ADR 0005). The bay has no roof, only a low wall with a dark rail
      * along its sides and back, the Engine room closing it at the front.
      */
-    private static CarBody locomotive() {
+    private static CarBody locomotive(boolean electric) {
         double half = LOCOMOTIVE_LENGTH / 2.0;
         double windowBack = CAB_BACK + WINDOW_FROM_CAB_BACK;
         double windowFront = half - WINDOW_FROM_FRONT;
@@ -268,14 +284,30 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         sides(parts, new Part(Panel.TRIM, 0.8, 0.66, half - 0.14, 0.995, 2.64, half - 0.015));
         parts.add(new Part(Panel.TRIM, -0.99, 2.45, half - 0.05, 0.99, 2.65, half - 0.005));
         parts.add(new Part(Panel.TRIM, -0.81, 0.65, half - 0.12, 0.81, 1.6, half - 0.02));
-        parts.add(new Part(Panel.BURNER_NOSE, -1.0, 0.72, half - 0.04, 1.0, 1.45, half - 0.01));
+        rounded(parts, electric ? Panel.ELECTRIC_NOSE : Panel.BURNER_NOSE, 1.0, 0.72, 1.45, half - 0.2, half - 0.01,
+                false, true);
+        // The chin: a slab rounded as the band is, turned upside down, so its bottom edges are rounded.
+        List<Part> chin = new ArrayList<>();
+        rounded(chin, Panel.SKIRT, 0.993, 0.4, 0.72 + ROOF_ROUNDING, half - 0.3, half - 0.017, false, true);
+        for (Part part : chin) {
+            parts.add(new Part(part.panel(), part.box().upsideDown(CHIN_MIDDLE)));
+        }
         sides(parts, new Part(Panel.LAMP, 0.72, 1.1, half - 0.025, 0.86, 1.3, half));
         // The Engine room, stopping just short of the cab's door, its roof reaching just under the
-        // cab's back wall, and its louvres and a dark band low down its sides, set into its walls.
+        // cab's back wall, and a dark band low down its sides, set into its walls.
         parts.add(new Part(Panel.SHELL, -0.95, 0.69, BAY_FRONT, 0.95, 2.2, CAB_BACK - 0.005));
-        rounded(parts, 0.99, ENGINE_ROOM_TOP - 0.15, ENGINE_ROOM_TOP, BAY_FRONT - 0.02, CAB_BACK + 0.005, true, false);
-        for (double z = BAY_FRONT + 0.2; z + 0.12 < CAB_BACK - 0.1; z += 0.3) {
-            sides(parts, new Part(Panel.TRIM, 0.94, 1.2, z, 0.97, 2.05, z + 0.12));
+        rounded(parts, Panel.ROOF, 0.99, ENGINE_ROOM_TOP - 0.15, ENGINE_ROOM_TOP, BAY_FRONT - 0.02, CAB_BACK + 0.005,
+                true, false);
+        if (electric) {
+            sides(parts, new Part(Panel.COIL, 0.94, 1.05, -0.38, 0.975, 2.05, 0.38));
+        } else {
+            for (double z = BAY_FRONT + 0.2; z + 0.12 < CAB_BACK - 0.1; z += 0.3) {
+                sides(parts, new Part(Panel.TRIM, 0.94, 1.65, z, 0.97, 2.05, z + 0.12));
+            }
+            sides(parts, new Part(Panel.FIREBOX, 0.955, 0.9, -0.28, 0.99, 1.5, 0.28));
+            // The stack, standing down into the roof, and its wider cap.
+            parts.add(new Part(Panel.STACK, -0.13, ENGINE_ROOM_TOP - 0.01, -0.13, 0.13, 2.66, 0.13));
+            parts.add(new Part(Panel.STACK, -0.16, 2.62, -0.16, 0.16, 2.74, 0.16));
         }
         sides(parts, new Part(Panel.SKIRT, 0.945, 0.75, BAY_FRONT + 0.1, 0.98, 1.1, CAB_BACK - 0.1));
         // The bay's low wall along each side and across the back, reaching into the Engine room, and
@@ -285,15 +317,6 @@ public record CarBody(double length, List<Part> parts, List<Box> crates, List<Si
         sides(parts, new Part(Panel.TRIM, 0.91, BAY_WALL_TOP - 0.005, -half, 1.0, BAY_WALL_TOP + 0.08, BAY_FRONT + 0.03));
         parts.add(new Part(Panel.TRIM, -0.995, BAY_WALL_TOP - 0.015, -half + 0.005, 0.995, BAY_WALL_TOP + 0.075, -half + 0.065));
         return new CarBody(LOCOMOTIVE_LENGTH, List.copyOf(parts), List.of(), List.of());
-    }
-
-    /** The Electric Locomotive: the Burner's body, with its own nose band. */
-    private static CarBody electric() {
-        List<Part> parts = new ArrayList<>();
-        for (Part part : LOCOMOTIVE.parts()) {
-            parts.add(part.panel() == Panel.BURNER_NOSE ? new Part(Panel.ELECTRIC_NOSE, part.box()) : part);
-        }
-        return new CarBody(LOCOMOTIVE.length(), List.copyOf(parts), List.of(), List.of());
     }
 
     /**
