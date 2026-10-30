@@ -351,6 +351,9 @@ final class GalleryTests {
                 helper.getLevel().getChunk(cx, cz);
             }
         }
+        // Cleared before as after: what an earlier test left on the strip, failing before its own
+        // clear, would hold this scene's Spans or stand a second Mine by it.
+        clearFarStrip(helper, farStrip(at));
         List<Train> train = new java.util.ArrayList<>();
         boolean[] unseen = {false};
         helper.onEachTick(() -> {
@@ -397,7 +400,7 @@ final class GalleryTests {
     }
 
     /**
-     * Breaks what the far-away scene built along its line, {@code strip}, as {@code gallery/clear}
+     * Breaks what stands along the far-away scene's line, {@code strip}, as {@code gallery/clear}
      * breaks a plot, its Pylons cutting their Spans and its Station and hatch taking their records with
      * them, then takes what that dropped. The plot's own clear stops at the plot, and the test grid lays
      * the next tests along the line, where a second Station named Mine would stop their Trains.
