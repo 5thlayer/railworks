@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "railworks:block/station/side",
+    "down": "railworks:block/station/side",
+    "up": "railworks:block/station/top",
+    "north": "railworks:block/station/side",
+    "east": "railworks:block/station/front",
+    "south": "railworks:block/station/side",
+    "west": "railworks:block/station/side"
+  }
+}

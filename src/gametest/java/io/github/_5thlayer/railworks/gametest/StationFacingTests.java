@@ -35,8 +35,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A Station faces the way it serves (ADR 0008): placed by a real player beside {@link LocomotiveTests}'
  * Span, which runs east from x -1 to x 11 along z 3, its arrow points the way the Trains it serves
- * head, the Trains with it on their drive side, and a Train standing at it is stopped there only
- * when it came in that way. Run driving on the right and, in a batch of their own, on the left. A
+ * head, the Trains with it on their drive side, its terminal faces the Rail, and a Train standing at
+ * it is stopped there only when it came in that way. Run driving on the right and, in a batch of their own, on the left. A
  * Station under the Rail, off the row beside it, or one whose platform would overlap another's, is
  * refused with the reason on the action bar. Where the platform runs and what overlaps is {@code PlatformTest}'s; what only a
  * server shows is the placed block, the level's Stations and real cars. All of these tests share the
@@ -114,6 +114,9 @@ final class StationFacingTests {
         if (arrow != facing) {
             helper.fail("the Station's arrow points " + arrow + ", not " + facing, pos);
         }
+        // The Rail runs along z 3, between the two.
+        Direction rail = pos.getZ() < 3 ? Direction.SOUTH : Direction.NORTH;
+        facesTheRail(helper, pos, rail);
         BlockPos at = helper.absolutePos(pos);
         helper.startSequence()
                 .thenIdle(2)
@@ -128,8 +131,17 @@ final class StationFacingTests {
                     if (helper.getBlockState(pos).getValue(StationBlock.FACING) != facing) {
                         helper.fail("the Station's arrow turned to " + helper.getBlockState(pos).getValue(StationBlock.FACING), pos);
                     }
+                    facesTheRail(helper, pos, rail);
                 })
                 .thenSucceed();
+    }
+
+    /** The Station at {@code pos} has its terminal toward {@code rail}, the way to the Rail. */
+    private static void facesTheRail(GameTestHelper helper, BlockPos pos, Direction rail) {
+        Direction terminal = StationBlock.railward(helper.getBlockState(pos));
+        if (terminal != rail) {
+            helper.fail("the Station's terminal faces " + terminal + ", not the Rail to its " + rail, pos);
+        }
     }
 
     /**

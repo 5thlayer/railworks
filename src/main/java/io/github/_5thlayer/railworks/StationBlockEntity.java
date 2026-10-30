@@ -88,15 +88,15 @@ public final class StationBlockEntity extends BlockEntity {
     }
 
     /**
-     * Turns the block's arrow to the way it serves now, on a server: a Span strung or cut since, or
-     * the drive side changed, may have turned it. Jade asks afresh each time, so it is never behind.
+     * Turns the block's arrow to the way it serves now, and its terminal to the Rail, on a server: a
+     * Span strung or cut since, or the drive side changed, may have turned them. Jade asks afresh each
+     * time, so it is never behind.
      */
     void face() {
         if (level instanceof ServerLevel server && getBlockState().hasProperty(StationBlock.FACING)) {
-            StationBlock.serving(LevelRails.of(server).network(), worldPosition)
-                    .filter(way -> getBlockState().getValue(StationBlock.FACING) != way)
-                    .ifPresent(way -> server.setBlock(worldPosition,
-                            getBlockState().setValue(StationBlock.FACING, way), Block.UPDATE_CLIENTS));
+            StationBlock.faced(getBlockState(), LevelRails.of(server).network(), worldPosition)
+                    .filter(faced -> faced != getBlockState())
+                    .ifPresent(faced -> server.setBlock(worldPosition, faced, Block.UPDATE_CLIENTS));
         }
     }
 

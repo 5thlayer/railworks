@@ -3,10 +3,12 @@
 
 package io.github._5thlayer.railworks;
 
+import java.util.Locale;
 import java.util.Optional;
 
 import io.github._5thlayer.railworks.network.StationMenuPacket;
 import io.github._5thlayer.railworks.rail.Arm;
+import io.github._5thlayer.railworks.rail.DriveSide;
 import io.github._5thlayer.railworks.rail.RailNetwork;
 import io.github._5thlayer.railworks.rail.Station;
 import net.minecraft.core.BlockPos;
@@ -14,6 +16,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -35,9 +38,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A Station: a named block beside the Rail, which a Train arriving its serving way stops at (ADRs
- * 0007, 0008). Its {@link #FACING} is that way, which the arrow on its top shows: set as it is
- * placed and looked at again as it loads and every couple of seconds after, from the Rail by it and
- * the drive side. Using it opens its menu,
+ * 0007, 0008). Its {@link #FACING} is that way, which the arrow on its top shows, and its {@link
+ * #DRIVE_SIDE} the side of the Rail it stands on, which turns its terminal to the Rail: both set as it
+ * is placed and looked at again as it loads and every couple of seconds after, from the Rail by it
+ * and the drive side. Using it opens its menu,
  * where it is named. Breaking it takes it out of the level's Stations.
  */
 public final class StationBlock extends Block implements EntityBlock {
@@ -45,23 +49,59 @@ public final class StationBlock extends Block implements EntityBlock {
     public static final String BLOCK_NAME = "station";
     /** The way the Trains it serves head, for the arrow on its top. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+    /**
+     * The side of the Rail it stands on, seen the way it faces, for the terminal that faces the Rail:
+     * the drive side it was faced under.
+     */
+    public static final EnumProperty<Side> DRIVE_SIDE = EnumProperty.create("drive_side", Side.class);
+
+    /** {@link DriveSide} as a blockstate value. */
+    public enum Side implements StringRepresentable {
+        RIGHT, LEFT;
+
+        static Side of(DriveSide side) {
+            return side == DriveSide.RIGHT ? RIGHT : LEFT;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
 
     public StationBlock(BlockBehaviour.Properties props) {
         super(props.strength(2.0F).sound(SoundType.METAL));
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH)
+                .setValue(DRIVE_SIDE, Side.of(DriveSide.DEFAULT)));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, DRIVE_SIDE);
     }
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockPos pos = context.getClickedPos();
-        return serving(PlatformsNear.network(context.getLevel()), pos)
-                .map(way -> defaultBlockState().setValue(FACING, way))
+        return faced(defaultBlockState(), PlatformsNear.network(context.getLevel()), context.getClickedPos())
                 .orElse(defaultBlockState());
+    }
+
+    /**
+     * {@code state} as a Station at {@code pos} faces: the way it serves and the drive side it serves
+     * on. Empty by no Rail.
+     */
+    static Optional<BlockState> faced(BlockState state, RailNetwork network, BlockPos pos) {
+        return serving(network, pos).map(way -> state.setValue(FACING, way)
+                .setValue(DRIVE_SIDE, Side.of(DriveSide.current())));
+    }
+
+    /**
+     * The way from a Station in {@code state} to the Rail, which its terminal faces: to the left of the
+     * way it serves when it stands on the right, and to the right when on the left.
+     */
+    public static Direction railward(BlockState state) {
+        Direction way = state.getValue(FACING);
+        return state.getValue(DRIVE_SIDE) == Side.RIGHT ? way.getCounterClockWise() : way.getClockWise();
     }
 
     /**

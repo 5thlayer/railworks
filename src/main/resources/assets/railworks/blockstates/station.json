@@ -1,8 +1,12 @@
 {
   "variants": {
-    "facing=north": {"model": "railworks:block/station"},
-    "facing=east": {"model": "railworks:block/station", "y": 90},
-    "facing=south": {"model": "railworks:block/station", "y": 180},
-    "facing=west": {"model": "railworks:block/station", "y": 270}
+    "drive_side=right,facing=north": {"model": "railworks:block/station"},
+    "drive_side=right,facing=east": {"model": "railworks:block/station", "y": 90},
+    "drive_side=right,facing=south": {"model": "railworks:block/station", "y": 180},
+    "drive_side=right,facing=west": {"model": "railworks:block/station", "y": 270},
+    "drive_side=left,facing=north": {"model": "railworks:block/station_driving_left"},
+    "drive_side=left,facing=east": {"model": "railworks:block/station_driving_left", "y": 90},
+    "drive_side=left,facing=south": {"model": "railworks:block/station_driving_left", "y": 180},
+    "drive_side=left,facing=west": {"model": "railworks:block/station_driving_left", "y": 270}
   }
 }
