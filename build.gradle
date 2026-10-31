@@ -19,7 +19,7 @@ libworks {
     upstream('groundworks') {
         // Groundworks' tags are v<version>.
         tagPrefix = 'v'
-        range = '[0.6.3,0.7)'
+        range = '[0.7.0,0.8)'
     }
     // Nested by jar-in-jar: the Works tab the whole suite shares, and from 0.1.8 libworks-gametest on
     // the game tests' classpath (5thlayer/libworks ADR 0008).
