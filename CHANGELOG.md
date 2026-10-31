@@ -3,6 +3,8 @@
 Written for Consumers: what a mod building against Railworks can use, or will see change. A published version never changes: a fix is the next patch (`docs/agents/releases.md`).
 
 ## Unreleased
+
+## 0.2.1
 - Railworks now requires Groundworks 0.7 (`[0.7.0,0.8)`), the one the -works mods load together; it no longer loads with Groundworks 0.6.
 
 ## 0.2.0
